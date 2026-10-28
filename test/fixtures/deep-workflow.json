@@ -1,0 +1,141 @@
+{
+  "mode": "deep",
+  "tasks": [
+    {
+      "id": "analysis.market",
+      "dependsOn": [],
+      "inputTasks": []
+    },
+    {
+      "id": "analysis.fundamentals",
+      "dependsOn": [],
+      "inputTasks": []
+    },
+    {
+      "id": "analysis.macro",
+      "dependsOn": [],
+      "inputTasks": []
+    },
+    {
+      "id": "analysis.business",
+      "dependsOn": [],
+      "inputTasks": []
+    },
+    {
+      "id": "analysis.geopolitics",
+      "dependsOn": [],
+      "inputTasks": []
+    },
+    {
+      "id": "analysis.sentiment",
+      "dependsOn": [],
+      "inputTasks": []
+    },
+    {
+      "id": "analysis.public",
+      "dependsOn": [],
+      "inputTasks": []
+    },
+    {
+      "id": "digest.analysis",
+      "dependsOn": [
+        "analysis.market",
+        "analysis.fundamentals",
+        "analysis.macro",
+        "analysis.business",
+        "analysis.geopolitics",
+        "analysis.sentiment",
+        "analysis.public"
+      ],
+      "inputTasks": [
+        "analysis.market",
+        "analysis.fundamentals",
+        "analysis.macro",
+        "analysis.business",
+        "analysis.geopolitics",
+        "analysis.sentiment",
+        "analysis.public"
+      ]
+    },
+    {
+      "id": "debate.1.bull",
+      "dependsOn": ["digest.analysis"],
+      "inputTasks": ["digest.analysis"]
+    },
+    {
+      "id": "debate.1.bear",
+      "dependsOn": ["digest.analysis"],
+      "inputTasks": ["digest.analysis"]
+    },
+    {
+      "id": "digest.debate.1",
+      "dependsOn": ["digest.analysis", "debate.1.bull", "debate.1.bear"],
+      "inputTasks": ["digest.analysis", "debate.1.bull", "debate.1.bear"]
+    },
+    {
+      "id": "debate.2.bull",
+      "dependsOn": ["digest.debate.1"],
+      "inputTasks": ["digest.debate.1"]
+    },
+    {
+      "id": "debate.2.bear",
+      "dependsOn": ["digest.debate.1"],
+      "inputTasks": ["digest.debate.1"]
+    },
+    {
+      "id": "digest.debate.2",
+      "dependsOn": ["digest.debate.1", "debate.2.bull", "debate.2.bear"],
+      "inputTasks": ["digest.debate.1", "debate.2.bull", "debate.2.bear"]
+    },
+    {
+      "id": "manager.research",
+      "dependsOn": ["digest.debate.2"],
+      "inputTasks": ["digest.debate.2"]
+    },
+    {
+      "id": "digest.plan",
+      "dependsOn": ["digest.debate.2", "manager.research"],
+      "inputTasks": ["digest.debate.2", "manager.research"]
+    },
+    {
+      "id": "risk.finance",
+      "dependsOn": ["digest.plan"],
+      "inputTasks": ["digest.plan"]
+    },
+    {
+      "id": "risk.valuation",
+      "dependsOn": ["digest.plan"],
+      "inputTasks": ["digest.plan"]
+    },
+    {
+      "id": "risk.events",
+      "dependsOn": ["digest.plan"],
+      "inputTasks": ["digest.plan"]
+    },
+    {
+      "id": "digest.risk",
+      "dependsOn": [
+        "digest.plan",
+        "risk.finance",
+        "risk.valuation",
+        "risk.events"
+      ],
+      "inputTasks": [
+        "digest.plan",
+        "risk.finance",
+        "risk.valuation",
+        "risk.events"
+      ]
+    },
+    {
+      "id": "manager.decision",
+      "dependsOn": ["digest.risk"],
+      "inputTasks": ["digest.risk"]
+    },
+    {
+      "id": "finalize",
+      "dependsOn": ["digest.risk", "manager.decision"],
+      "inputTasks": ["digest.risk", "manager.decision"]
+    }
+  ]
+}

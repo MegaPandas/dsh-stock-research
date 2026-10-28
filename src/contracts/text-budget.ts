@@ -1,0 +1,1 @@
+export const TEXT_BUDGET_MAX_MULTIPLIER = 1.5;

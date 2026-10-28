@@ -1,0 +1,20 @@
+{
+  "version": "e4dfe4fff6d43d132671233c249d77d0",
+  "result": {
+    "pages": 1,
+    "data": [
+      {
+        "SECUCODE": "600519.SH",
+        "SECURITY_CODE": "600519",
+        "REPORT_DATE": "2024-03-31 00:00:00",
+        "NOTICE_DATE": "2025-04-30 00:00:00",
+        "TOTAL_OPERATE_INCOME": 46484738134.23,
+        "PARENT_NETPROFIT": 24065262374.15
+      }
+    ],
+    "count": 1
+  },
+  "success": true,
+  "message": "ok",
+  "code": 0
+}

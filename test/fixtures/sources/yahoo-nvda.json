@@ -1,0 +1,107 @@
+{
+  "chart": {
+    "result": [
+      {
+        "meta": {
+          "currency": "USD",
+          "symbol": "NVDA",
+          "exchangeName": "NMS",
+          "fullExchangeName": "NasdaqGS",
+          "instrumentType": "EQUITY",
+          "firstTradeDate": 917015400,
+          "regularMarketTime": 1792785600,
+          "hasPrePostMarketData": true,
+          "gmtoffset": -14400,
+          "timezone": "EDT",
+          "exchangeTimezoneName": "America/New_York",
+          "regularMarketPrice": 210.96,
+          "regularMarketChangePercent": -0.589,
+          "fulldayPrice": 210.96,
+          "fulldayChange": -1.096,
+          "fulldayChangePercent": -0.516,
+          "fiftyTwoWeekHigh": 243.37,
+          "fiftyTwoWeekLow": 164.27,
+          "regularMarketDayHigh": 213.85,
+          "regularMarketDayLow": 210.18,
+          "regularMarketVolume": 79740563,
+          "longName": "NVIDIA Corporation",
+          "shortName": "NVIDIA Corporation",
+          "chartPreviousClose": 49.522,
+          "priceHint": 2,
+          "currentTradingPeriod": {
+            "pre": {
+              "timezone": "EDT",
+              "end": 1792762200,
+              "start": 1792742400,
+              "gmtoffset": -14400
+            },
+            "regular": {
+              "timezone": "EDT",
+              "end": 1792785600,
+              "start": 1792762200,
+              "gmtoffset": -14400
+            },
+            "post": {
+              "timezone": "EDT",
+              "end": 1792800000,
+              "start": 1792785600,
+              "gmtoffset": -14400
+            }
+          },
+          "dataGranularity": "1d",
+          "range": "",
+          "validRanges": [
+            "1d",
+            "5d",
+            "1mo",
+            "3mo",
+            "6mo",
+            "1y",
+            "2y",
+            "5y",
+            "10y",
+            "ytd",
+            "max"
+          ]
+        },
+        "timestamp": [
+          1704205800, 1704292200, 1704378600, 1704465000, 1704724200, 1704810600
+        ],
+        "indicators": {
+          "quote": [
+            {
+              "close": [
+                48.167999267578125, 47.569000244140625, 47.99800109863281,
+                49.09700012207031, 52.25299835205078, 53.13999938964844
+              ],
+              "volume": [
+                411254000, 320896000, 306535000, 415039000, 642510000, 773100000
+              ],
+              "low": [
+                47.595001220703125, 47.31999969482422, 47.507999420166016,
+                48.305999755859375, 49.479000091552734, 51.689998626708984
+              ],
+              "high": [
+                49.29499816894531, 48.183998107910156, 48.5, 49.547000885009766,
+                52.275001525878906, 54.32500076293945
+              ],
+              "open": [
+                49.24399948120117, 47.48500061035156, 47.766998291015625,
+                48.46200180053711, 49.512001037597656, 52.4010009765625
+              ]
+            }
+          ],
+          "adjclose": [
+            {
+              "adjclose": [
+                48.028785705566406, 47.43152618408203, 47.859283447265625,
+                48.955108642578125, 52.101985931396484, 52.986419677734375
+              ]
+            }
+          ]
+        }
+      }
+    ],
+    "error": null
+  }
+}

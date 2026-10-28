@@ -1,0 +1,201 @@
+{
+  "name": "dsh-stock-research",
+  "version": "0.1.0-rc.1",
+  "private": true,
+  "description": "Evidence-based single-stock research for DSH",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": "24.16.0",
+    "dsh": ">0.2.1-rc.1"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.mts",
+      "import": "./dist/index.mjs"
+    },
+    "./core": {
+      "types": "./dist/core.d.mts",
+      "import": "./dist/core.mjs"
+    },
+    "./tools": {
+      "types": "./dist/tools.d.mts",
+      "import": "./dist/tools.mjs"
+    },
+    "./runtime": {
+      "types": "./dist/runtime.d.mts",
+      "import": "./dist/runtime.mjs"
+    },
+    "./ask": {
+      "types": "./dist/ask.d.mts",
+      "import": "./dist/ask.mjs"
+    },
+    "./review": {
+      "types": "./dist/review.d.mts",
+      "import": "./dist/review.mjs"
+    },
+    "./application": {
+      "types": "./dist/application.d.mts",
+      "import": "./dist/application.mjs"
+    },
+    "./role": {
+      "types": "./dist/role.d.mts",
+      "import": "./dist/role.mjs"
+    },
+    "./package.json": "./package.json",
+    "./quick": {
+      "types": "./dist/quick.d.mts",
+      "import": "./dist/quick.mjs"
+    },
+    "./client": {
+      "types": "./dist/client.d.ts",
+      "default": "./dist/client.js"
+    }
+  },
+  "files": [
+    "dist",
+    "cordis.patch.yml"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-settings",
+        "@deepseek-ai/dsh-client-ui-renderer",
+        "@deepseek-ai/dsh-api-remotes",
+        "@deepseek-ai/dsh-api-job-controller",
+        "@deepseek-ai/dsh-client-ui-conversation",
+        "@deepseek-ai/dsh-client-ui-chat"
+      ]
+    }
+  },
+  "scripts": {
+    "build": "tsdown",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:package": "node scripts/check-package.mjs",
+    "test:tools-package": "node scripts/check-tools.mjs",
+    "test:runtime-package": "node scripts/check-runtime.mjs",
+    "test:application-package": "node scripts/check-application.mjs",
+    "test:install": "node scripts/check-install.mjs",
+    "bench:indicators": "node --expose-gc scripts/benchmark-indicators.mjs",
+    "bench:cache": "node scripts/benchmark-cache.mjs",
+    "bench:market": "node scripts/benchmark-market.mjs",
+    "bench:runs": "node scripts/benchmark-runs.mjs",
+    "bench:memory": "node scripts/benchmark-memory.mjs",
+    "bench:memory-service": "node scripts/benchmark-memory-service.mjs",
+    "bench:report": "node scripts/benchmark-report.mjs",
+    "bench:run-service": "node scripts/benchmark-run-service.mjs",
+    "bench:run-control": "node scripts/benchmark-run-control.mjs",
+    "bench:run-data": "node scripts/benchmark-run-data.mjs",
+    "bench:query": "node scripts/benchmark-query.mjs",
+    "bench:replay": "node scripts/benchmark-replay.mjs",
+    "bench:numbers": "node scripts/benchmark-numbers.mjs",
+    "bench:decisions": "node scripts/benchmark-decisions.mjs",
+    "bench:digests": "node scripts/benchmark-digests.mjs",
+    "check:market": "node scripts/check-market.mjs",
+    "collect:data": "node --use-env-proxy scripts/collect-data.mjs",
+    "check:ask": "node --use-env-proxy scripts/check-ask.mjs",
+    "check:quick": "node --use-env-proxy scripts/check-quick.mjs",
+    "check:research": "node --use-env-proxy scripts/check-research.mjs",
+    "check:byd-income": "node --use-env-proxy scripts/check-byd-income.mjs",
+    "check:eastmoney": "node --use-env-proxy scripts/check-eastmoney.mjs",
+    "lint": "eslint .",
+    "format": "prettier --write src test scripts *.json *.ts *.mjs",
+    "format:check": "prettier --check src test scripts *.json *.ts *.mjs"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "^4.0.5",
+    "@deepseek-ai/cordis-plugin-loader": "^1.0.6",
+    "@deepseek-ai/dsh-agent": ">0.2.1-rc.1",
+    "@deepseek-ai/dsh-commands": ">0.2.1-rc.1",
+    "@deepseek-ai/dsh-fs": ">0.2.1-rc.1",
+    "@deepseek-ai/dsh-jobs": ">0.2.1-rc.1",
+    "@deepseek-ai/dsh-llm": ">0.2.1-rc.1",
+    "@deepseek-ai/dsh-session": ">0.2.1-rc.1",
+    "@deepseek-ai/dsh-settings": ">0.2.1-rc.1",
+    "@deepseek-ai/dsh-subagent": ">0.2.1-rc.1",
+    "@deepseek-ai/dsh-system-prompt": ">0.2.1-rc.1",
+    "@deepseek-ai/dsh-tools": ">0.2.1-rc.1",
+    "@deepseek-ai/dsh-user-approval": ">0.2.1-rc.1",
+    "@deepseek-ai/dsh-web": ">0.2.1-rc.1",
+    "@deepseek-ai/schemastery": "^3.18.5"
+  },
+  "peerDependenciesMeta": {
+    "@deepseek-ai/dsh-user-approval": {
+      "optional": true
+    },
+    "@deepseek-ai/dsh-web": {
+      "optional": true
+    },
+    "@deepseek-ai/dsh-settings": {
+      "optional": true
+    }
+  },
+  "overrides": {
+    "zod": "4.6.6"
+  },
+  "devDependencies": {
+    "@deepseek-ai/cordis": "4.0.5",
+    "@deepseek-ai/cordis-plugin-include": "1.0.10",
+    "@deepseek-ai/cordis-plugin-loader": "1.0.6",
+    "@deepseek-ai/dsh-agent": "0.2.1-rc.4",
+    "@deepseek-ai/dsh-agent-loop": "0.2.1-rc.4",
+    "@deepseek-ai/dsh-agent-loop-testkit": "0.2.1-rc.4",
+    "@deepseek-ai/dsh-agent-preset-registry": "0.2.1-rc.4",
+    "@deepseek-ai/dsh-api-job-controller": "0.2.1-rc.4",
+    "@deepseek-ai/dsh-api-remotes": "0.2.1-rc.4",
+    "@deepseek-ai/dsh-api-session-controller": "0.2.1-rc.4",
+    "@deepseek-ai/dsh-client-locale": "0.2.1-rc.4",
+    "@deepseek-ai/dsh-client-modules": "0.2.1-rc.4",
+    "@deepseek-ai/dsh-client-store": "0.2.1-rc.4",
+    "@deepseek-ai/dsh-client-ui-chat": "0.2.1-rc.4",
+    "@deepseek-ai/dsh-client-ui-conversation": "0.2.1-rc.4",
+    "@deepseek-ai/dsh-client-ui-renderer": "0.2.1-rc.4",
+    "@deepseek-ai/dsh-client-ui-settings": "0.2.1-rc.4",
+    "@deepseek-ai/dsh-client-ui-slots": "0.2.1-rc.4",
+    "@deepseek-ai/dsh-commands": "0.2.1-rc.4",
+    "@deepseek-ai/dsh-config-editor": "0.2.1-rc.4",
+    "@deepseek-ai/dsh-fs": "0.2.1-rc.4",
+    "@deepseek-ai/dsh-jobs": "0.2.1-rc.4",
+    "@deepseek-ai/dsh-jobs-local": "0.2.1-rc.4",
+    "@deepseek-ai/dsh-launch-environment": "0.2.1-rc.4",
+    "@deepseek-ai/dsh-llm": "0.2.1-rc.4",
+    "@deepseek-ai/dsh-llm-pi-ai": "0.2.1-rc.4",
+    "@deepseek-ai/dsh-session": "0.2.1-rc.4",
+    "@deepseek-ai/dsh-session-persistence": "0.2.1-rc.4",
+    "@deepseek-ai/dsh-session-persistence-jsonl": "0.2.1-rc.4",
+    "@deepseek-ai/dsh-session-query-sqlite": "0.2.1-rc.4",
+    "@deepseek-ai/dsh-settings": "0.2.1-rc.4",
+    "@deepseek-ai/dsh-subagent": "0.2.1-rc.4",
+    "@deepseek-ai/dsh-subagent-spawn-in-process": "0.2.1-rc.4",
+    "@deepseek-ai/dsh-system-prompt": "0.2.1-rc.4",
+    "@deepseek-ai/dsh-tool-subagent": "0.2.1-rc.4",
+    "@deepseek-ai/dsh-tools": "0.2.1-rc.4",
+    "@deepseek-ai/dsh-user-approval": "0.2.1-rc.4",
+    "@deepseek-ai/dsh-web": "0.2.1-rc.4",
+    "@deepseek-ai/schemastery": "3.18.5",
+    "@eslint/js": "10.0.1",
+    "@testing-library/react": "16.3.0",
+    "@types/node": "24.13.6",
+    "@types/react": "18.3.26",
+    "@types/react-dom": "18.3.7",
+    "@types/semver": "7.7.1",
+    "eslint": "10.13.0",
+    "immer": "10.2.0",
+    "jsdom": "27.0.1",
+    "prettier": "3.9.10",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "semver": "7.7.3",
+    "tsdown": "0.23.2",
+    "typescript": "5.9.3",
+    "typescript-eslint": "8.72.0",
+    "vitest": "5.0.5",
+    "yaml": "2.9.1",
+    "zustand": "4.5.7"
+  }
+}

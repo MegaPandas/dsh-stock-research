@@ -1,0 +1,14 @@
+- insert:
+    - id: stock-research
+      name: dsh-stock-research
+      config:
+        runtime:
+          dataRoot: !!js "ctx.dshHomePath('stock-research')"
+          enabledSources: [yahoo, eastmoney-market, tencent, eastmoney-income, sina, china-macro, benchmarks, fred, dsh-web]
+          http: { timeoutMs: 15000, maxConcurrency: 1, minIntervalMs: 2000 }
+          cache:
+            maxEntries: 1000
+            ttl: { market: 3600000, fundamentals: 86400000, macro: 86400000, research: 3600000 }
+          policy:
+            freshness: { market: 86400000, fundamentals: 17280000000, macro: 3888000000 }
+            secCiks: {}

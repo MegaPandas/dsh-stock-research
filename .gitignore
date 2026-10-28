@@ -1,0 +1,17 @@
+# Dependencies and generated files
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+*.tgz
+
+# Local environment and credentials
+.env
+.env.*
+!.env.example
+/.aws/
+/.agents/
+/.codex/
+
+# Documentation is managed in a separate local repository
+/docs/
