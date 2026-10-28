@@ -171,14 +171,14 @@ export function workflowModel(
           current.tasks = feedback.tasks!;
           current.view = feedback.view!;
         } else if (
-          current.lastAction === "stock_read" &&
+          current.lastAction === "stock_read_run" &&
           feedback.kind === "run_view"
         )
           current.view = feedback.view!;
         else if (current.lastAction === "stock_review_stage")
           current.view = feedback as unknown as RunView;
         else if (
-          current.lastAction === "stock_read" &&
+          current.lastAction === "stock_read_artifact" &&
           feedback.artifact !== undefined
         ) {
           if (feedback.artifact.content.kind === "report")
@@ -193,7 +193,7 @@ export function workflowModel(
             feedback.refs?.[0] !== undefined
           )
             state.marketRef = feedback.refs[0];
-          yield* invoke("stock_read", { kind: "run_view", runId: state.runId });
+          yield* invoke("stock_read_run", { runId: state.runId });
           return;
         }
       }
@@ -207,7 +207,7 @@ export function workflowModel(
             view.tasks
               .find(({ taskId }) => taskId === "finalize")!
               .outputRefs.at(-1)!;
-          yield* invoke("stock_read", { kind: "artifact", ref: reportRef });
+          yield* invoke("stock_read_artifact", { ref: reportRef });
         } else
           yield* textResponse(
             `运行 ${view.runId} 已完成。\n\n${current.finalReport}`,
@@ -241,7 +241,7 @@ export function workflowModel(
         );
         if (unseen !== undefined) {
           current.inspected.add(JSON.stringify(unseen));
-          yield* invoke("stock_read", { kind: "artifact", ref: unseen });
+          yield* invoke("stock_read_artifact", { ref: unseen });
           return;
         }
         const reject =

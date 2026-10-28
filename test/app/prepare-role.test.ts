@@ -197,100 +197,110 @@ describe("persisted research role preparation", () => {
     expect(JSON.stringify(input)).not.toContain(runId);
   });
 
-  it("assigns equity benchmarks to market and external prices and rates to macro", async () => {
-    const h = await host();
-    const snapshot = collection(h.scope);
-    for (const [id, title, unit, dataset, attributes] of [
-      [
-        "benchmark.shanghai.daily",
-        "上证指数日线",
-        "index",
-        "market",
-        { assetCode: "CN:000001.SH", assetType: "index" },
-      ],
-      [
-        "benchmark.gold.daily",
-        "现货黄金日线",
-        "USD/troy_ounce",
-        "market",
-        { assetCode: "XAU/USD", assetType: "gold", instrument: "spot" },
-      ],
-      [
-        "benchmark.bondYields",
-        "中美10年期收益率",
-        "percent",
-        "macro",
-        undefined,
-      ],
-    ] as const) {
-      const envelope = structuredClone(snapshot.packets[0]!.envelope);
-      envelope.dataset = dataset;
-      envelope.data = {
-        table: id,
-        title,
-        interval: "1d",
-        columns: { close: { label: title, unit } },
-        basis: "source_reported",
-        ...(attributes && { attributes: { ...attributes } }),
-        rows: [
-          {
-            date: "2024-01-03",
-            asOf: envelope.asOf,
-            availableAt: null,
-            complete: true,
-            values: { close: 100 },
-          },
+  it.each(["22", "23"])(
+    "assigns equity benchmarks to market and external prices and rates to macro under role protocol %s",
+    async (version) => {
+      const h = await host();
+      h.input.versions.prompts.roles = version;
+      const snapshot = collection(h.scope);
+      for (const [id, title, unit, dataset, attributes] of [
+        [
+          "benchmark.shanghai.daily",
+          "上证指数日线",
+          "index",
+          "market",
+          { assetCode: "CN:000001.SH", assetType: "index" },
         ],
-      };
-      snapshot.packets.push({ id, envelope });
-    }
-    attachCollection(h.input, snapshot);
-    const { runId } = h.runtime.runs.open("owner", h.input, "open-benchmarks");
-    for (const [taskId, expected] of [
-      ["analysis.market", ["market.daily", "benchmark.shanghai.daily"]],
-      [
-        "analysis.macro",
-        ["macro.dgs10", "benchmark.gold.daily", "benchmark.bondYields"],
-      ],
-    ] as const) {
-      const context = h.runtime.runs.dispatchForCall(
-        { runId, identity: "owner" },
-        taskId,
-        taskId,
-      );
-      const prepared = prompt(prepareResearchRole(h.runtime, context));
-      expect(
-        prepared.context.dataCatalog.map((source: { id: string }) => source.id),
-      ).toEqual(expected);
-      if (taskId === "analysis.market") continue;
-      expect(prepared.context.dataCatalog).toContainEqual(
-        expect.objectContaining({
-          id: "benchmark.gold.daily",
-          title: "现货黄金日线",
+        [
+          "benchmark.gold.daily",
+          "现货黄金日线",
+          "USD/troy_ounce",
+          "market",
+          { assetCode: "XAU/USD", assetType: "gold", instrument: "spot" },
+        ],
+        [
+          "benchmark.bondYields",
+          "中美10年期收益率",
+          "percent",
+          "macro",
+          undefined,
+        ],
+      ] as const) {
+        const envelope = structuredClone(snapshot.packets[0]!.envelope);
+        envelope.dataset = dataset;
+        envelope.data = {
+          table: id,
+          title,
           interval: "1d",
+          columns: { close: { label: title, unit } },
           basis: "source_reported",
-        }),
+          ...(attributes && { attributes: { ...attributes } }),
+          rows: [
+            {
+              date: "2024-01-03",
+              asOf: envelope.asOf,
+              availableAt: null,
+              complete: true,
+              values: { close: 100 },
+            },
+          ],
+        };
+        snapshot.packets.push({ id, envelope });
+      }
+      attachCollection(h.input, snapshot);
+      const { runId } = h.runtime.runs.open(
+        "owner",
+        h.input,
+        "open-benchmarks",
       );
-      const gold = h.runtime.runs
-        .numberContext(runId)
-        .evidence.find(
-          (entry) =>
-            entry.taskId === taskId &&
-            entry.callId === "collection:benchmark.gold.daily",
-        )!;
-      expect(
-        h.runtime.runs.readEvidence({ runId, evidenceId: gold.evidenceId })
-          .envelope.data,
-      ).toMatchObject({
-        attributes: {
-          assetCode: "XAU/USD",
-          assetType: "gold",
-          instrument: "spot",
-        },
-        columns: { close: { label: "现货黄金日线", unit: "USD/troy_ounce" } },
-      });
-    }
-  });
+      for (const [taskId, expected] of [
+        ["analysis.market", ["market.daily", "benchmark.shanghai.daily"]],
+        [
+          "analysis.macro",
+          ["macro.dgs10", "benchmark.gold.daily", "benchmark.bondYields"],
+        ],
+      ] as const) {
+        const context = h.runtime.runs.dispatchForCall(
+          { runId, identity: "owner" },
+          taskId,
+          taskId,
+        );
+        const prepared = prompt(prepareResearchRole(h.runtime, context));
+        expect(
+          prepared.context.dataCatalog.map(
+            (source: { id: string }) => source.id,
+          ),
+        ).toEqual(expected);
+        if (taskId === "analysis.market") continue;
+        expect(prepared.context.dataCatalog).toContainEqual(
+          expect.objectContaining({
+            id: "benchmark.gold.daily",
+            title: "现货黄金日线",
+            interval: "1d",
+            basis: "source_reported",
+          }),
+        );
+        const gold = h.runtime.runs
+          .numberContext(runId)
+          .evidence.find(
+            (entry) =>
+              entry.taskId === taskId &&
+              entry.callId === "collection:benchmark.gold.daily",
+          )!;
+        expect(
+          h.runtime.runs.readEvidence({ runId, evidenceId: gold.evidenceId })
+            .envelope.data,
+        ).toMatchObject({
+          attributes: {
+            assetCode: "XAU/USD",
+            assetType: "gold",
+            instrument: "spot",
+          },
+          columns: { close: { label: "现货黄金日线", unit: "USD/troy_ounce" } },
+        });
+      }
+    },
+  );
 
   it("shares the appropriate collected datasets with the additional deep analysts", async () => {
     const h = await host();
@@ -366,7 +376,6 @@ describe("persisted research role preparation", () => {
     const exec = { signal: new AbortController().signal } as ToolRunContext;
     const rows = await read.execute(
       {
-        kind: "rows",
         table: "market.daily",
         fields: ["close"],
         offset: 0,
@@ -380,7 +389,9 @@ describe("persisted research role preparation", () => {
     expect(rows).not.toHaveProperty("candidateClaims");
     expect(rows).not.toHaveProperty("sourceRef");
     await expect(
-      read.execute({ kind: "schema", table: "financial.indicators" }, exec),
+      provision.tools
+        .find((tool) => tool.name === "stock_describe_collection")!
+        .execute({ table: "financial.indicators" }, exec),
     ).rejects.toMatchObject({ code: "DATA_INSUFFICIENT" });
     expect(JSON.stringify(prepared)).not.toContain('"rows":');
     expect(prompt(prepareResearchRole(h.runtime, context))).toEqual(prepared);
@@ -429,7 +440,13 @@ describe("persisted research role preparation", () => {
     expect(prepared).not.toHaveProperty("secIssuerConfigured");
     expect(provision.agentPreset).toBeUndefined();
     expect(provision.systemPrompt).toBe(ROLE_PROMPTS.analyst);
-    expect(provision.tools).toHaveLength(6);
+    expect(provision.tools).toHaveLength(7);
+    expect(provision.tools.map(({ name }) => name)).toEqual(
+      expect.arrayContaining([
+        "stock_describe_collection",
+        "stock_read_collection",
+      ]),
+    );
     const save = provision.tools.find(
       (tool) => tool.name === "stock_submit",
     )!.parameters;
@@ -448,9 +465,13 @@ describe("persisted research role preparation", () => {
     ).toBe(false);
     for (const tool of provision.tools.filter(
       (tool) =>
-        !["stock_read", "stock_check_numbers", "stock_save_report"].includes(
-          tool.name,
-        ),
+        ![
+          "stock_read_run",
+          "stock_read_artifact",
+          "stock_read_evidence",
+          "stock_check_numbers",
+          "stock_save_report",
+        ].includes(tool.name),
     )) {
       expect(tool.parameters.properties ?? {}).not.toHaveProperty("source");
       expect(tool.parameters.properties ?? {}).not.toHaveProperty("runId");
@@ -461,9 +482,15 @@ describe("persisted research role preparation", () => {
           tool.name.startsWith("stock_get_") || tool.name === "stock_research",
       ),
     ).toBe(false);
-    expect(provision.tools.some((tool) => tool.name === "stock_read")).toBe(
-      false,
-    );
+    expect(
+      provision.tools.some((tool) =>
+        [
+          "stock_read_run",
+          "stock_read_artifact",
+          "stock_read_evidence",
+        ].includes(tool.name),
+      ),
+    ).toBe(false);
     expect(prepared.context.dataCatalog).toEqual([]);
     expect(prepared).not.toHaveProperty("sourceCatalogue");
   });
@@ -605,6 +632,7 @@ describe("persisted research role preparation", () => {
       h.adapter.requests[0]!.tools?.map((tool) => tool.name).sort(),
     ).toEqual(
       [
+        "stock_describe_collection",
         "stock_read_collection",
         "stock_read_report",
         "stock_read_report_draft",
@@ -660,6 +688,7 @@ describe("persisted research role preparation", () => {
     expect(h.adapter.requests).toHaveLength(1);
     const request = h.adapter.requests[0]!;
     expect(request.tools!.map(({ name }) => name).sort()).toEqual([
+      "stock_describe_collection",
       "stock_read_collection",
       "stock_read_report",
       "stock_submit",
@@ -815,7 +844,13 @@ describe("persisted research role preparation", () => {
         new AbortController().signal,
       );
       expect(result.status).toBe("succeeded");
-      expect(h.adapter.requests[0]!.tools).toHaveLength(5);
+      expect(h.adapter.requests[0]!.tools).toHaveLength(6);
+      expect(h.adapter.requests[0]!.tools!.map(({ name }) => name)).toEqual(
+        expect.arrayContaining([
+          "stock_describe_collection",
+          "stock_read_collection",
+        ]),
+      );
       expect(JSON.stringify(h.adapter.requests[0]!.messages)).toContain(
         profile.prompts.analyst,
       );
@@ -859,7 +894,7 @@ describe("persisted research role preparation", () => {
       new AbortController().signal,
     );
     expect(result.status).toBe("succeeded");
-    expect(h.adapter.requests[0]!.tools).toHaveLength(8);
+    expect(h.adapter.requests[0]!.tools).toHaveLength(11);
     expect(JSON.stringify(h.adapter.requests[0]!.messages)).toContain(
       profile.prompts.analyst,
     );

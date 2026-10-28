@@ -115,7 +115,7 @@ try {
       policy,
     ),
   ];
-  assert.equal(tools.length, 13);
+  assert.equal(tools.length, 16);
   const invoke = (name, args, caller = agent) =>
     tools
       .find((tool) => tool.name === name)
@@ -124,15 +124,13 @@ try {
         callId: name,
         signal: new globalThis.AbortController().signal,
       });
-  const viewed = await invoke("stock_read", {
-    kind: "run_view",
+  const viewed = await invoke("stock_read_run", {
     runId: operation.runId,
   });
   assert.equal(viewed.view.runId, operation.runId);
   const ref = viewed.view.tasks.find((task) => task.taskId === "manager")
     .outputRefs[0];
   const checked = await invoke("stock_check_numbers", {
-    kind: "artifact",
     ref,
   });
   assert.equal(checked.passed, true);
@@ -148,8 +146,7 @@ try {
   );
   assert.deepEqual(recalled.entries, []);
   await assert.rejects(
-    () =>
-      invoke("stock_read", { kind: "run_view", runId: operation.runId }, asker),
+    () => invoke("stock_read_run", { runId: operation.runId }, asker),
     { code: "ACCESS_DENIED" },
   );
   const market = await invoke(

@@ -18,7 +18,7 @@ import { ASK_PROMPT, ASK_TOOL_NAMES } from "./ask-prompt.js";
 import { scopedQueryParameters } from "./query-scope.js";
 import { ModelConfig, resolveModelOptions } from "./model-config.js";
 import { researchCutoff } from "./ask-input.js";
-import { collectionReadTool } from "./collection-tools.js";
+import { collectionReadTools } from "./collection-tools.js";
 import {
   collectionDirectory,
   requireCollectionData,
@@ -117,7 +117,7 @@ class AskApplication {
         const submission = createSubmission("ask", (report) =>
           renderAgentReport("ask", report).trimEnd(),
         );
-        tools.push(collectionReadTool(collection.packets), submission.tool);
+        tools.push(...collectionReadTools(collection.packets), submission.tool);
         handle = await runtime.createAgent(
           {
             sessionId: SessionId(randomUUID()),

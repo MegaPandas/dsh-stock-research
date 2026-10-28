@@ -1,9 +1,15 @@
 import fs from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { ToolRunContext } from "@deepseek-ai/dsh-tools";
+import {
+  validateJsonSchemaValue,
+  type ToolRunContext,
+} from "@deepseek-ai/dsh-tools";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { collectionReadTool } from "../../src/app/collection-tools.js";
+import {
+  collectionReadTools,
+  collectionDataTools,
+} from "../../src/app/collection-tools.js";
 import type { ResearchArtifactInput } from "../../src/contracts/artifact-payloads.js";
 import type { CollectedTableData } from "../../src/contracts/collection.js";
 import type {
@@ -95,15 +101,16 @@ function envelope(): DataEnvelope<CollectedTableData> {
   };
 }
 function reader(saved = envelope(), sourceRef?: SourceRef) {
-  const tool = collectionReadTool([
+  const [describeTool, tool] = collectionReadTools([
     { id: "market.daily", envelope: saved, ...(sourceRef && { sourceRef }) },
   ]);
   const call = (args: unknown, signal = new AbortController().signal) =>
-    tool.execute(args, { signal } as ToolRunContext);
-  return { tool, call };
+    tool!.execute(args, { signal } as ToolRunContext);
+  const describe = (args: unknown, signal = new AbortController().signal) =>
+    describeTool!.execute(args, { signal } as ToolRunContext);
+  return { tool: tool!, describeTool: describeTool!, call, describe };
 }
 const rowRequest = {
-  kind: "rows",
   table: "market.daily",
   fields: ["close"],
   offset: 0,
@@ -119,6 +126,49 @@ afterEach(() => {
 });
 
 describe("collected table views", () => {
+  it.each([collectionReadTools, collectionDataTools])(
+    "exposes separate object schemas and rejects omitted or legacy arguments",
+    async (createTools) => {
+      const tools = createTools([{ id: "market.daily", envelope: envelope() }]);
+      const [describe, read] = tools;
+      expect(tools.map(({ name }) => name)).toEqual([
+        "stock_describe_collection",
+        "stock_read_collection",
+      ]);
+      expect(describe!.parameters).toEqual({
+        type: "object",
+        properties: { table: { type: "string" } },
+        required: ["table"],
+        additionalProperties: false,
+      });
+      expect(read!.parameters).toMatchObject({
+        type: "object",
+        required: ["table", "fields", "offset", "limit"],
+      });
+      expect(read!.parameters).not.toHaveProperty("oneOf");
+      expect(read!.parameters.properties).not.toHaveProperty("kind");
+      expect(validateJsonSchemaValue(read!.parameters, rowRequest)).toEqual([]);
+      for (const [tool, args] of [
+        [describe!, {}],
+        [describe!, { table: "market.daily", kind: "schema" }],
+        [describe!, rowRequest],
+        [read!, {}],
+        [read!, { table: "market.daily" }],
+        [read!, { ...rowRequest, kind: "rows" }],
+      ] as const) {
+        expect(
+          validateJsonSchemaValue(tool.parameters, args).length,
+        ).toBeGreaterThan(0);
+        await expect(
+          tool.execute(args, {
+            signal: new AbortController().signal,
+          } as ToolRunContext),
+        ).rejects.toMatchObject({ code: "INVALID_INPUT" });
+      }
+      expect(fetch).not.toHaveBeenCalled();
+    },
+  );
+
   it("projects a discoverable directory without embedding values, field definitions or detailed gaps", () => {
     const saved = envelope();
     const before = structuredClone(saved);
@@ -140,8 +190,7 @@ describe("collected table views", () => {
 
   it("returns field definitions and price basis without historical rows or numeric candidates", async () => {
     const saved = envelope();
-    const result = await reader(saved).call({
-      kind: "schema",
+    const result = await reader(saved).describe({
       table: "market.daily",
     });
     expect(result).toMatchObject({
@@ -247,7 +296,7 @@ describe("collected table views", () => {
     { ...rowRequest, cutoff: scope.cutoff },
     { kind: "schema", table: "market.daily", fields: ["close"] },
     { kind: "unexpected", table: "market.daily" },
-    { table: "market.daily", fields: ["close"], offset: 0, limit: 1 },
+    { table: "market.daily", fields: ["close"], offset: 0 },
   ])(
     "rejects invalid public read arguments without calling a data source: %j",
     async (args) => {
@@ -260,13 +309,19 @@ describe("collected table views", () => {
 
   it("reports unavailable tables and respects cancellation", async () => {
     await expect(
-      reader().call({ kind: "schema", table: "financial.income" }),
+      reader().describe({ table: "financial.income" }),
+    ).rejects.toMatchObject({ code: "DATA_INSUFFICIENT" });
+    await expect(
+      reader().call({ ...rowRequest, table: "financial.income" }),
     ).rejects.toMatchObject({ code: "DATA_INSUFFICIENT" });
     const controller = new AbortController();
     controller.abort(new Error("Stop local read"));
     await expect(reader().call(rowRequest, controller.signal)).rejects.toThrow(
       "Stop local read",
     );
+    await expect(
+      reader().describe({ table: "market.daily" }, controller.signal),
+    ).rejects.toThrow("Stop local read");
     expect(fetch).not.toHaveBeenCalled();
   });
 

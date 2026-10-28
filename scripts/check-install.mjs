@@ -168,7 +168,10 @@ async function probe(directory, targetVersion) {
     const mainAgentTools = [
       "stock_start_research",
       "stock_review_stage",
-      "stock_research_control",
+      "stock_resume_research",
+      "stock_cancel_research",
+      "stock_recover_research",
+      "stock_replay_research",
       "stock_followup_task",
       "stock_dispatch_stage",
     ];
@@ -217,7 +220,7 @@ async function probe(directory, targetVersion) {
     );
     ctx.jobs.remove(jobId, outside.agent.id);
     unlisten();
-    assert.equal(ctx.stockResearch.tools.length, 17);
+    assert.equal(ctx.stockResearch.tools.length, 20);
     const health = ctx.stockResearch.queries.health({
       security: {
         id: "CN:002594.SZ",

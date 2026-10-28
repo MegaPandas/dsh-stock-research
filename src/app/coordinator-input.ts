@@ -17,6 +17,7 @@ export function savedCoordinator(runs: RunService, runId: string) {
       version !== "8" &&
       version !== "9" &&
       version !== "10" &&
+      version !== "11" &&
       version !== COORDINATOR_PROMPT_VERSION) ||
     inputs.length !== 1
   )

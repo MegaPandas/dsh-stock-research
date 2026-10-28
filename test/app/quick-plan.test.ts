@@ -110,6 +110,7 @@ describe("quick application plan", () => {
     expect(instructions.get("analysis.fundamentals")).toContain("12个报告期");
     expect(instructions.get("analysis.macro")).toContain("中国GDP");
     expect(ROLE_PROMPTS.analyst).toContain("数据目录");
+    expect(ROLE_PROMPTS.analyst).toContain("stock_describe_collection");
     expect(ROLE_PROMPTS.analyst).toContain("stock_read_collection");
     expect(ROLE_PROMPTS.analyst).toContain("采用快照已有值");
     expect(ROLE_PROMPTS.analyst).not.toContain("fixedQueries");

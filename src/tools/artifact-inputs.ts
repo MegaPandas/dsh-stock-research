@@ -173,17 +173,16 @@ export function saveReportParameters(
   });
 }
 
-export function checkNumbersParameters(
+export function checkNumbersParameters(): JsonSchemaNode &
+  Record<string, unknown> {
+  return objectSchema({ ref: artifactRefSchema });
+}
+
+export function checkPendingNumbersParameters(
   kinds: readonly RoleArtifactKind[] = KINDS,
 ): JsonSchemaNode & Record<string, unknown> {
-  return {
-    oneOf: [
-      objectSchema({ kind: literal("artifact"), ref: artifactRefSchema }),
-      objectSchema({
-        kind: literal("pending"),
-        contentId: stringSchema,
-        content: artifactSchema(kinds),
-      }),
-    ],
-  };
+  return objectSchema({
+    contentId: stringSchema,
+    content: artifactSchema(kinds),
+  });
 }

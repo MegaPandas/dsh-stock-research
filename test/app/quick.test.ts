@@ -425,7 +425,7 @@ describe("stock-quick real command boundary", () => {
         [
           "stock_start_research",
           "host_marker",
-          "stock_read",
+          "stock_read_run",
           "stock_data_health",
           "stock_dispatch_task",
           "stock_make_digest",

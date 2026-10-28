@@ -60,7 +60,6 @@ async function* block(
 async function* collectionCall(
   index = 2,
   parameters: Record<string, unknown> = {
-    kind: "rows",
     table: "market.daily",
     fields: ["close"],
     offset: 1,
@@ -90,6 +89,7 @@ async function* collectionCall(
   yield { type: "finish", reason: { kind: "tool-calls" } };
 }
 const readOnlyTools = [
+  "stock_describe_collection",
   "stock_read_collection",
   "stock_recall",
   "stock_submit",
@@ -176,20 +176,27 @@ describe("stock-ask through real commands, runtime and AgentLoop", () => {
     const reader = h.adapter.requests[0]!.tools!.find(
       (tool) => tool.name === "stock_read_collection",
     )!;
-    const rowsParameters = (
-      reader.parameters.oneOf as {
-        properties: Record<string, unknown>;
-      }[]
-    ).find(
-      (variant) =>
-        (variant.properties.kind as { const: string }).const === "rows",
-    )!;
-    expect(rowsParameters.properties).toMatchObject({
-      kind: { const: "rows" },
-      table: { type: "string" },
-      fields: { type: "array" },
-      offset: { type: "integer" },
-      limit: { type: "integer" },
+    expect(reader.parameters).toMatchObject({
+      type: "object",
+      required: ["table", "fields", "offset", "limit"],
+      properties: {
+        table: { type: "string" },
+        fields: { type: "array" },
+        offset: { type: "integer" },
+        limit: { type: "integer" },
+      },
+    });
+    expect(reader.parameters).not.toHaveProperty("oneOf");
+    expect(reader.parameters.properties).not.toHaveProperty("kind");
+    expect(
+      h.adapter.requests[0]!.tools!.find(
+        (tool) => tool.name === "stock_describe_collection",
+      )!.parameters,
+    ).toEqual({
+      type: "object",
+      properties: { table: { type: "string" } },
+      required: ["table"],
+      additionalProperties: false,
     });
     const prompt = h.adapter.requests[0]!.messages.find(
       (message) => message.role === "user",
@@ -326,7 +333,6 @@ describe("stock-ask through real commands, runtime and AgentLoop", () => {
         respond: async function* (request): AsyncIterable<StreamChunk> {
           if (++calls === 1) {
             yield* collectionCall(0, {
-              kind: "rows",
               table: "market.daily",
               fields: ["close"],
               ...page,

@@ -32,7 +32,10 @@ import {
 } from "./collection-input.js";
 import type { DraftFile } from "../host/draft-file.js";
 import { draftFileTools } from "../tools/draft-file.js";
-import { collectionDataTool, collectionReadTool } from "./collection-tools.js";
+import {
+  collectionDataTools,
+  collectionReadTools,
+} from "./collection-tools.js";
 import { researchTool } from "../tools/errors.js";
 import { createPublicSearchSession } from "./public-search.js";
 import {
@@ -49,7 +52,9 @@ import {
 } from "../tools/parameters.js";
 
 const ROLE_TOOLS = new Set([
-  "stock_read",
+  "stock_read_run",
+  "stock_read_artifact",
+  "stock_read_evidence",
   "stock_data_health",
   "stock_recall",
   "stock_save_report",
@@ -98,6 +103,7 @@ export function prepareResearchRole(
     roleVersion !== "19" &&
     roleVersion !== "20" &&
     roleVersion !== "21" &&
+    roleVersion !== "22" &&
     roleVersion !== ROLE_PROMPT_VERSION
   )
     throw new ResearchError(
@@ -115,6 +121,7 @@ export function prepareResearchRole(
   ).instruction;
   if (
     roleVersion === ROLE_PROMPT_VERSION ||
+    roleVersion === "22" ||
     roleVersion === "21" ||
     roleVersion === "20" ||
     roleVersion === "19"
@@ -160,7 +167,7 @@ export function prepareResearchRole(
     const submit = taskTools.find((tool) => tool.name === "stock_save_report")!;
     const publicRole = claim.taskId === PUBLIC_RESEARCH_TASK;
     let systemPrompt = profile.prompts.analyst;
-    let dataTool = collectionDataTool(tables);
+    let dataTools = collectionDataTools(tables);
     let publicInput: object | undefined;
     if (publicRole) {
       const saved = services.runs
@@ -181,14 +188,16 @@ export function prepareResearchRole(
           "Invalid public analyst prompt.",
         );
       systemPrompt = value;
-      dataTool = createPublicSearchSession(
-        {
-          search: (query, exec) => services.searchPublic(query, exec, parent),
-          approve: (query, exec, used) =>
-            services.approvePublicSearch(query, exec, used, parent),
-        },
-        profile.publicSearchLimit,
-      ).tool;
+      dataTools = [
+        createPublicSearchSession(
+          {
+            search: (query, exec) => services.searchPublic(query, exec, parent),
+            approve: (query, exec, used) =>
+              services.approvePublicSearch(query, exec, used, parent),
+          },
+          profile.publicSearchLimit,
+        ).tool,
+      ];
       const savedSearches =
         snapshot?.tasks.find(({ taskId }) => taskId === claim.taskId)
           ?.evidenceRefs ?? [];
@@ -216,7 +225,7 @@ export function prepareResearchRole(
     return {
       systemPrompt,
       tools: [
-        dataTool,
+        ...dataTools,
         ...businessDraftTools(file),
         researchTool({
           ...submit,
@@ -332,7 +341,7 @@ export function prepareResearchRole(
     });
   return {
     systemPrompt: profile.prompts[definition.executor.role],
-    tools: [...tools, collectionReadTool(tables), ...draftFileTools(file)],
+    tools: [...tools, ...collectionReadTools(tables), ...draftFileTools(file)],
     prompt: [
       {
         type: "text",

@@ -21,21 +21,25 @@ describe("model-facing research control", () => {
   it.each([
     { action: "resume", input },
     { action: "resume", input: { resolvedReasonIds: [], instructions: [] } },
-    { action: "redo", taskId: "risk.finance", reason: "Revise risk." },
-    { action: "redo", taskId: "risk.finance" },
     { action: "recover", attempts: [{ taskId: "risk.finance", attempt: 2 }] },
     { action: "cancel" },
     { action: "replay" },
-  ])("exposes the complete supported $action contract", (args) => {
-    assertSupportedJsonSchema(runControlParameters);
-    expect(
-      validateJsonSchemaValue(runControlParameters, { ...base, ...args }),
-    ).toEqual([]);
-    expect(parseRunControl({ ...base, ...args })).toMatchObject({
-      command: { kind: args.action, runId: base.runId },
-      requestId: base.requestId,
-    });
-  });
+  ] as const)(
+    "exposes the complete supported $action contract",
+    ({ action, ...args }) => {
+      assertSupportedJsonSchema(runControlParameters[action]);
+      expect(
+        validateJsonSchemaValue(runControlParameters[action], {
+          ...base,
+          ...args,
+        }),
+      ).toEqual([]);
+      expect(parseRunControl(action, { ...base, ...args })).toMatchObject({
+        command: { kind: action, runId: base.runId },
+        requestId: base.requestId,
+      });
+    },
+  );
 
   it.each([
     {},
@@ -51,20 +55,20 @@ describe("model-facing research control", () => {
     },
     { input, attempts: [] },
   ])("rejects observed resume argument errors: %j", (args) => {
-    const value = { ...base, action: "resume", ...args };
+    const value = { ...base, ...args };
     expect(
-      validateJsonSchemaValue(runControlParameters, value).length,
+      validateJsonSchemaValue(runControlParameters.resume, value).length,
     ).toBeGreaterThan(0);
-    expect(() => parseRunControl(value)).toThrowError();
+    expect(() => parseRunControl("resume", value)).toThrowError();
   });
 
   it("shares structured resume and recovery parsing with CLI commands", () => {
-    expect(
-      parseRunControl({ ...base, action: "resume", input }).command,
-    ).toEqual(parseRunCommand("resume", `run ${JSON.stringify(input)}`));
+    expect(parseRunControl("resume", { ...base, input }).command).toEqual(
+      parseRunCommand("resume", `run ${JSON.stringify(input)}`),
+    );
     const attempts = [{ taskId: "risk.finance", attempt: 2 }];
-    expect(
-      parseRunControl({ ...base, action: "recover", attempts }).command,
-    ).toEqual(parseRunCommand("recover", `run ${JSON.stringify(attempts)}`));
+    expect(parseRunControl("recover", { ...base, attempts }).command).toEqual(
+      parseRunCommand("recover", `run ${JSON.stringify(attempts)}`),
+    );
   });
 });

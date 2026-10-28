@@ -34,37 +34,14 @@ const attemptsSchema = {
   type: "array",
   items: objectSchema({ taskId: stringSchema, attempt: { type: "integer" } }),
 } as const;
-export const runControlParameters: JsonSchemaNode & Record<string, unknown> = {
-  oneOf: [
-    objectSchema({
-      action: { type: "string", const: "resume" },
-      runId: stringSchema,
-      requestId: stringSchema,
-      input: resumeInputSchema,
-    }),
-    objectSchema(
-      {
-        action: { type: "string", const: "redo" },
-        runId: stringSchema,
-        requestId: stringSchema,
-        taskId: stringSchema,
-        reason: stringSchema,
-      },
-      ["action", "runId", "requestId", "taskId"],
-    ),
-    objectSchema({
-      action: { type: "string", const: "recover" },
-      runId: stringSchema,
-      requestId: stringSchema,
-      attempts: attemptsSchema,
-    }),
-    objectSchema({
-      action: { type: "string", enum: ["cancel", "replay"] },
-      runId: stringSchema,
-      requestId: stringSchema,
-    }),
-  ],
-};
+export type ResearchControlKind = Exclude<RunCommandKind, "status" | "redo">;
+const controlFields = { runId: stringSchema, requestId: stringSchema };
+export const runControlParameters = {
+  resume: objectSchema({ ...controlFields, input: resumeInputSchema }),
+  recover: objectSchema({ ...controlFields, attempts: attemptsSchema }),
+  cancel: objectSchema(controlFields),
+  replay: objectSchema(controlFields),
+} satisfies Record<ResearchControlKind, JsonSchemaNode>;
 
 function array(value: unknown, field: string): unknown[] {
   if (!Array.isArray(value))
@@ -107,21 +84,16 @@ function attempts(value: unknown): AttemptTarget[] {
   });
 }
 
-export function parseRunControl(value: unknown): {
+export function parseRunControl(
+  kind: ResearchControlKind,
+  value: unknown,
+): {
   command: RunCommand;
   requestId: string;
 } {
-  const action = (value as { action?: unknown } | null)?.action;
   const actionFields =
-    action === "resume"
-      ? ["input"]
-      : action === "redo"
-        ? ["taskId", "reason"]
-        : action === "recover"
-          ? ["attempts"]
-          : [];
-  const item = object(value, ["action", "runId", "requestId", ...actionFields]);
-  const kind = text(item.action, "action");
+    kind === "resume" ? ["input"] : kind === "recover" ? ["attempts"] : [];
+  const item = object(value, ["runId", "requestId", ...actionFields]);
   const runId = text(item.runId, "runId");
   const requestId = text(item.requestId, "requestId");
   let command: RunCommand;
@@ -132,23 +104,10 @@ export function parseRunControl(value: unknown): {
     case "recover":
       command = { kind, runId, attempts: attempts(item.attempts) };
       break;
-    case "redo":
-      command = {
-        kind,
-        runId,
-        taskId: text(item.taskId, "taskId"),
-        reason: item.reason === undefined ? null : text(item.reason, "reason"),
-      };
-      break;
     case "cancel":
     case "replay":
       command = { kind, runId };
       break;
-    default:
-      throw new ResearchError(
-        "INVALID_INPUT",
-        "Unknown research control action.",
-      );
   }
   return { command, requestId };
 }

@@ -60,6 +60,7 @@ const streamedArguments = new Map();
 const artifactTools = new Set([
   "stock_save_report",
   "stock_check_numbers",
+  "stock_check_pending_numbers",
   "stock_submit",
   "stock_remember",
   "stock_review_stage",

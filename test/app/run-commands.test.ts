@@ -130,9 +130,8 @@ describe("explicit run control commands", () => {
     const result = await h.ctx.tools.execute({
       agent: h.outside.agent,
       callId: ToolCallId("resume-tool"),
-      name: "stock_research_control",
+      name: "stock_resume_research",
       arguments: {
-        action: "resume",
         runId: seeded.runId,
         requestId: "resume-tool",
         input: {
@@ -178,9 +177,8 @@ describe("explicit run control commands", () => {
     const result = await h.ctx.tools.execute({
       agent: h.outside.agent,
       callId: ToolCallId("bad-resume-tool"),
-      name: "stock_research_control",
+      name: "stock_resume_research",
       arguments: {
-        action: "resume",
         runId: seeded.runId,
         requestId: "bad-resume-tool",
         input: { resolvedReasonIds: [], taskNotes: [] },
@@ -274,7 +272,7 @@ describe("explicit run control commands", () => {
       expect(coordinator.tools!.map((tool) => tool.name).sort()).toEqual(
         expect.arrayContaining(
           [
-            "stock_read",
+            "stock_read_run",
             "stock_data_health",
             "stock_dispatch_task",
             "stock_make_digest",

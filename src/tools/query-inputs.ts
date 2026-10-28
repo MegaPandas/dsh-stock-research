@@ -100,25 +100,29 @@ export const dataSchemas: Record<
     },
     ["provider", "startDate"],
   ),
-  stock_get_fundamentals: {
-    oneOf: [
-      schema({
-        provider: enumeration(["sec"]),
-        field: enumeration(secFields),
-        periodEndFrom: stringSchema,
-      }),
-      schema({
-        provider: enumeration(["eastmoney"]),
-        fields: fieldsSchema(eastmoneyFields),
-        periodEndFrom: stringSchema,
-        periodEndTo: stringSchema,
-      }),
-      schema({
-        provider: enumeration(["sina"]),
-        fields: fieldsSchema(sinaFields),
-      }),
-    ],
-  },
+  stock_get_fundamentals: schema(
+    {
+      provider: enumeration(["sec", "eastmoney", "sina"]),
+      field: {
+        ...enumeration(secFields),
+        description: "SEC必填；东财和新浪不接受。",
+      },
+      fields: {
+        ...fieldsSchema(sinaFields),
+        description:
+          "东财和新浪必填；东财仅支持totalOperatingRevenue、netIncomeToParent；SEC不接受。",
+      },
+      periodEndFrom: {
+        ...stringSchema,
+        description: "SEC和东财必填；新浪不接受。",
+      },
+      periodEndTo: {
+        ...stringSchema,
+        description: "东财必填；SEC和新浪不接受。",
+      },
+    },
+    ["provider"],
+  ),
   stock_get_macro: schema({
     provider: enumeration(["fred"]),
     seriesId: enumeration(seriesIds),

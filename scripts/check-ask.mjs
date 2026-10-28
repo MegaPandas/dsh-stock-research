@@ -46,7 +46,11 @@ const calls = new Map();
 const toolCalls = new Map();
 const observations = [];
 const nativeFetch = globalThis.fetch;
-const allowedTools = new Set(["stock_read_collection", "stock_recall"]);
+const allowedTools = new Set([
+  "stock_describe_collection",
+  "stock_read_collection",
+  "stock_recall",
+]);
 let tencentRequests = 0;
 let stage = "profile";
 let runtime;

@@ -22,7 +22,7 @@ import {
   readCollection,
   registerCollectionSources,
 } from "./collection-input.js";
-import { collectionDataTool } from "./collection-tools.js";
+import { collectionDataTools } from "./collection-tools.js";
 import { createReportReader } from "./report-reader.js";
 import {
   PUBLIC_RESEARCH_PROMPT_INPUT,
@@ -138,7 +138,7 @@ export function prepareUnifiedRole(
         })),
     };
   } else if (definition.executor.role === "analyst") {
-    tools.push(collectionDataTool(tables));
+    tools.push(...collectionDataTools(tables));
     const collection = readCollection(services.runs, claim.runId);
     const assigned = new Set(collected.map(({ id }) => id));
     details.coverage = {

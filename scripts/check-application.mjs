@@ -103,11 +103,14 @@ try {
   for (const name of commands)
     assert.equal(ctx.commands.find(outside.agent, name).name, name);
   assert.deepEqual(await ctx.agentPresets.remoteExportList(), userPresets);
-  assert.equal(ctx.stockResearch.tools.length, 17);
+  assert.equal(ctx.stockResearch.tools.length, 20);
   const mainAgentTools = [
     "stock_start_research",
     "stock_review_stage",
-    "stock_research_control",
+    "stock_resume_research",
+    "stock_cancel_research",
+    "stock_recover_research",
+    "stock_replay_research",
   ];
   for (const name of mainAgentTools)
     assert.ok(
@@ -131,7 +134,7 @@ try {
   assert.equal(deep.definition.mode, "deep");
   assert.equal(deep.definition.tasks.length, 22);
   assert.equal(deep.versions.mode, DEEP_MODE_VERSION);
-  assert.equal(deep.versions.prompts.roles, "22");
+  assert.equal(deep.versions.prompts.roles, "23");
   assert.equal(deep.versions.prompts.digest, "12");
   assert.ok(health.sources.every((source) => source.sourceCalls === 0));
   // Removed entries disappear from Loader.await(); retain the actual disposal.

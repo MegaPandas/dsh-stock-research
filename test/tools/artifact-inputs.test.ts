@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 import type { ResearchArtifactInput } from "../../src/contracts/artifact-payloads.js";
 import { parseArtifactInput } from "../../src/services/artifact-schema.js";
 import {
-  checkNumbersParameters,
+  checkPendingNumbersParameters,
   saveReportParameters,
 } from "../../src/tools/artifact-inputs.js";
 
@@ -100,7 +100,7 @@ describe("model-facing research artifact input contracts", () => {
     (content) => {
       expect(parseArtifactInput(content)).toEqual(content);
       const save = saveReportParameters();
-      const check = checkNumbersParameters();
+      const check = checkPendingNumbersParameters();
       assertSupportedJsonSchema(save);
       assertSupportedJsonSchema(check);
       expect(
@@ -111,7 +111,6 @@ describe("model-facing research artifact input contracts", () => {
       ).toEqual([]);
       expect(
         validateJsonSchemaValue(check, {
-          kind: "pending",
           contentId: "pending",
           content,
         }),
@@ -134,8 +133,7 @@ describe("model-facing research artifact input contracts", () => {
         }).length,
       ).toBeGreaterThan(0);
       expect(
-        validateJsonSchemaValue(checkNumbersParameters(["analysis"]), {
-          kind: "pending",
+        validateJsonSchemaValue(checkPendingNumbersParameters(["analysis"]), {
           contentId: "pending",
           content,
         }).length,

@@ -116,8 +116,8 @@ describe("stock-replay command", () => {
           if (!attemptedSourceRead) {
             attemptedSourceRead = true;
             yield* toolCall(
-              "stock_read",
-              { kind: "run_view", runId: sourceRunId },
+              "stock_read_run",
+              { runId: sourceRunId },
               "source-read",
             );
             return;

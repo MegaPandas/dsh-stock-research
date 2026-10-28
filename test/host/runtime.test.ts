@@ -60,7 +60,7 @@ function stockNames(h: Awaited<ReturnType<typeof host>>) {
 }
 
 describe("research runtime plugin with the real DSH host", () => {
-  it("publishes its ready service and fifteen tools without querying enabled sources", async () => {
+  it("publishes its ready service and twenty tools without querying enabled sources", async () => {
     let searches = 0;
     const h = await host({
       search: async () => {
@@ -72,8 +72,8 @@ describe("research runtime plugin with the real DSH host", () => {
       h.config({ enabledSources: ["sina", "fred", "dsh-web"] }),
     );
     expect(h.ctx.get("stockResearch")).toBeDefined();
-    expect(mounted.runtime.tools).toHaveLength(17);
-    expect(new Set(stockNames(h)).size).toBe(17);
+    expect(mounted.runtime.tools).toHaveLength(20);
+    expect(new Set(stockNames(h)).size).toBe(20);
     const health = mounted.runtime.queries.health(h.scope);
     expect(
       health.sources
@@ -295,8 +295,8 @@ describe("research runtime plugin with the real DSH host", () => {
     ).rejects.toMatchObject({ code: "ACCESS_DENIED" });
     reacquire(h.directory);
     const second = await h.mount();
-    expect(second.runtime.tools).toHaveLength(17);
-    expect(stockNames(h)).toHaveLength(17);
+    expect(second.runtime.tools).toHaveLength(20);
+    expect(stockNames(h)).toHaveLength(20);
     await second.fiber.dispose();
     expect(stockNames(h)).toEqual([]);
     expect(h.ctx.agents.get(h.outside.agent.id)).toBe(h.outside.agent);
@@ -480,7 +480,7 @@ describe("research runtime plugin with the real DSH host", () => {
       if (problem === "corrupt-cache")
         fs.rmSync(join(h.directory, "cache.sqlite"));
       const recovered = await h.mount();
-      expect(recovered.runtime.tools).toHaveLength(17);
+      expect(recovered.runtime.tools).toHaveLength(20);
       expect(fetch).not.toHaveBeenCalled();
       await recovered.fiber.dispose();
       expect(stockNames(h)).toEqual([]);

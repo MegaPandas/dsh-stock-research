@@ -1,6 +1,10 @@
 import { Context } from "@deepseek-ai/cordis";
 import type { Agent } from "@deepseek-ai/dsh-agent";
-import { ToolRuntime, type ToolRunContext } from "@deepseek-ai/dsh-tools";
+import {
+  ToolRuntime,
+  validateJsonSchemaValue,
+  type ToolRunContext,
+} from "@deepseek-ai/dsh-tools";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { SqliteCache } from "../../src/cache/index.js";
 import type { DataEnvelope, MarketData } from "../../src/contracts/data.js";
@@ -19,7 +23,10 @@ import {
 } from "../../src/host/bindings.js";
 import { QueryService } from "../../src/services/query.js";
 import { createDataTools } from "../../src/tools/data.js";
-import type { QueryToolPolicy } from "../../src/tools/query-inputs.js";
+import {
+  dataSchemas,
+  type QueryToolPolicy,
+} from "../../src/tools/query-inputs.js";
 import { decisionFixture } from "../fixtures/decision.js";
 import { CN_SECURITY, MARKET_FIXTURE } from "../fixtures/market.js";
 
@@ -220,6 +227,44 @@ afterEach(async () => {
 });
 
 describe("data tools", () => {
+  it("exposes fundamentals provider fields in one object and preserves provider contracts", async () => {
+    const schema = dataSchemas.stock_get_fundamentals;
+    expect(schema.type).toBe("object");
+    expect(schema.oneOf).toBeUndefined();
+    expect(Object.keys(schema.properties!)).toEqual([
+      "provider",
+      "field",
+      "fields",
+      "periodEndFrom",
+      "periodEndTo",
+      "source",
+    ]);
+    for (const args of [
+      secArgs,
+      {
+        provider: "eastmoney",
+        fields: ["netIncomeToParent"],
+        periodEndFrom: "2023-01-01",
+        periodEndTo: "2023-12-31",
+      },
+      { provider: "sina", fields: ["netIncome"] },
+    ])
+      expect(validateJsonSchemaValue(schema, args)).toEqual([]);
+    const f = setup();
+    for (const args of [
+      { ...secArgs, fields: ["netIncome"] },
+      {
+        provider: "eastmoney",
+        fields: ["netIncome"],
+        periodEndFrom: "2023-01-01",
+        periodEndTo: "2023-12-31",
+      },
+      { provider: "sina", fields: ["netIncome"], periodEndFrom: "2023-01-01" },
+    ])
+      await expect(
+        f.call("stock_get_fundamentals", args),
+      ).rejects.toMatchObject({ code: "INVALID_INPUT" });
+  });
   it("registers and executes all five SDK tools with valid output schemas", async () => {
     const f = setup();
     const ctx = new Context();

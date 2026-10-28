@@ -1,6 +1,10 @@
 import { Context } from "@deepseek-ai/cordis";
 import type { Agent } from "@deepseek-ai/dsh-agent";
-import { ToolRuntime, type ToolRunContext } from "@deepseek-ai/dsh-tools";
+import {
+  ToolRuntime,
+  validateJsonSchemaValue,
+  type ToolRunContext,
+} from "@deepseek-ai/dsh-tools";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type {
   DigestDraft,
@@ -18,6 +22,7 @@ import { MemoryStore } from "../../src/memory/store.js";
 import { DecisionService } from "../../src/services/decisions.js";
 import { DigestService } from "../../src/services/digests.js";
 import { MemoryService } from "../../src/services/memory.js";
+import { rememberInputSchema } from "../../src/tools/write-inputs.js";
 import { createWriteTools } from "../../src/tools/write.js";
 import { decisionFixture } from "../fixtures/decision.js";
 import { oneDigest } from "../fixtures/digest-conversation.js";
@@ -181,6 +186,33 @@ afterEach(async () => {
 });
 
 describe("write tools", () => {
+  it("omits replay source from memory returns request schema", () => {
+    const input = {
+      ...note(),
+      returns: {
+        kind: "query",
+        request: {
+          provider: "yahoo",
+          historyStartDate: "2024-01-01",
+          startDate: "2024-01-02",
+          endDate: "2024-01-03",
+        },
+      },
+    };
+    expect(validateJsonSchemaValue(rememberInputSchema, input)).toEqual([]);
+    expect(
+      validateJsonSchemaValue(rememberInputSchema, {
+        ...input,
+        returns: {
+          ...input.returns,
+          request: {
+            ...input.returns.request,
+            source: { runId: "run", evidenceId: "evidence" },
+          },
+        },
+      }).length,
+    ).toBeGreaterThan(0);
+  });
   it("preserves unauthorized error codes through the SDK runtime", async () => {
     const f = setup();
     const ctx = new Context();

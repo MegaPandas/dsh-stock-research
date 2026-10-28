@@ -54,6 +54,7 @@ import {
   runControlParameters,
   type RunCommand,
   type RunCommandKind,
+  type ResearchControlKind,
 } from "./run-command-input.js";
 import { createReplayInput } from "./replay-input.js";
 import { runStatus } from "./run-view.js";
@@ -134,7 +135,7 @@ class ResearchApplication {
       const releases = [this.ctx.stockResearch.bindCoordinator(agent)];
       this.#coordinators.set(agent, releases);
       for (const tool of this.ctx.stockResearch.tools) {
-        if (tool.name === "stock_read") {
+        if (tool.name === "stock_read_run") {
           releases.push(
             agent.ctx.tools.register({
               ...tool,
@@ -563,6 +564,44 @@ class ResearchApplication {
     }
   }
 
+  controlTool(kind: ResearchControlKind): ToolDefinition {
+    const definitions = {
+      resume: [
+        "stock_resume_research",
+        "恢复研究并修订待执行任务。input必须包含resolvedReasonIds和instructions，无变更时传空数组。返回任务计划，由当前主Agent继续推进。",
+      ],
+      cancel: [
+        "stock_cancel_research",
+        "取消指定研究，停止相关执行并保留已提交内容。",
+      ],
+      recover: [
+        "stock_recover_research",
+        "仅在用户明确确认旧执行丢失后登记指定中断尝试；不直接启动执行。",
+      ],
+      replay: [
+        "stock_replay_research",
+        "使用指定研究的固定输入建立派生运行，返回任务计划，由当前主Agent继续推进。",
+      ],
+    } as const;
+    const [name, description] = definitions[kind];
+    return researchTool({
+      name,
+      description,
+      parameters: runControlParameters[kind],
+      output: resultOutput(opaqueObjectSchema),
+      execute: (value, exec) =>
+        runApplicationTool(this.ctx, name, value, exec, () => {
+          const { command, requestId } = parseRunControl(kind, value);
+          if (exec.agent === undefined)
+            throw new ResearchError(
+              "ACCESS_DENIED",
+              "A host Agent is required.",
+            );
+          return this.control(command, exec.agent, requestId, exec.signal);
+        }),
+    });
+  }
+
   async control(
     input: RunCommand,
     owner: Agent,
@@ -861,24 +900,8 @@ export function apply(ctx: Context, config?: ModelConfig): void {
         execute: async (value, exec) => app.review(value, exec),
       }),
     );
-    yield ctx.tools.register(
-      tool({
-        name: "stock_research_control",
-        description:
-          '按用户诉求恢复、重做、取消、确认中断或快照重跑研究。resume必须传input:{resolvedReasonIds:[],instructions:[{taskId:"...",instruction:"..."}]}，两数组均必填，无变更时传[]。redo传taskId及可选reason；recover传attempts。resume/replay返回任务计划，由当前主Agent继续，不创建其他调度员。',
-        parameters: runControlParameters,
-        output: resultOutput(opaqueObjectSchema),
-        execute: async (value, exec) => {
-          const { command, requestId } = parseRunControl(value);
-          if (exec.agent === undefined)
-            throw new ResearchError(
-              "ACCESS_DENIED",
-              "A host Agent is required.",
-            );
-          return app.control(command, exec.agent, requestId, exec.signal);
-        },
-      }),
-    );
+    for (const kind of ["resume", "cancel", "recover", "replay"] as const)
+      yield ctx.tools.register(app.controlTool(kind));
     for (const mode of ["quick", "deep"] as const)
       yield ctx.commands.register({
         name: `stock-${mode}`,

@@ -118,7 +118,7 @@ describe("main Agent research lifecycle", () => {
     const dispatch = h.runtime.tools.find(
       ({ name }) => name === "stock_dispatch_task",
     )!;
-    const read = h.runtime.tools.find(({ name }) => name === "stock_read")!;
+    const read = h.runtime.tools.find(({ name }) => name === "stock_read_run")!;
     expect(h.ctx.tools.get(dispatch.name, h.outside.agent)).not.toBe(dispatch);
     expect(h.ctx.tools.get(read.name, h.outside.agent)).not.toBe(read);
     expect(isApplicationBusy(h.runtime)).toBe(true);

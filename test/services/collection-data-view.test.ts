@@ -1,7 +1,7 @@
 import type { ToolRunContext } from "@deepseek-ai/dsh-tools";
 import { validateJsonSchemaValue } from "@deepseek-ai/dsh-tools";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { collectionDataTool } from "../../src/app/collection-tools.js";
+import { collectionDataTools } from "../../src/app/collection-tools.js";
 import type { CollectionReadSource } from "../../src/contracts/collection.js";
 
 const fetch = vi.fn<typeof globalThis.fetch>();
@@ -86,14 +86,15 @@ function source(): CollectionReadSource {
 }
 
 function reader(saved = source()) {
-  const tool = collectionDataTool([saved]);
+  const [describeTool, tool] = collectionDataTools([saved]);
   const call = (args: unknown, signal = new AbortController().signal) =>
-    tool.execute(args, { signal } as ToolRunContext);
-  return { tool, call };
+    tool!.execute(args, { signal } as ToolRunContext);
+  const describe = (args: unknown, signal = new AbortController().signal) =>
+    describeTool!.execute(args, { signal } as ToolRunContext);
+  return { tool: tool!, describeTool: describeTool!, call, describe };
 }
 
 const request = {
-  kind: "rows",
   table: "financial.indicators",
   fields: ["profit"],
   offset: 0,
@@ -109,10 +110,10 @@ afterEach(() => vi.unstubAllGlobals());
 
 describe("analysis collection business views", () => {
   it("describes numeric columns and automatically supplied row fields without provenance", async () => {
-    const { tool, call } = reader();
-    const args = { kind: "schema", table: "financial.indicators" };
-    expect(validateJsonSchemaValue(tool.parameters, args)).toEqual([]);
-    const result = await call(args);
+    const { describeTool, describe } = reader();
+    const args = { table: "financial.indicators" };
+    expect(validateJsonSchemaValue(describeTool.parameters, args)).toEqual([]);
+    const result = await describe(args);
     expect(result).toMatchObject({
       kind: "schema",
       provider: "fixture",
@@ -267,8 +268,7 @@ describe("analysis collection business views", () => {
       limitations: expect.arrayContaining([limitation]),
     });
     expect(
-      await reader(saved).call({
-        kind: "schema",
+      await reader(saved).describe({
         table: "financial.indicators",
       }),
     ).toMatchObject({

@@ -130,7 +130,7 @@ afterEach(async () => {
 });
 
 describe("read tools", () => {
-  it("registers and executes all four tools through the SDK runtime and output schemas", async () => {
+  it("registers and executes all read tools through the SDK runtime and output schemas", async () => {
     const f = setup();
     const ctx = new Context();
     const releasePrompt = ctx.provide("systemPrompt", {
@@ -142,10 +142,40 @@ describe("read tools", () => {
       for (const release of unregister.reverse()) release();
       releasePrompt();
     });
+    expect(f.tools.map((tool) => tool.name)).not.toContain("stock_read");
     const calls = [
       [
-        "stock_read",
-        { kind: "artifact", ref: f.analysisRef },
+        "stock_read_run",
+        { runId: f.operation.runId },
+        { kind: "run_view", view: { scope: f.scope } },
+      ],
+      [
+        "stock_read_evidence",
+        { ref: f.source },
+        { kind: "evidence", value: 100 },
+      ],
+      [
+        "stock_check_pending_numbers",
+        {
+          contentId: "draft",
+          content: {
+            kind: "analysis",
+            title: "Draft",
+            body: "Draft",
+            inputRefs: [],
+            claims: [],
+            payload: {
+              findings: [{ text: "Finding", evidence: [], numbers: [] }],
+              risks: [],
+              gaps: [],
+            },
+          },
+        },
+        { passed: true, target: { kind: "pending", contentId: "draft" } },
+      ],
+      [
+        "stock_read_artifact",
+        { ref: f.analysisRef },
         { kind: "artifact", artifact: { ref: f.analysisRef } },
       ],
       ["stock_data_health", {}, { scope: f.scope }],
@@ -156,7 +186,7 @@ describe("read tools", () => {
       ],
       [
         "stock_check_numbers",
-        { kind: "artifact", ref: f.analysisRef },
+        { ref: f.analysisRef },
         { passed: true, target: { kind: "artifact", ref: f.analysisRef } },
       ],
     ] as const;
@@ -168,10 +198,24 @@ describe("read tools", () => {
         callId: name as ToolRunContext["callId"],
         signal: new AbortController().signal,
       });
-      expect(result.isError).toBe(false);
       if (result.isError) throw new Error(JSON.stringify(result.error));
+      expect(result.isError).toBe(false);
       expect(result.value).toMatchObject(expected);
     }
+  });
+  it("rejects discriminator and cross-tool inputs on the split endpoints", async () => {
+    const f = setup();
+    for (const [name, args] of [
+      ["stock_read_run", { kind: "run_view", runId: f.operation.runId }],
+      ["stock_read_artifact", { kind: "artifact", ref: f.analysisRef }],
+      ["stock_read_evidence", { kind: "evidence", ref: f.source }],
+      ["stock_check_numbers", { kind: "artifact", ref: f.analysisRef }],
+      ["stock_check_numbers", { contentId: "draft", content: {} }],
+      ["stock_check_pending_numbers", { ref: f.analysisRef }],
+    ] as const)
+      await expect(f.call(name, args)).rejects.toMatchObject({
+        code: "INVALID_INPUT",
+      });
   });
   it("rejects unknown agents", async () => {
     const f = setup();
@@ -183,8 +227,8 @@ describe("read tools", () => {
     const f = setup();
     await expect(
       f.call(
-        "stock_read",
-        { kind: "artifact", ref: f.analysisRef },
+        "stock_read_artifact",
+        { ref: f.analysisRef },
         f.agent(undefined, f.task.id),
       ),
     ).rejects.toMatchObject({ code: "ACCESS_DENIED" });
@@ -196,23 +240,18 @@ describe("read tools", () => {
       runIds: [f.operation.runId],
     });
     await expect(
-      f.call(
-        "stock_read",
-        { kind: "run_view", runId: f.operation.runId },
-        caller,
-      ),
+      f.call("stock_read_run", { runId: f.operation.runId }, caller),
     ).resolves.toMatchObject({ kind: "run_view", view: { scope: f.scope } });
     await expect(
-      f.call("stock_read", { kind: "artifact", ref: f.riskRef }, caller),
+      f.call("stock_read_artifact", { ref: f.riskRef }, caller),
     ).resolves.toMatchObject({ kind: "artifact" });
   });
   it("allows a task to read another role's historical artifact and evidence", async () => {
     const f = setup();
     await expect(
-      f.call("stock_read", { kind: "artifact", ref: f.analysisRef }),
+      f.call("stock_read_artifact", { ref: f.analysisRef }),
     ).resolves.toMatchObject({ kind: "artifact" });
-    const result = await f.call("stock_read", {
-      kind: "evidence",
+    const result = await f.call("stock_read_evidence", {
       ref: f.source,
     });
     expect(result).toMatchObject({ kind: "evidence", value: 100 });
@@ -223,8 +262,7 @@ describe("read tools", () => {
       "candidateClaims",
     );
     await expect(
-      f.call("stock_read", {
-        kind: "evidence",
+      f.call("stock_read_evidence", {
         ref: { ...f.source, selector: "/availableAt" },
       }),
     ).resolves.toMatchObject({ kind: "evidence", value: null });
@@ -294,8 +332,7 @@ describe("read tools", () => {
     );
     const original = f.runs.readEvidence(source);
     await expect(
-      f.call("stock_read", {
-        kind: "evidence",
+      f.call("stock_read_evidence", {
         ref: { ...source, selector: "/data/rows/1/values/close" },
       }),
     ).resolves.toMatchObject({
@@ -303,8 +340,7 @@ describe("read tools", () => {
       metadata: { gaps: [global, rowTime] },
     });
     await expect(
-      f.call("stock_read", {
-        kind: "evidence",
+      f.call("stock_read_evidence", {
         ref: { ...source, selector: "" },
       }),
     ).resolves.toMatchObject({
@@ -312,8 +348,7 @@ describe("read tools", () => {
       metadata: { gaps: envelope.gaps },
     });
     await expect(
-      f.call("stock_read", {
-        kind: "evidence",
+      f.call("stock_read_evidence", {
         ref: { ...source, selector: "/availableAt" },
       }),
     ).resolves.toMatchObject({ value: null });
@@ -323,8 +358,7 @@ describe("read tools", () => {
     const f = setup();
     const read = vi.spyOn(f.runs, "readArtifact");
     await expect(
-      f.call("stock_read", {
-        kind: "artifact",
+      f.call("stock_read_artifact", {
         ref: { ...f.analysisRef, runId: "other" },
       }),
     ).rejects.toMatchObject({ code: "ACCESS_DENIED" });
@@ -344,9 +378,9 @@ describe("read tools", () => {
   it("denies ask formal reads and pending checks", async () => {
     const f = setup();
     for (const [name, args] of [
-      ["stock_read", { kind: "run_view", runId: f.operation.runId }],
-      ["stock_check_numbers", { kind: "artifact", ref: f.analysisRef }],
-      ["stock_check_numbers", { kind: "pending", contentId: "x", content: {} }],
+      ["stock_read_run", { runId: f.operation.runId }],
+      ["stock_check_numbers", { ref: f.analysisRef }],
+      ["stock_check_pending_numbers", { contentId: "x", content: {} }],
     ] as const)
       await expect(f.call(name, args, f.ask)).rejects.toMatchObject({
         code: "ACCESS_DENIED",
@@ -355,7 +389,7 @@ describe("read tools", () => {
   it("allows review historical reads and ordinary recall", async () => {
     const f = setup();
     await expect(
-      f.call("stock_read", { kind: "artifact", ref: f.analysisRef }, f.review),
+      f.call("stock_read_artifact", { ref: f.analysisRef }, f.review),
     ).resolves.toMatchObject({ kind: "artifact" });
     await expect(
       f.call("stock_recall", recall, f.review),
@@ -391,7 +425,16 @@ describe("read tools", () => {
       { kind: "artifact", ref: { ...f.analysisRef, path: "/tmp/x" } },
       { kind: "evidence", ref: { ...f.source, cutoff: f.scope.cutoff } },
     ])
-      await expect(f.call("stock_read", args)).rejects.toMatchObject({
+      await expect(
+        f.call(
+          args.kind === "evidence"
+            ? "stock_read_evidence"
+            : "stock_read_artifact",
+          Object.fromEntries(
+            Object.entries(args).filter(([key]) => key !== "kind"),
+          ),
+        ),
+      ).rejects.toMatchObject({
         code: "INVALID_INPUT",
       });
   });
@@ -480,8 +523,7 @@ describe("read tools", () => {
       },
     };
     await expect(
-      f.call("stock_check_numbers", {
-        kind: "pending",
+      f.call("stock_check_pending_numbers", {
         contentId: "draft",
         content,
       }),
@@ -491,8 +533,7 @@ describe("read tools", () => {
     });
     expect(f.store.read(f.operation.runId).artifacts).toEqual(before);
     await expect(
-      f.call("stock_check_numbers", {
-        kind: "pending",
+      f.call("stock_check_pending_numbers", {
         contentId: "draft",
         content: { ...content, payload: {} },
       }),
@@ -506,8 +547,8 @@ describe("read tools", () => {
     ])
       await expect(
         f.call(
-          "stock_check_numbers",
-          { kind: "pending", contentId: "draft", content: {} },
+          "stock_check_pending_numbers",
+          { contentId: "draft", content: {} },
           caller,
         ),
       ).rejects.toMatchObject({ code: "ACCESS_DENIED" });
@@ -515,8 +556,7 @@ describe("read tools", () => {
   it("reports malformed JSON Pointer as INVALID_INPUT", async () => {
     const f = setup();
     await expect(
-      f.call("stock_read", {
-        kind: "evidence",
+      f.call("stock_read_evidence", {
         ref: { ...f.source, selector: "/data/~2" },
       }),
     ).rejects.toMatchObject({ code: "INVALID_INPUT" });

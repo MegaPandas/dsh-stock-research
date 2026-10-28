@@ -29,6 +29,11 @@ export const memoryRefSchema = objectSchema({
   entryId: stringSchema,
   revision: { type: "integer", description: "正安全整数修订号。" },
 });
+const returnsRequestProperties = {
+  ...dataSchemas.stock_get_returns.properties!,
+};
+Reflect.deleteProperty(returnsRequestProperties, "source");
+const memoryReturnsRequestSchema = objectSchema(returnsRequestProperties);
 export const rememberInputSchema = objectSchema({
   previous: { oneOf: [memoryRefSchema, { type: "null" }] },
   outcome: stringSchema,
@@ -41,7 +46,7 @@ export const rememberInputSchema = objectSchema({
     oneOf: [
       objectSchema({
         kind: { type: "string", const: "query" },
-        request: dataSchemas.stock_get_returns,
+        request: memoryReturnsRequestSchema,
       }),
       objectSchema({
         kind: { type: "string", const: "unavailable" },

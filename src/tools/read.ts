@@ -1,7 +1,6 @@
 import type { ToolDefinition, JsonSchemaNode } from "@deepseek-ai/dsh-tools";
 import type { ResearchScope } from "../contracts/data.js";
 import type { EvidenceData } from "../contracts/query.js";
-import type { NumberTarget } from "../contracts/numbers.js";
 import type { MemoryInputRegistration } from "../contracts/task-data.js";
 import { ResearchError } from "../contracts/errors.js";
 import {
@@ -11,7 +10,10 @@ import {
   type SessionBindings,
 } from "../host/bindings.js";
 import { parseArtifactInput } from "../services/artifact-schema.js";
-import { checkNumbersParameters } from "./artifact-inputs.js";
+import {
+  checkNumbersParameters,
+  checkPendingNumbersParameters,
+} from "./artifact-inputs.js";
 import type { MemoryService } from "../services/memory.js";
 import type { NumberService } from "../services/numbers.js";
 import { readPointer, SelectorError } from "../services/number-fields.js";
@@ -67,6 +69,13 @@ const kind = (value: string): JsonSchemaNode => ({
   type: "string",
   const: value,
 });
+const numberCheckOutput = objectSchema({
+  checkerVersion: stringSchema,
+  target: opaqueObject,
+  scope: opaqueObject,
+  passed: { type: "boolean" },
+  claims: { type: "array", items: opaqueObject },
+});
 export function createReadTools(
   services: ReadToolServices,
   bindings: SessionBindings,
@@ -74,47 +83,53 @@ export function createReadTools(
   const { runs, queries, memory, numbers } = services;
   const tools: ToolDefinition[] = [
     {
-      name: "stock_read",
-      description:
-        "读取绑定允许的运行视图、固定产物或证据字段。没有文件路径参数。",
-      parameters: {
-        oneOf: [
-          objectSchema({ kind: kind("run_view"), runId: stringSchema }),
-          objectSchema({ kind: kind("artifact"), ref: artifactRefSchema }),
-          objectSchema({ kind: kind("evidence"), ref: sourceRefSchema }),
-        ],
-      },
-      output: output({
-        oneOf: [
-          objectSchema({ kind: kind("run_view"), view: opaqueObject }),
-          objectSchema({ kind: kind("artifact"), artifact: opaqueObject }),
-          objectSchema({
-            kind: kind("evidence"),
-            ref: sourceRefSchema,
-            value: {},
-            metadata: opaqueObject,
-          }),
-        ],
-      }),
+      name: "stock_read_run",
+      description: "读取绑定允许的运行视图。没有文件路径参数。",
+      parameters: objectSchema({ runId: stringSchema }),
+      output: output(
+        objectSchema({ kind: kind("run_view"), view: opaqueObject }),
+      ),
       async execute(value, exec) {
         exec.signal.throwIfAborted();
         const caller = bindings.require(exec.agent);
-        const targetKind = (value as { kind?: unknown } | null)?.kind;
-        const item = object(
-          value,
-          targetKind === "run_view" ? ["kind", "runId"] : ["kind", "ref"],
-        );
-        if (targetKind === "run_view") {
-          const runId = text(item.runId, "runId");
-          authorizeRun(caller.binding, runId);
-          return { kind: "run_view", view: runs.view({ runId }) };
-        }
-        if (targetKind === "artifact") {
-          const ref = artifactRef(item.ref);
-          authorizeRun(caller.binding, ref.runId);
-          return { kind: "artifact", artifact: runs.readArtifact(ref) };
-        }
-        if (targetKind !== "evidence") invalid("Unknown stock_read kind.");
+        const item = object(value, ["runId"]);
+        const runId = text(item.runId, "runId");
+        authorizeRun(caller.binding, runId);
+        return { kind: "run_view", view: runs.view({ runId }) };
+      },
+    },
+    {
+      name: "stock_read_artifact",
+      description: "读取绑定允许的固定产物。没有文件路径参数。",
+      parameters: objectSchema({ ref: artifactRefSchema }),
+      output: output(
+        objectSchema({ kind: kind("artifact"), artifact: opaqueObject }),
+      ),
+      async execute(value, exec) {
+        exec.signal.throwIfAborted();
+        const caller = bindings.require(exec.agent);
+        const item = object(value, ["ref"]);
+        const ref = artifactRef(item.ref);
+        authorizeRun(caller.binding, ref.runId);
+        return { kind: "artifact", artifact: runs.readArtifact(ref) };
+      },
+    },
+    {
+      name: "stock_read_evidence",
+      description: "读取绑定允许的证据字段。没有文件路径参数。",
+      parameters: objectSchema({ ref: sourceRefSchema }),
+      output: output(
+        objectSchema({
+          kind: kind("evidence"),
+          ref: sourceRefSchema,
+          value: {},
+          metadata: opaqueObject,
+        }),
+      ),
+      async execute(value, exec) {
+        exec.signal.throwIfAborted();
+        const caller = bindings.require(exec.agent);
+        const item = object(value, ["ref"]);
         const ref = sourceRef(item.ref);
         authorizeRun(caller.binding, ref.runId);
         const envelope = runs.readEvidence<EvidenceData>(ref).envelope;
@@ -232,48 +247,39 @@ export function createReadTools(
     },
     {
       name: "stock_check_numbers",
-      description:
-        "只读核验获准的固定产物，或当前绑定任务的完整待提交产物。不会提交或自动修正声明。",
+      description: "只读核验获准的固定产物。不会提交或自动修正声明。",
       parameters: checkNumbersParameters(),
-      output: output(
-        objectSchema({
-          checkerVersion: stringSchema,
-          target: opaqueObject,
-          scope: opaqueObject,
-          passed: { type: "boolean" },
-          claims: { type: "array", items: opaqueObject },
-        }),
-      ),
+      output: output(numberCheckOutput),
       async execute(value, exec) {
         exec.signal.throwIfAborted();
         const caller = bindings.require(exec.agent);
-        const targetKind = (value as { kind?: unknown } | null)?.kind;
-        const item = object(
-          value,
-          targetKind === "artifact"
-            ? ["kind", "ref"]
-            : ["kind", "contentId", "content"],
+        const item = object(value, ["ref"]);
+        const ref = artifactRef(item.ref);
+        authorizeRun(caller.binding, ref.runId);
+        return numbers.checkNumbers(
+          { runId: ref.runId, identity: caller.agent.id },
+          { kind: "artifact", ref },
         );
-        let target: NumberTarget;
-        let runId: string;
-        if (targetKind === "artifact") {
-          const ref = artifactRef(item.ref);
-          authorizeRun(caller.binding, ref.runId);
-          target = { kind: "artifact", ref };
-          runId = ref.runId;
-        } else {
-          if (targetKind !== "pending")
-            invalid("Unknown stock_check_numbers kind.");
-          runId = taskOperation(caller).runId;
-          target = {
+      },
+    },
+    {
+      name: "stock_check_pending_numbers",
+      description:
+        "只读核验当前绑定任务的完整待提交产物。不会提交或自动修正声明。",
+      parameters: checkPendingNumbersParameters(),
+      output: output(numberCheckOutput),
+      async execute(value, exec) {
+        exec.signal.throwIfAborted();
+        const caller = bindings.require(exec.agent);
+        const item = object(value, ["contentId", "content"]);
+        const runId = taskOperation(caller).runId;
+        return numbers.checkNumbers(
+          { runId, identity: caller.agent.id },
+          {
             kind: "pending",
             contentId: text(item.contentId, "contentId"),
             content: parseArtifactInput(item.content),
-          };
-        }
-        return numbers.checkNumbers(
-          { runId, identity: caller.agent.id },
-          target,
+          },
         );
       },
     },
