@@ -1,9 +1,16 @@
 {
   "name": "dsh-stock-research",
   "version": "0.1.0-rc.1",
-  "private": true,
   "description": "Evidence-based single-stock research for DSH",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/MegaPandas/dsh-stock-research.git"
+  },
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org/",
+    "tag": "next"
+  },
   "type": "module",
   "engines": {
     "node": "24.16.0",
@@ -74,6 +81,7 @@
   },
   "scripts": {
     "build": "tsdown",
+    "prepack": "npm run build",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:package": "node scripts/check-package.mjs",

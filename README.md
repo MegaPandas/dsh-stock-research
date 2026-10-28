@@ -19,7 +19,13 @@
 
 ## 开始使用
 
-需要 Node.js 24.16.0 和 DSH `>0.2.1-rc.1`。在项目目录执行 `npm ci` 和 `npm run build`，将构建后的包放入 DSH 宿主可解析的依赖中，并在 profile 的 `dsh.profile.bundles` 中加入 `dsh-stock-research`，保留已有 bundle。宿主需提供 Agent、工具、模型、命令及本地子 Agent 等基础服务；模型及凭证由 DSH 管理。
+需要 Node.js 24.16.0、DSH `>0.2.1-rc.1` 和 pnpm。使用 DSH 插件管理命令从 npm 安装到指定 profile（以 `web` 为例）：
+
+```bash
+dsh plugin --profile web add dsh-stock-research@0.1.0-rc.1
+```
+
+宿主需提供 Agent、工具、模型、命令及本地子 Agent 等基础服务；模型及凭证由 DSH 管理。
 
 在 DSH 聊天中直接提出研究需求，例如：
 
