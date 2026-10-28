@@ -12,6 +12,7 @@ export const SOURCE_IDS = [
   "sec",
   "eastmoney-income",
   "sina",
+  "xueqiu",
   "fred",
   "china-macro",
   "benchmarks",
@@ -26,6 +27,7 @@ export interface ResearchConfig {
   policy: QueryToolPolicy;
   digestModel?: ModelConfig;
   secUserAgent?: string;
+  xueqiuCookie?: string;
 }
 
 const MAX_TIMER_MS = 2_147_483_647;
@@ -87,11 +89,28 @@ const schema = closed({
   }),
   digestModel: ModelConfig.required(false),
   secUserAgent: text.required(false),
+  xueqiuCookie: z.string().required(false),
 });
 
 export const Config = z
   .transform(schema, (value): ResearchConfig => {
     const config = value as ResearchConfig;
+    if (
+      config.xueqiuCookie === null ||
+      (config.xueqiuCookie !== undefined && /[\r\n]/.test(config.xueqiuCookie))
+    )
+      throw new ResearchError(
+        "INVALID_INPUT",
+        "Xueqiu Cookie must be a single-line string when supplied.",
+      );
+    if (
+      config.enabledSources.includes("xueqiu") &&
+      !config.xueqiuCookie?.trim()
+    )
+      throw new ResearchError(
+        "INVALID_INPUT",
+        "The enabled Xueqiu source requires a Cookie.",
+      );
     if (config.secUserAgent === null)
       throw new ResearchError(
         "INVALID_INPUT",

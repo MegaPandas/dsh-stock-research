@@ -26,9 +26,11 @@ import type { QueryService } from "./query.js";
 import { SharedQueries } from "./shared-queries.js";
 import { createUsCollectionTasks } from "./collection-us.js";
 import { applyCollectionFreshness } from "./collection-freshness.js";
+import { XueqiuClient } from "../data/xueqiu.js";
 
 export interface CollectionOptions {
   enabledSources: readonly string[];
+  xueqiuCookie?: string;
   freshness: { market: number; fundamentals: number; macro: number };
   secCiks: Readonly<Record<string, string>>;
   ttl: QueryCachePolicy;
@@ -253,9 +255,19 @@ export class CollectionService {
     const enabled = new Set(this.#options.enabledSources);
     let tasks: CollectionTask[];
     if (scope.security.market === "CN") {
+      const xueqiu = enabled.has("xueqiu")
+        ? new XueqiuClient(
+            this.http.forSource("xueqiu"),
+            this.#options.xueqiuCookie!,
+          )
+        : undefined;
       tasks = [
-        ...createChinaMarketTasks(this.http, scope),
-        ...createChinaFinancialTasks(this.http.forSource("eastmoney"), scope),
+        ...createChinaMarketTasks(this.http, scope, xueqiu),
+        ...createChinaFinancialTasks(
+          this.http.forSource("eastmoney"),
+          scope,
+          xueqiu,
+        ),
         ...createChinaMacroTasks(this.http, scope),
         ...createBenchmarkMarketTasks(this.http, scope),
         ...createBenchmarkBondTasks(this.http.forSource("eastmoney"), scope),

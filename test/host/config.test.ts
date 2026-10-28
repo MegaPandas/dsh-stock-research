@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import z from "@deepseek-ai/schemastery";
 import { Config, type ResearchConfig } from "../../src/host/config.js";
+import { ResearchError } from "../../src/contracts/errors.js";
 
 function parse(value: unknown): ResearchConfig {
   return z.resolve(value, Config, {})[0];
@@ -54,6 +55,41 @@ describe("Research runtime configuration boundary", () => {
     expect(() => parse({ ...config, secUserAgent: null })).toThrow();
     expect(() => parse({ ...input(), secUserAgent: null })).toThrow();
   });
+
+  it("leaves Xueqiu disabled unless selected and retains its configured Cookie", () => {
+    const config = input();
+    expect(parse(config).enabledSources).not.toContain("xueqiu");
+    expect(parse(config).xueqiuCookie).toBeUndefined();
+    config.xueqiuCookie = "session=fixture";
+    expect(parse(config).xueqiuCookie).toBe("session=fixture");
+    config.enabledSources.push("xueqiu");
+    expect(parse(config)).toEqual(config);
+  });
+
+  it.each([undefined, "", "   "])(
+    "requires a Cookie before enabling Xueqiu: %j",
+    (xueqiuCookie) => {
+      expect(() =>
+        parse({
+          ...input(),
+          enabledSources: ["xueqiu"],
+          xueqiuCookie,
+        }),
+      ).toThrow("The enabled Xueqiu source requires a Cookie.");
+    },
+  );
+
+  it.each([null, "session=fixture\r", "session=fixture\nInjected: fixture"])(
+    "rejects invalid Cookie headers without including their contents: %j",
+    (xueqiuCookie) => {
+      expect(() => parse({ ...input(), xueqiuCookie })).toThrow(
+        new ResearchError(
+          "INVALID_INPUT",
+          "Xueqiu Cookie must be a single-line string when supplied.",
+        ),
+      );
+    },
+  );
 
   it.each([NaN, Infinity, -1, null, undefined])(
     "rejects invalid durations %s at cache and freshness boundaries",

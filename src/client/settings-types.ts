@@ -47,6 +47,7 @@ export interface SettingsValue {
       secCiks: Record<string, string>;
     };
     secUserAgent?: string;
+    xueqiuCookie?: string;
     digestModel?: ModelOverride;
   };
 }

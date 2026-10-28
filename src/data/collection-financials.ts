@@ -6,6 +6,7 @@ import type {
 import type { ResearchScope } from "../contracts/data.js";
 import { ResearchError } from "../contracts/errors.js";
 import type { HttpClient } from "./http.js";
+import { type XueqiuClient, xueqiuDate } from "./xueqiu.js";
 import { collectedEnvelope, collectedNumber } from "./collection-utils.js";
 import {
   parseSourceJson,
@@ -173,6 +174,182 @@ const REPORTS: Report[] = [
   },
 ];
 
+const XUEQIU_REPORTS: Record<
+  string,
+  { endpoint: string; fields: Record<string, string> }
+> = {
+  "financial.indicators": {
+    endpoint: "indicator",
+    fields: {
+      EPSJB: "basic_eps",
+      BPS: "np_per_share",
+      MGZBGJ: "capital_reserve",
+      MGWFPLR: "undistri_profit_ps",
+      MGJYXJJE: "operate_cash_flow_ps",
+      TOTALOPERATEREVE: "total_revenue",
+      PARENTNETPROFIT: "net_profit_atsopc",
+      KCFJCXSYJLR: "net_profit_after_nrgal_atsolc",
+      PARENTNETPROFITTZ: "net_profit_atsopc_yoy",
+      KCFJCXSYJLRTZ: "np_atsopc_nrgal_yoy",
+      ROEJQ: "avg_roe",
+      XSJLL: "net_selling_rate",
+      XSMLL: "gross_selling_rate",
+      LD: "current_ratio",
+      SD: "quick_ratio",
+      ZCFZL: "asset_liab_ratio",
+      CHZZTS: "inventory_turnover_days",
+      YSZKZZTS: "receivable_turnover_days",
+      TOAZZL: "total_capital_turnover",
+      CHZZL: "inventory_turnover",
+      YSZKZZL: "account_receivable_turnover",
+    },
+  },
+  "financial.income": {
+    endpoint: "income",
+    fields: {
+      TOTAL_OPERATE_INCOME: "total_revenue",
+      OPERATE_INCOME: "revenue",
+      TOTAL_OPERATE_COST: "operating_costs",
+      OPERATE_COST: "operating_cost",
+      SALE_EXPENSE: "sales_fee",
+      MANAGE_EXPENSE: "manage_fee",
+      FINANCE_EXPENSE: "financing_expenses",
+      OPERATE_PROFIT: "op",
+      TOTAL_PROFIT: "profit_total_amt",
+      INCOME_TAX: "income_tax_expenses",
+      PARENT_NETPROFIT: "net_profit_atsopc",
+      DEDUCT_PARENT_NETPROFIT: "net_profit_after_nrgal_atsolc",
+    },
+  },
+  "financial.balance": {
+    endpoint: "balance",
+    fields: {
+      TOTAL_ASSETS: "total_assets",
+      TOTAL_LIABILITIES: "total_liab",
+      TOTAL_EQUITY: "total_holders_equity",
+      MONETARYFUNDS: "currency_funds",
+      ACCOUNTS_RECE: "account_receivable",
+      INVENTORY: "inventory",
+      FIXED_ASSET: "fixed_asset",
+      ACCOUNTS_PAYABLE: "accounts_payable",
+      ADVANCE_RECEIVABLES: "pre_receivable",
+      SHORT_LOAN: "st_loan",
+      DEBT_ASSET_RATIO: "asset_liab_ratio",
+    },
+  },
+  "financial.cashflow": {
+    endpoint: "cash_flow",
+    fields: {
+      NETCASH_OPERATE: "ncf_from_oa",
+      NETCASH_INVEST: "ncf_from_ia",
+      NETCASH_FINANCE: "ncf_from_fa",
+      SALES_SERVICES: "cash_received_of_sales_service",
+      PAY_STAFF_CASH: "cash_paid_to_employee_etc",
+      RECEIVE_INVEST_INCOME: "invest_income_cash_received",
+      CONSTRUCT_LONG_ASSET: "cash_paid_for_assets",
+      INVEST_PAY_CASH: "invest_paid_cash",
+      CCE_ADD: "net_increase_in_cce",
+      BEGIN_CCE: "initial_balance_of_cce",
+      END_CCE: "final_balance_of_cce",
+    },
+  },
+};
+
+function xueqiuValue(value: unknown, field: string): number | null {
+  if (value === undefined || value === null) return null;
+  const pair = sourceArray(value, field);
+  if (pair.length !== 2)
+    sourceError(field, "expected a source value and comparison pair");
+  return collectedNumber(pair[0], field);
+}
+
+function xueqiuReportTask(
+  client: XueqiuClient,
+  scope: ResearchScope,
+  report: Report,
+  source: (typeof XUEQIU_REPORTS)[string],
+): CollectionTask {
+  const path = `/v5/stock/finance/cn/${source.endpoint}.json`;
+  const cutoffDate = localDate.format(new Date(scope.cutoff));
+  const end = scope.date < cutoffDate ? scope.date : cutoffDate;
+  return {
+    id: report.id,
+    dataset: "fundamentals",
+    provider: "xueqiu",
+    endpoint: `https://stock.xueqiu.com${path}`,
+    async run(signal) {
+      const response = await client.get(
+        path,
+        {
+          symbol: scope.security.exchange + scope.security.symbol.slice(0, 6),
+          type: "all",
+          is_detail: "true",
+          count: String(REPORT_WINDOW),
+          timestamp: String(Date.parse(scope.cutoff)),
+        },
+        signal,
+      );
+      if (response.data.currency !== "CNY")
+        sourceError("currency", "expected CNY financial quantities");
+      const rows: CollectionRow[] = [];
+      for (const item of sourceArray(response.data.list, "list")) {
+        const raw = sourceObject(item, report.id);
+        const date = xueqiuDate(raw.report_date, "report_date");
+        if (!QUARTER_ENDS.has(date.slice(5)))
+          sourceError("report_date", "expected a quarter or year end");
+        const asOf = `${date}T15:59:59.999Z`;
+        if (date > end || asOf > scope.cutoff) continue;
+        rows.push({
+          date,
+          asOf,
+          availableAt: null,
+          complete: true,
+          publishedDate: null,
+          periodStart: periodStart(date, report.basis),
+          values: Object.fromEntries(
+            Object.keys(report.columns).map((key) => {
+              const field = source.fields[key];
+              return [
+                key,
+                field === undefined ? null : xueqiuValue(raw[field], field),
+              ];
+            }),
+          ),
+        });
+      }
+      rows.sort((a, b) => a.date.localeCompare(b.date));
+      const envelope = collectedEnvelope(
+        scope,
+        "fundamentals",
+        {
+          table: report.id,
+          title: report.title,
+          columns: report.columns,
+          rows: rows.slice(-REPORT_WINDOW),
+          currency: "CNY",
+          basis: report.basis,
+        },
+        "xueqiu",
+        response.url,
+        response.retrievedAt,
+      );
+      if (envelope.data.rows.length < REPORT_WINDOW)
+        envelope.gaps.push({
+          code: "missing",
+          field: "/data/rows",
+          detail: `The source supplies ${envelope.data.rows.length} eligible reporting periods; the fixed window requests ${REPORT_WINDOW}.`,
+        });
+      envelope.gaps.push({
+        code: "unverified_time",
+        field: "/data/rows/publishedDate",
+        detail:
+          "Xueqiu report dates and creation timestamps do not establish public disclosure times or historical revisions.",
+      });
+      return envelope;
+    },
+  };
+}
+
 function reportDate(value: unknown, field: string): string {
   if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2} 00:00:00$/.test(value))
     sourceError(field, "expected a calendar date with midnight padding");
@@ -338,6 +515,7 @@ function reportTask(
 export function createChinaFinancialTasks(
   http: HttpClient,
   scope: ResearchScope,
+  xueqiu?: XueqiuClient,
 ): CollectionTask[] {
   if (
     scope.security.market !== "CN" ||
@@ -348,5 +526,11 @@ export function createChinaFinancialTasks(
       "VERSION_UNAVAILABLE",
       "Deterministic China financial collection supports SH/SZ A shares in CNY.",
     );
-  return REPORTS.map((report) => reportTask(http, scope, report));
+  return REPORTS.map((report) => {
+    const task = reportTask(http, scope, report);
+    const source = XUEQIU_REPORTS[report.id];
+    if (xueqiu !== undefined && source !== undefined)
+      task.fallback = xueqiuReportTask(xueqiu, scope, report, source);
+    return task;
+  });
 }

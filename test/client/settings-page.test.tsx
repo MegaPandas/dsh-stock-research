@@ -472,6 +472,51 @@ describe("stock research settings page", () => {
     ]);
   });
 
+  it("requires a masked Cookie before enabling Xueqiu and preserves it when disabled", async () => {
+    const h = fixture();
+    render(<SettingsPage form={h.form} loadCatalog={loadCatalog} />);
+    await ready();
+    fireEvent.click(screen.getByText("数据来源"));
+    const xueqiu = screen.getByRole("checkbox", { name: /雪球/ });
+    expect((xueqiu as HTMLInputElement).checked).toBe(false);
+    expect(screen.queryByLabelText("雪球 Cookie")).toBeNull();
+    fireEvent.click(xueqiu);
+    fireEvent.click(screen.getByRole("button", { name: "保存" }));
+    expect(await screen.findByRole("alert")).toHaveProperty(
+      "textContent",
+      "启用雪球前请填写 Cookie。",
+    );
+    const cookie = screen.getByLabelText("雪球 Cookie");
+    expect(cookie.getAttribute("type")).toBe("password");
+    expect(document.activeElement).toBe(cookie);
+    expect(h.mutate).not.toHaveBeenCalled();
+    fireEvent.change(cookie, { target: { value: "session=fixture" } });
+    fireEvent.click(xueqiu);
+    expect(screen.queryByLabelText("雪球 Cookie")).toBeNull();
+    fireEvent.click(xueqiu);
+    expect(
+      (screen.getByLabelText("雪球 Cookie") as HTMLInputElement).value,
+    ).toBe("session=fixture");
+    fireEvent.click(screen.getByRole("button", { name: "保存" }));
+    await waitFor(() =>
+      expect(h.mutate).toHaveBeenCalledWith(
+        [
+          {
+            op: "set",
+            path: ["runtime", "enabledSources"],
+            value: ["yahoo", "tencent", "xueqiu"],
+          },
+          {
+            op: "set",
+            path: ["runtime", "xueqiuCookie"],
+            value: "session=fixture",
+          },
+        ],
+        7,
+      ),
+    );
+  });
+
   it("validates SEC identity and mapping, preserving fields when the source is disabled", async () => {
     const h = fixture();
     render(<SettingsPage form={h.form} loadCatalog={loadCatalog} />);

@@ -482,6 +482,9 @@ export function createResearchPlugin(prepareRole: PrepareRole) {
           queries,
           {
             enabledSources: config.enabledSources,
+            ...(config.xueqiuCookie === undefined
+              ? {}
+              : { xueqiuCookie: config.xueqiuCookie }),
             freshness: config.policy.freshness,
             secCiks: config.policy.secCiks,
             ttl: config.cache.ttl,

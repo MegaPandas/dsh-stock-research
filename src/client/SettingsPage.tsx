@@ -32,6 +32,7 @@ const sources = [
   ["tencent", "腾讯行情", "行情查询与日线备用来源"],
   ["eastmoney-income", "东方财富财务", "A 股财务指标与报表"],
   ["sina", "新浪财经", "财务查询、行情均线及个股、指数、部分国际基准备用"],
+  ["xueqiu", "雪球", "默认关闭，配置 Cookie 后作为 A 股行情与财务备用来源"],
   ["china-macro", "中国宏观", "国内宏观固定采集"],
   ["benchmarks", "市场基准", "指数、汇率、黄金与国债"],
   ["fred", "FRED", "美国宏观序列"],
@@ -487,6 +488,14 @@ export function SettingsPage({
         message: "请填写有效的网络、缓存和新鲜度参数；容量和并发须为正整数。",
         field: invalidNumber[0],
       };
+    if (
+      draft.runtime.enabledSources.includes("xueqiu") &&
+      !draft.runtime.xueqiuCookie?.trim()
+    )
+      return {
+        message: "启用雪球前请填写 Cookie。",
+        field: "雪球 Cookie",
+      };
     if (draft.runtime.enabledSources.includes("sec")) {
       if (!draft.runtime.secUserAgent?.trim())
         return {
@@ -735,6 +744,27 @@ export function SettingsPage({
                 </label>
               ))}
             </div>
+            {draft.runtime.enabledSources.includes("xueqiu") && (
+              <fieldset className="sr-card">
+                <legend>雪球请求配置</legend>
+                <label>
+                  Cookie
+                  <input
+                    type="password"
+                    aria-label="雪球 Cookie"
+                    autoComplete="off"
+                    value={draft.runtime.xueqiuCookie ?? ""}
+                    placeholder="xq_a_token=你的值; u=你的用户ID; xq_is_login=1"
+                    onChange={(event) =>
+                      edit(["runtime", "xueqiuCookie"], event.target.value)
+                    }
+                  />
+                </label>
+                <p className="sr-muted">
+                  格式：xq_a_token=你的值; u=你的用户ID; xq_is_login=1
+                </p>
+              </fieldset>
+            )}
             {draft.runtime.enabledSources.includes("sec") && (
               <fieldset className="sr-card">
                 <legend>SEC 请求配置</legend>

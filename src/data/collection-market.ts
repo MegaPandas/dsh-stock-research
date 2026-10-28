@@ -23,6 +23,7 @@ import {
   tencentPeriodCount,
 } from "./tencent-kline.js";
 import { SINA_KLINE_ENDPOINT, sinaKlines } from "./sina-kline.js";
+import { type XueqiuClient, xueqiuDate, xueqiuTimestamp } from "./xueqiu.js";
 
 const DAY_MS = 86_400_000;
 const MARKET_WINDOWS = [
@@ -150,6 +151,7 @@ function klineTask(
   window: (typeof MARKET_WINDOWS)[number],
   tencent: HttpClient,
   sina: HttpClient,
+  xueqiu?: XueqiuClient,
 ): CollectionTask {
   const end = completedEnd(scope, window.interval);
   const start =
@@ -347,6 +349,117 @@ function klineTask(
   }
   task.fallback = backup("tencent");
   task.fallback.fallback = backup("sina");
+  if (xueqiu !== undefined) {
+    const client = xueqiu;
+    task.fallback.fallback.fallback = {
+      id: task.id,
+      dataset: "market",
+      provider: "xueqiu",
+      endpoint: "https://stock.xueqiu.com/v5/stock/chart/kline.json",
+      async run(signal) {
+        const symbol = scope.security.exchange + code;
+        const response = await client.get(
+          "/v5/stock/chart/kline.json",
+          {
+            symbol,
+            begin: String(Date.parse(sessionEnd(end, scope.security))),
+            period:
+              window.interval === "1d"
+                ? "day"
+                : window.interval === "1wk"
+                  ? "week"
+                  : "month",
+            type: "normal",
+            count: String(-window.count),
+            indicator: "kline",
+          },
+          signal,
+        );
+        const raw = response.data;
+        if (raw.symbol !== symbol)
+          sourceError("symbol", "security does not match the request");
+        const columns = sourceArray(raw.column, "column").map((column) => {
+          if (typeof column !== "string")
+            sourceError("column", "expected column names");
+          return column;
+        });
+        if (new Set(columns).size !== columns.length)
+          sourceError("column", "duplicate column names");
+        for (const field of [
+          "timestamp",
+          "open",
+          "close",
+          "high",
+          "low",
+          "volume",
+        ])
+          if (!columns.includes(field))
+            sourceError("column", `missing ${field} column`);
+        const mapping = {
+          open: "open",
+          close: "close",
+          high: "high",
+          low: "low",
+          volume: "volume",
+          amount: "amount",
+          amplitude: "amplitude",
+          changePercent: "percent",
+          change: "chg",
+          turnover: "turnoverrate",
+        };
+        const rows = sourceArray(raw.item, "item")
+          .map((item) => {
+            const values = sourceArray(item, "item row");
+            if (values.length !== columns.length)
+              sourceError("item", "row length does not match the columns");
+            const record = Object.fromEntries(
+              columns.map((column, index) => [column, values[index]]),
+            );
+            const date = xueqiuDate(record.timestamp, "timestamp");
+            const quantities = Object.fromEntries(
+              Object.entries(mapping).map(([key, field]) => [
+                key,
+                collectedNumber(record[field], field),
+              ]),
+            );
+            validatePrices(quantities, date);
+            return sourceRow(date, quantities, scope, window.interval);
+          })
+          .filter(
+            (row) =>
+              periodEnd(row.date, window.interval) <= end && row.complete,
+          )
+          .sort((a, b) => a.date.localeCompare(b.date))
+          .slice(-window.count);
+        const data: CollectedTableData = {
+          table: task.id,
+          title: window.title,
+          columns: MARKET_COLUMNS,
+          rows,
+          currency: "CNY",
+          adjustment: "unadjusted",
+          interval: window.interval,
+        };
+        const envelope = collectedEnvelope(
+          scope,
+          "market",
+          data,
+          "xueqiu",
+          response.url,
+          response.retrievedAt,
+        );
+        envelope.gaps.push(...windowGap(data, window.count));
+        if (window.interval !== "1d")
+          envelope.gaps.push({
+            code: "missing",
+            field: "/data/columns/ma",
+            detail:
+              "This period endpoint does not supply source-reported moving averages; none are calculated locally.",
+          });
+        return envelope;
+      },
+    };
+  }
   return task;
 }
 
@@ -527,7 +640,11 @@ function valuationTask(http: HttpClient, scope: ResearchScope): CollectionTask {
   };
 }
 
-function snapshotTask(http: HttpClient, scope: ResearchScope): CollectionTask {
+function snapshotTask(
+  http: HttpClient,
+  scope: ResearchScope,
+  xueqiu?: XueqiuClient,
+): CollectionTask {
   const code = scope.security.symbol.slice(0, 6);
   const url = urlWith("https://push2.eastmoney.com/api/qt/stock/get", {
     secid: `${scope.security.exchange === "SH" ? 1 : 0}.${code}`,
@@ -554,7 +671,7 @@ function snapshotTask(http: HttpClient, scope: ResearchScope): CollectionTask {
   const columns = Object.fromEntries(
     Object.entries(mapping).map(([key, [, column]]) => [key, column]),
   );
-  return {
+  const task: CollectionTask = {
     id: "stock.snapshot",
     dataset: "market",
     provider: "eastmoney",
@@ -634,11 +751,91 @@ function snapshotTask(http: HttpClient, scope: ResearchScope): CollectionTask {
       );
     },
   };
+  if (xueqiu !== undefined) {
+    const client = xueqiu;
+    task.fallback = {
+      id: task.id,
+      dataset: "market",
+      provider: "xueqiu",
+      endpoint: "https://stock.xueqiu.com/v5/stock/quote.json",
+      async run(signal) {
+        const symbol = scope.security.exchange + code;
+        const response = await client.get(
+          "/v5/stock/quote.json",
+          { symbol, extend: "detail" },
+          signal,
+        );
+        const raw = sourceObject(response.data.quote, "quote");
+        if (raw.symbol !== symbol)
+          sourceError("symbol", "security does not match the request");
+        if (raw.currency !== "CNY")
+          sourceError("currency", "expected CNY quote quantities");
+        if (typeof raw.name !== "string" || raw.name.trim() === "")
+          sourceError("name", "expected the source security name");
+        const asOf = xueqiuTimestamp(raw.timestamp, "timestamp");
+        const date = localDate.format(new Date(asOf));
+        if (asOf > scope.cutoff || date > scope.date)
+          throw new ResearchError(
+            "DATA_INSUFFICIENT",
+            "The current quote snapshot is after the research cutoff; it cannot supply a historical quote.",
+          );
+        const fields = {
+          price: "current",
+          volume: "volume",
+          amount: "amount",
+          volumeRatio: "volume_ratio",
+          peStatic: "pe_lyr",
+          peTtm: "pe_ttm",
+          pb: "pb",
+          turnover: "turnover_rate",
+          totalShares: "total_shares",
+          floatShares: "float_shares",
+          marketCap: "market_capital",
+          floatMarketCap: "float_market_capital",
+        };
+        const values: CollectionRow["values"] = {
+          ...Object.fromEntries(
+            Object.entries(fields).map(([key, field]) => [
+              key,
+              collectedNumber(raw[field], field),
+            ]),
+          ),
+          peDynamic: null,
+        };
+        for (const key of ["price", "volume", "amount"])
+          if (values[key] !== null && values[key]! < 0)
+            sourceError(key, "expected a nonnegative quantity");
+        return collectedEnvelope(
+          scope,
+          "market",
+          {
+            table: task.id,
+            title: "股票基础与最新估值快照",
+            columns,
+            rows: [{ date, asOf, availableAt: null, complete: true, values }],
+            currency: "CNY",
+            adjustment: "unadjusted",
+            basis: "current_quote",
+            attributes: {
+              name: raw.name,
+              code,
+              exchange: scope.security.exchange,
+            },
+          },
+          "xueqiu",
+          response.url,
+          response.retrievedAt,
+        );
+      },
+    };
+  }
+  return task;
 }
 
 export function createChinaMarketTasks(
   http: HttpClient,
   scope: ResearchScope,
+  xueqiu?: XueqiuClient,
 ): CollectionTask[] {
   if (
     scope.security.market !== "CN" ||
@@ -654,10 +851,10 @@ export function createChinaMarketTasks(
   const sina = http.forSource("sina");
   return [
     ...MARKET_WINDOWS.map((window) =>
-      klineTask(eastmoney, scope, window, tencent, sina),
+      klineTask(eastmoney, scope, window, tencent, sina, xueqiu),
     ),
     averagesTask(sina, scope),
     valuationTask(eastmoney, scope),
-    snapshotTask(eastmoney, scope),
+    snapshotTask(eastmoney, scope, xueqiu),
   ];
 }
