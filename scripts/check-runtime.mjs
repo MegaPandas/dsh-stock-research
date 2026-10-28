@@ -16,15 +16,18 @@ import { SessionId } from "@deepseek-ai/dsh-session";
 import { SubagentRuntime } from "@deepseek-ai/dsh-subagent";
 import * as SpawnInProcess from "@deepseek-ai/dsh-subagent-spawn-in-process";
 import { ToolCallId } from "@deepseek-ai/dsh-llm";
-import { DataRoot } from "dsh-stock-research/core";
-import { Config, createResearchPlugin } from "dsh-stock-research/runtime";
-import * as Ask from "dsh-stock-research/ask";
-import * as Review from "dsh-stock-research/review";
+import { DataRoot } from "@megapandas/dsh-stock-research/core";
+import {
+  Config,
+  createResearchPlugin,
+} from "@megapandas/dsh-stock-research/runtime";
+import * as Ask from "@megapandas/dsh-stock-research/ask";
+import * as Review from "@megapandas/dsh-stock-research/review";
 import {
   createQuickInput,
   prepareResearchRole,
-} from "dsh-stock-research/application";
-import * as Role from "dsh-stock-research/role";
+} from "@megapandas/dsh-stock-research/application";
+import * as Role from "@megapandas/dsh-stock-research/role";
 
 // Resolve from each consuming SDK package, rather than assume a hoisted copy.
 for (const dependency of [
@@ -126,7 +129,7 @@ try {
   assert.ok(result.value.sources.every((source) => source.sourceCalls === 0));
   const input = createQuickInput(scope, runtime.policy, result.value.sources);
   const manifest = createRequire(import.meta.url)(
-    "dsh-stock-research/package.json",
+    "@megapandas/dsh-stock-research/package.json",
   );
   assert.equal(input.versions.plugin, manifest.version);
   assert.equal(input.versions.prompts.roles, "22");

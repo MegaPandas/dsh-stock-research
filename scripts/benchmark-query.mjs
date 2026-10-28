@@ -13,7 +13,7 @@ import {
   RunService,
   RunStore,
   SqliteCache,
-} from "dsh-stock-research/core";
+} from "@megapandas/dsh-stock-research/core";
 
 const directory = mkdtempSync(join(tmpdir(), "dsh-query-bench-"));
 const scope = {

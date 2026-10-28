@@ -12,7 +12,7 @@ import {
   NumberService,
   RunService,
   RunStore,
-} from "dsh-stock-research/core";
+} from "@megapandas/dsh-stock-research/core";
 
 const directory = mkdtempSync(join(tmpdir(), "dsh-numbers-bench-"));
 const cutoff = "2024-01-02T21:00:00.000Z";

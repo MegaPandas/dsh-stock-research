@@ -1,4 +1,7 @@
-import { ArtifactService, NumberService } from "dsh-stock-research/core";
+import {
+  ArtifactService,
+  NumberService,
+} from "@megapandas/dsh-stock-research/core";
 
 // Three synthetic service inputs, never evidence of full quick-mode/vendor coverage.
 export function openDecisionSample(runs, requestId) {

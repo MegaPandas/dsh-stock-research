@@ -192,7 +192,7 @@ try {
   const profileDirectory = join(directory, "profile");
   const packageDirectory = join(
     profileDirectory,
-    "node_modules/dsh-stock-research",
+    "node_modules/@megapandas/dsh-stock-research",
   );
   mkdirSync(packageDirectory, { recursive: true });
   const packed = await execute(

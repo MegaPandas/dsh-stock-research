@@ -28,7 +28,9 @@ import {
 } from "./quick-snapshots.js";
 
 const PLUGIN_VERSION = (
-  createRequire(import.meta.url)("dsh-stock-research/package.json") as {
+  createRequire(import.meta.url)(
+    "@megapandas/dsh-stock-research/package.json",
+  ) as {
     version: string;
   }
 ).version;

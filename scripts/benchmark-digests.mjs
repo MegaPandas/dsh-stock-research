@@ -13,7 +13,7 @@ import {
   NumberService,
   RunService,
   RunStore,
-} from "dsh-stock-research/core";
+} from "@megapandas/dsh-stock-research/core";
 import { openDigestSample, sampleDigestReply } from "./digest-sample.mjs";
 
 const directory = mkdtempSync(join(tmpdir(), "dsh-digest-bench-"));

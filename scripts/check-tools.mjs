@@ -17,13 +17,13 @@ import {
   RunStore,
   SqliteCache,
   YahooMarketAdapter,
-} from "dsh-stock-research/core";
+} from "@megapandas/dsh-stock-research/core";
 import {
   createDataTools,
   createReadTools,
   createWriteTools,
   SessionBindings,
-} from "dsh-stock-research/tools";
+} from "@megapandas/dsh-stock-research/tools";
 import { openDecisionSample } from "./decision-sample.mjs";
 
 const directory = mkdtempSync(join(tmpdir(), "dsh-stock-tools-package-"));

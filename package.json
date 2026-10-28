@@ -1,5 +1,5 @@
 {
-  "name": "dsh-stock-research",
+  "name": "@megapandas/dsh-stock-research",
   "version": "0.1.0-rc.1",
   "description": "Evidence-based single-stock research for DSH",
   "license": "MIT",

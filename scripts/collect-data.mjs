@@ -12,7 +12,7 @@ import {
   RunStore,
   SqliteCache,
   parseLocalDate,
-} from "dsh-stock-research/core";
+} from "@megapandas/dsh-stock-research/core";
 
 const [securityInput, dateInput, destination] = process.argv.slice(2);
 if (process.argv.length !== 5 || destination === undefined) {

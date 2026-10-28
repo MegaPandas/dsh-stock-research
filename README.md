@@ -19,13 +19,13 @@
 
 ## 开始使用
 
-需要 Node.js 24.16.0、DSH `>0.2.1-rc.1` 和 pnpm。插件尚未发布到 npm；发布后可使用 DSH 插件管理命令安装到指定 profile（以 `web` 为例）：
+需要 Node.js 24.16.0、DSH `>0.2.1-rc.1` 和 pnpm。使用 DSH 插件管理命令安装到指定 profile（以 `web` 为例）：
 
 ```bash
-dsh plugin --profile web add dsh-stock-research@0.1.0-rc.1
+dsh plugin --profile web add @megapandas/dsh-stock-research@next
 ```
 
-目前可在项目目录执行 `npm ci` 和 `npm run build`，将构建后的包放入 DSH 宿主可解析的依赖中，并在 profile 的 `dsh.profile.bundles` 中加入 `dsh-stock-research`。
+也可在项目目录执行 `npm ci` 和 `npm run build`，将构建后的包放入 DSH 宿主可解析的依赖中，并在 profile 的 `dsh.profile.bundles` 中加入 `@megapandas/dsh-stock-research`。
 
 宿主需提供 Agent、工具、模型、命令及本地子 Agent 等基础服务；模型及凭证由 DSH 管理。
 
@@ -75,6 +75,16 @@ dsh plugin --profile web add dsh-stock-research@0.1.0-rc.1
 | 数据新鲜度 | 设置行情、财务和宏观数据的新鲜度阈值；超过阈值的数据会标记为陈旧。 |
 
 修改后需保存。模型与搜索额度对新任务生效，在途研究保留启动时的设置；数据目录、来源、网络与缓存等资源配置需在研究空闲时保存，并在下一次研究操作前应用。
+
+## 写锁恢复
+
+DSH 非正常退出可能留下写锁，导致再次启动时出现 `Cannot acquire data-root writer lock`。锁不会自动清除；后续版本将改进这一问题。临时恢复时，确认使用该数据目录的 DSH 和其他写入者均已停止，然后执行以下命令并重新启动 DSH：
+
+```bash
+rm ~/.dsh/stock-research/.writer.lock
+```
+
+以上路径适用于默认数据目录；如果使用其他目录，请替换为报错中显示的数据目录。不要在写入者运行时删除锁。
 
 ## 数据来源
 

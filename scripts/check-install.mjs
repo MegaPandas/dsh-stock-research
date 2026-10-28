@@ -41,18 +41,18 @@ async function probe(directory, targetVersion) {
   };
   const require = createRequire(join(directory, "package.json"));
   const load = (name) => import(name);
-  const manifest = require("dsh-stock-research/package.json");
+  const manifest = require("@megapandas/dsh-stock-research/package.json");
   assert.equal(require("@deepseek-ai/dsh/package.json").version, targetVersion);
   assert.ok(
     satisfies(targetVersion, manifest.engines.dsh, { includePrerelease: true }),
     `DSH ${targetVersion} must satisfy ${manifest.engines.dsh}`,
   );
   const installed = realpathSync(
-    dirname(require.resolve("dsh-stock-research/package.json")),
+    dirname(require.resolve("@megapandas/dsh-stock-research/package.json")),
   );
   for (const subpath of Object.keys(manifest.exports)) {
     if (subpath === "./package.json") continue;
-    const specifier = `dsh-stock-research${subpath === "." ? "" : subpath.slice(1)}`;
+    const specifier = `@megapandas/dsh-stock-research${subpath === "." ? "" : subpath.slice(1)}`;
     assert.ok(
       realpathSync(fileURLToPath(import.meta.resolve(specifier))).startsWith(
         `${installed}${sep}`,
@@ -122,7 +122,7 @@ async function probe(directory, targetVersion) {
     for (const subpath of Object.keys(manifest.exports)) {
       if (subpath !== "./package.json" && subpath !== "./client")
         await load(
-          `dsh-stock-research${subpath === "." ? "" : subpath.slice(1)}`,
+          `@megapandas/dsh-stock-research${subpath === "." ? "" : subpath.slice(1)}`,
         );
     }
     assert.deepEqual((await ctx.agentPresets.remoteExportList()).presets, []);
@@ -326,7 +326,7 @@ async function probe(directory, targetVersion) {
       ctx.commands.find(outside.agent, "host-ping").name,
       "host-ping",
     );
-    const { DataRoot } = await load("dsh-stock-research/core");
+    const { DataRoot } = await load("@megapandas/dsh-stock-research/core");
     const root = new DataRoot(join(process.env.DSH_HOME, "stock-research"));
     root.close();
     assert.equal(fetches, 0);
@@ -388,11 +388,11 @@ async function install(requestedVersion) {
                 .filter((name) => name.startsWith("@deepseek-ai/dsh-"))
                 .map((name) => [name, targetVersion]),
             ),
-            "dsh-stock-research": `file:${filename}`,
+            "@megapandas/dsh-stock-research": `file:${filename}`,
             semver: manifest.devDependencies.semver,
           },
           overrides: { zod: "4.6.6" },
-          dsh: { profile: { bundles: ["dsh-stock-research"] } },
+          dsh: { profile: { bundles: ["@megapandas/dsh-stock-research"] } },
         },
         null,
         2,

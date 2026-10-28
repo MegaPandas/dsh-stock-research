@@ -5,7 +5,7 @@ import { performance } from "node:perf_hooks";
 import process from "node:process";
 import { Buffer } from "node:buffer";
 import console from "node:console";
-import { DataRoot, RunStore } from "dsh-stock-research/core";
+import { DataRoot, RunStore } from "@megapandas/dsh-stock-research/core";
 
 const directory = mkdtempSync(join(tmpdir(), "dsh-runs-bench-"));
 const entries = 100;

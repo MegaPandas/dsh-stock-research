@@ -4,7 +4,11 @@ import { cpus, tmpdir } from "node:os";
 import { join } from "node:path";
 import { performance } from "node:perf_hooks";
 import process from "node:process";
-import { DataRoot, RunService, RunStore } from "dsh-stock-research/core";
+import {
+  DataRoot,
+  RunService,
+  RunStore,
+} from "@megapandas/dsh-stock-research/core";
 
 const directory = mkdtempSync(join(tmpdir(), "dsh-run-data-bench-"));
 const timestamp = "2024-01-03T00:00:00.000Z";

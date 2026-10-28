@@ -29,7 +29,7 @@ export default defineConfig([
     deps: { neverBundle: ["react", "react/jsx-runtime"] },
     outExtensions: () => ({ js: ".js" }),
     banner:
-      'window.__ModuleLoader__.load({id:"dsh-stock-research",factory:(require)=>{var module={exports:{}};var exports=module.exports;',
+      'window.__ModuleLoader__.load({id:"@megapandas/dsh-stock-research",factory:(require)=>{var module={exports:{}};var exports=module.exports;',
     footer: "return module.exports;}});",
   },
 ]);

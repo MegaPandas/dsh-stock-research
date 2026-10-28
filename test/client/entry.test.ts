@@ -33,12 +33,14 @@ describe("packaged DSH settings client", () => {
     const entries = applyEntryPatches([], patches, (message) => {
       throw new Error(message);
     });
-    expect(entries[0]!.name).toBe("dsh-stock-research");
+    expect(entries[0]!.name).toBe("@megapandas/dsh-stock-research");
     entries[0]!.config = { runtime: h.config({ enabledSources: [] }) };
     await h.ctx.loader.root.update(entries);
     await h.ctx.loader.await();
     const graph = h.ctx.clientModules.graph();
-    const row = graph.entries.find(({ id }) => id === "dsh-stock-research");
+    const row = graph.entries.find(
+      ({ id }) => id === "@megapandas/dsh-stock-research",
+    );
     expect(row).toMatchObject({
       inject: [
         "@deepseek-ai/dsh-client-ui-settings",
@@ -50,7 +52,7 @@ describe("packaged DSH settings client", () => {
       ],
     });
     const batch = graph.batches.find(({ entries }) =>
-      entries.includes("dsh-stock-research"),
+      entries.includes("@megapandas/dsh-stock-research"),
     )!;
     expect(batch).toBeDefined();
     const response = await h.ctx.clientModules.fetchBundle(
@@ -69,7 +71,7 @@ describe("packaged DSH settings client", () => {
         apply(ctx: Context): void;
       };
     };
-    expect(entry.id).toBe("dsh-stock-research");
+    expect(entry.id).toBe("@megapandas/dsh-stock-research");
     const client = entry.factory(createRequire(import.meta.url));
     const form = {};
     const catalog = { groups: [] };

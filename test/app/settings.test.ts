@@ -39,7 +39,7 @@ async function host(
   delete config.runtime.digestModel;
   const userPresets = await h.ctx.agentPresets.remoteExportList();
   await h.ctx.loader.root.update([
-    { id: "stock-research", name: "dsh-stock-research", config },
+    { id: "stock-research", name: "@megapandas/dsh-stock-research", config },
   ]);
   await h.ctx.loader.await();
   const entry = h.ctx.loader.resolve("stock-research");

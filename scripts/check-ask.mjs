@@ -21,8 +21,8 @@ import * as PiAi from "@deepseek-ai/dsh-llm-pi-ai";
 import { SessionId } from "@deepseek-ai/dsh-session";
 import { SubagentRuntime } from "@deepseek-ai/dsh-subagent";
 import * as SpawnInProcess from "@deepseek-ai/dsh-subagent-spawn-in-process";
-import { createResearchPlugin } from "dsh-stock-research/runtime";
-import * as Ask from "dsh-stock-research/ask";
+import { createResearchPlugin } from "@megapandas/dsh-stock-research/runtime";
+import * as Ask from "@megapandas/dsh-stock-research/ask";
 
 const [profilePath, envPath, model, date] = process.argv.slice(2);
 if ([profilePath, envPath, model, date].some((value) => value === undefined)) {

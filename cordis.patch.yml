@@ -1,6 +1,6 @@
 - insert:
     - id: stock-research
-      name: dsh-stock-research
+      name: "@megapandas/dsh-stock-research"
       config:
         runtime:
           dataRoot: !!js "ctx.dshHomePath('stock-research')"

@@ -38,7 +38,7 @@ import {
   agentReportSchemas,
   parseAgentReport,
   renderAgentReport,
-} from "dsh-stock-research/core";
+} from "@megapandas/dsh-stock-research/core";
 import { openDecisionSample } from "./decision-sample.mjs";
 import { openDigestSample, sampleDigestReply } from "./digest-sample.mjs";
 

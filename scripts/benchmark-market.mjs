@@ -10,7 +10,7 @@ import {
   HttpClient,
   TencentMarketAdapter,
   YahooMarketAdapter,
-} from "dsh-stock-research/core";
+} from "@megapandas/dsh-stock-research/core";
 
 const samples = [
   [

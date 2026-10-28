@@ -4,7 +4,7 @@ import { cpus, tmpdir } from "node:os";
 import { join } from "node:path";
 import { performance } from "node:perf_hooks";
 import process from "node:process";
-import { SqliteCache } from "dsh-stock-research/core";
+import { SqliteCache } from "@megapandas/dsh-stock-research/core";
 
 const SAMPLE_COUNT = 5;
 const CAPACITY = 1_000;

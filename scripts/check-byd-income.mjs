@@ -8,7 +8,7 @@ import {
   HttpClient,
   parseLocalDate,
   SinaIncomeAdapter,
-} from "dsh-stock-research/core";
+} from "@megapandas/dsh-stock-research/core";
 
 const [inputDate, outputPath] = process.argv.slice(2);
 if (inputDate === undefined || outputPath === undefined) {

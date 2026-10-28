@@ -1,4 +1,7 @@
-import { ArtifactService, NumberService } from "dsh-stock-research/core";
+import {
+  ArtifactService,
+  NumberService,
+} from "@megapandas/dsh-stock-research/core";
 
 export function sampleDigestReply(context) {
   const candidate = context.numbers[0].candidateId;

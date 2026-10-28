@@ -9,7 +9,10 @@ import { URL, pathToFileURL } from "node:url";
 import { parseEnv } from "node:util";
 import { parse } from "yaml";
 import { satisfies } from "semver";
-import { HostResearchAdapter, parseLocalDate } from "dsh-stock-research/core";
+import {
+  HostResearchAdapter,
+  parseLocalDate,
+} from "@megapandas/dsh-stock-research/core";
 
 const [installAnchor, profilePath, envPath, inputDate, outputPath] =
   process.argv.slice(2);

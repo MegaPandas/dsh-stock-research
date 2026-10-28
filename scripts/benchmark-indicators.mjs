@@ -1,7 +1,7 @@
 import { cpus } from "node:os";
 import { performance } from "node:perf_hooks";
 import process from "node:process";
-import { calculateIndicators } from "dsh-stock-research/core";
+import { calculateIndicators } from "@megapandas/dsh-stock-research/core";
 
 const requests = [
   { kind: "sma", period: 20 },

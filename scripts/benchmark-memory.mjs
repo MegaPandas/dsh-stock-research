@@ -5,7 +5,7 @@ import { cpus, tmpdir } from "node:os";
 import { join } from "node:path";
 import { performance } from "node:perf_hooks";
 import process from "node:process";
-import { DataRoot, MemoryStore } from "dsh-stock-research/core";
+import { DataRoot, MemoryStore } from "@megapandas/dsh-stock-research/core";
 
 const directory = mkdtempSync(join(tmpdir(), "dsh-memory-bench-"));
 const revisions = 100;

@@ -11,7 +11,7 @@ import {
   DecisionService,
   RunService,
   RunStore,
-} from "dsh-stock-research/core";
+} from "@megapandas/dsh-stock-research/core";
 import { openDecisionSample } from "./decision-sample.mjs";
 
 const directory = mkdtempSync(join(tmpdir(), "dsh-decision-bench-"));

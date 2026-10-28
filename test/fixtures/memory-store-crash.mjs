@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import process from "node:process";
-import { DataRoot, MemoryStore } from "dsh-stock-research/core";
+import { DataRoot, MemoryStore } from "@megapandas/dsh-stock-research/core";
 
 const root = new DataRoot(process.argv[2]);
 const store = new MemoryStore(root, () => ({ label: "initial" }));

@@ -3,7 +3,7 @@ import console from "node:console";
 import { cpus } from "node:os";
 import { performance } from "node:perf_hooks";
 import process from "node:process";
-import { renderArtifact } from "dsh-stock-research/core";
+import { renderArtifact } from "@megapandas/dsh-stock-research/core";
 
 const source = {
   runId: "sample-run",

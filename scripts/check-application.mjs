@@ -23,14 +23,14 @@ import { SessionId } from "@deepseek-ai/dsh-session";
 import { SubagentRuntime } from "@deepseek-ai/dsh-subagent";
 import * as SpawnInProcess from "@deepseek-ai/dsh-subagent-spawn-in-process";
 import WebRuntime from "@deepseek-ai/dsh-web";
-import { DataRoot } from "dsh-stock-research/core";
+import { DataRoot } from "@megapandas/dsh-stock-research/core";
 import {
   createDeepInput,
   DEEP_MODE_VERSION,
-} from "dsh-stock-research/application";
+} from "@megapandas/dsh-stock-research/application";
 
 const require = createRequire(import.meta.url);
-const manifest = require("dsh-stock-research/package.json");
+const manifest = require("@megapandas/dsh-stock-research/package.json");
 const includeRequire = createRequire(
   import.meta.resolve("@deepseek-ai/cordis-plugin-include"),
 );
