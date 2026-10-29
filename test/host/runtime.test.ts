@@ -60,7 +60,7 @@ function stockNames(h: Awaited<ReturnType<typeof host>>) {
 }
 
 describe("research runtime plugin with the real DSH host", () => {
-  it("publishes its ready service and research tools without querying enabled sources", async () => {
+  it("publishes its ready service and tool definitions without globally registering tools or querying sources", async () => {
     let searches = 0;
     const h = await host({
       search: async () => {
@@ -73,7 +73,7 @@ describe("research runtime plugin with the real DSH host", () => {
     );
     expect(h.ctx.get("stockResearch")).toBeDefined();
     expect(mounted.runtime.tools).toHaveLength(23);
-    expect(new Set(stockNames(h)).size).toBe(23);
+    expect(stockNames(h)).toEqual([]);
     const health = mounted.runtime.queries.health(h.scope);
     expect(
       health.sources
@@ -162,7 +162,7 @@ describe("research runtime plugin with the real DSH host", () => {
       }),
     ).toMatchObject({
       isError: true,
-      error: { info: { code: "ACCESS_DENIED" } },
+      error: { info: { code: "UNKNOWN_TOOL" } },
     });
 
     let originalCommitted = false;
@@ -296,7 +296,7 @@ describe("research runtime plugin with the real DSH host", () => {
     reacquire(h.directory);
     const second = await h.mount();
     expect(second.runtime.tools).toHaveLength(23);
-    expect(stockNames(h)).toHaveLength(23);
+    expect(stockNames(h)).toEqual([]);
     await second.fiber.dispose();
     expect(stockNames(h)).toEqual([]);
     expect(h.ctx.agents.get(h.outside.agent.id)).toBe(h.outside.agent);
@@ -441,19 +441,29 @@ describe("research runtime plugin with the real DSH host", () => {
     reacquire(h.directory);
   });
 
-  it.each(["missing-web", "corrupt-cache", "tool-conflict"] as const)(
+  it("keeps existing global tools independent of its internal definitions", async () => {
+    const h = await host();
+    const existing = markerTool("stock_get_macro");
+    h.ctx.tools.register(existing);
+    const mounted = await h.mount();
+    expect(h.ctx.tools.get(existing.name)).toBe(existing);
+    expect(
+      mounted.runtime.tools.find(({ name }) => name === existing.name),
+    ).not.toBe(existing);
+    await mounted.fiber.dispose();
+    expect(h.ctx.tools.get(existing.name)).toBe(existing);
+    reacquire(h.directory);
+  });
+
+  it.each(["missing-web", "corrupt-cache"] as const)(
     "rolls back %s startup while preserving the existing host plugin",
     async (problem) => {
       const h = await host();
-      const conflict = markerTool("stock_get_macro");
-      let unregister: (() => void) | undefined;
       if (problem === "corrupt-cache")
         fs.writeFileSync(
           join(h.directory, "cache.sqlite"),
           "not a SQLite database",
         );
-      if (problem === "tool-conflict")
-        unregister = h.ctx.tools.register(conflict);
       const failed = await observe(
         h.mount(
           h.config({
@@ -471,12 +481,9 @@ describe("research runtime plugin with the real DSH host", () => {
         });
       expect(h.ctx.get("stockResearch")).toBeUndefined();
       expect(h.ctx.tools.get(h.marker.name)).toBe(h.marker);
-      expect(stockNames(h)).toEqual(
-        problem === "tool-conflict" ? [conflict.name] : [],
-      );
+      expect(stockNames(h)).toEqual([]);
       expect(h.ctx.agents.get(h.outside.agent.id)).toBe(h.outside.agent);
       reacquire(h.directory);
-      unregister?.();
       if (problem === "corrupt-cache")
         fs.rmSync(join(h.directory, "cache.sqlite"));
       const recovered = await h.mount();

@@ -105,20 +105,20 @@ export const dataSchemas: Record<
       provider: enumeration(["sec", "eastmoney", "sina"]),
       field: {
         ...enumeration(secFields),
-        description: "SEC必填；东财和新浪不接受。",
+        description: "Required for SEC; not accepted by Eastmoney or Sina.",
       },
       fields: {
         ...fieldsSchema(sinaFields),
         description:
-          "东财和新浪必填；东财仅支持totalOperatingRevenue、netIncomeToParent；SEC不接受。",
+          "Required for Eastmoney and Sina; Eastmoney supports only totalOperatingRevenue and netIncomeToParent. Not accepted by SEC.",
       },
       periodEndFrom: {
         ...stringSchema,
-        description: "SEC和东财必填；新浪不接受。",
+        description: "Required for SEC and Eastmoney; not accepted by Sina.",
       },
       periodEndTo: {
         ...stringSchema,
-        description: "东财必填；SEC和新浪不接受。",
+        description: "Required for Eastmoney; not accepted by SEC or Sina.",
       },
     },
     ["provider"],

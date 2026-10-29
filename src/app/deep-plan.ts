@@ -16,28 +16,28 @@ export const DEEP_MODE_VERSION = "deep/7";
 const BRIEFS = {
   ...SHARED_BRIEFS,
   "analysis.business":
-    "依据固定快照与同运行产物建立经营驱动模型，解释产品、收入结构、成本、规模与竞争条件的作用关系。交付经营模式、优势来源、增长路径和成立条件；财务预测与估值由基本面方向整合，产品与竞争事件由公开信息方向提供。",
+    "Build a business-driver model from fixed snapshots and artifacts in this run. Explain relationships among products, revenue mix, costs, scale and competitive conditions. Describe the business model, sources of advantage, growth paths and necessary conditions. Fundamentals integrates financial forecasts and valuation; public-information research supplies product and competitive events.",
   "analysis.geopolitics":
-    "依据固定宏观快照与同运行产物分析贸易、政策及外部经济条件，交付需求、成本、汇率和融资向公司的传导路径、成立条件与事件节点。宏观总量背景由宏观方向提供，公司产品、产能与竞争事件由公开信息方向提供。",
+    "Analyze trade, policy and external economic conditions from fixed macro snapshots and artifacts in this run. Explain transmission to the company through demand, costs, FX and financing, with necessary conditions and event milestones. Macro research supplies aggregate context; public-information research supplies company product, capacity and competitive events.",
   "analysis.sentiment":
-    "依据固定行情快照分析量价表现所反映的交易特征、参与度与相对强弱，交付交易行为解释、成立条件和观察信号。行情方向提供价格结构与趋势，情绪方向解释这些观察对应的参与者行为及替代解释。",
-  "digest.analysis": `汇总七份分析的核心判断、驱动机制、展望与关键分歧，提炼影响后续讨论的具体问题，保留事实的期间与业务口径。${DIGEST_RISK_RULE}`,
-  "digest.debate.1": `汇总原分析摘要与本轮多空论点，提炼双方依据、反证和决定判断的分歧。${DIGEST_RISK_RULE}`,
+    "Analyze trading behavior, participation and relative strength reflected in fixed price/volume snapshots. Explain participant behavior, necessary conditions and watch signals. Market analysis supplies price structure and trends; sentiment analysis explains participant behavior behind those observations and alternative interpretations.",
+  "digest.analysis": `Combine the seven analyses' core judgments, drivers, outlooks and key disagreements. Identify specific questions affecting the debate; preserve factual periods and business definitions. ${DIGEST_RISK_RULE}`,
+  "digest.debate.1": `Combine the original analysis digest and this round's bull/bear claims. Identify each side's evidence, counterevidence and disagreements that determine the judgment. ${DIGEST_RISK_RULE}`,
   "debate.2.bull":
-    "基于第一轮辩论摘要继续多方讨论，回应已有反证与空方失效条件，明确剩余争议及决定上行判断的变量。按需读取原始报告，提交本方论点与回应。",
+    "Continue the bull case from the first-round debate digest. Address existing counterevidence and bear-case invalidation conditions; identify remaining disagreements and variables determining upside. Read original reports as needed; submit your claims and responses.",
   "debate.2.bear":
-    "基于同一第一轮辩论摘要继续空方讨论，回应多方的依据、约束与失效条件，明确剩余争议及决定下行风险的变量。按需读取原始报告，提交本方论点与回应。",
-  "digest.debate.2": `汇总前轮摘要和第二轮双方回应，提炼支持、反证及仍未解决的关键争议，供研究经理制定计划；不把重复观点当作独立证据。${DIGEST_RISK_RULE}`,
+    "Continue the bear case from the same first-round debate digest. Address the bull side's evidence, constraints and invalidation conditions; identify remaining disagreements and variables determining downside. Read original reports as needed; submit your claims and responses.",
+  "digest.debate.2": `Combine the prior digest and both sides' second-round responses. Identify supporting evidence, counterevidence and unresolved key disagreements for the research manager's plan. Repeated claims are not independent evidence. ${DIGEST_RISK_RULE}`,
   "manager.research":
-    "依据第二轮辩论摘要形成研究计划，说明研究问题、分析路径、关键假设、必要数据需求、风险与检查点。每项数据需求对应具体研究问题，输出plan。",
-  "digest.plan": `合并最终辩论摘要与研究计划，保留关键假设、必要数据需求、检查点、未决分歧和继承风险，交给各风控分工。${DIGEST_RISK_RULE}`,
+    "Build a research plan from the second-round debate digest. Specify research questions, analysis paths, key assumptions, required data, risks and checkpoints. Tie each data requirement to a specific research question; output plan.",
+  "digest.plan": `Combine the final debate digest and research plan for the risk-review specialties. Preserve key assumptions, required data, checkpoints, unresolved disagreements and inherited risks. ${DIGEST_RISK_RULE}`,
   "risk.finance":
-    "依据固定计划检查财务质量、偿付能力和流动性风险，交付损失机制、触发条件、投资者的暴露或仓位约束及重估或退出建议；公司资本开支、库存和授信动作作为观察事项。按需读取原始报告。",
+    "Review financial quality, solvency and liquidity risks against the fixed plan. Provide loss mechanisms, triggers, investor exposure or position constraints, and recommendations for reassessment or exit. Treat company capex, inventory and credit actions as observations. Read original reports as needed.",
   "risk.valuation":
-    "依据固定计划检查估值假设、价格口径和回撤情景，交付风险影响、触发条件、投资者的组合暴露约束及重估或退出建议。按需读取原始报告。",
+    "Review valuation assumptions, price bases and drawdown scenarios against the fixed plan. Provide risk impact, triggers, investor portfolio-exposure constraints, and recommendations for reassessment or exit. Read original reports as needed.",
   "risk.events":
-    "依据固定计划检查事件、政策、时间线和交易执行风险，交付事件节点、损失机制、触发条件及投资者的观察、暴露调整或退出建议。按需读取原始报告。",
-  "digest.risk": `合并计划摘要与三份风控，提炼影响决策的风险和未决问题。每项风险以一条综述保留关键影响、触发或处置约束，完整细节保存在原报告中，为组合经理逐项回应提供固定输入。${DIGEST_RISK_RULE}`,
+    "Review event, policy, timeline and trading-execution risks against the fixed plan. Provide event milestones, loss mechanisms, triggers, and recommendations for investor monitoring, exposure changes or exit. Read original reports as needed.",
+  "digest.risk": `Combine the plan digest and three risk reviews to identify risks and open questions affecting the decision. Summarize each risk's key impact, trigger or action constraint in one entry; retain full detail in the original report. Supply fixed inputs for the portfolio manager's itemized responses. ${DIGEST_RISK_RULE}`,
 } as const;
 
 export function createDeepInput(

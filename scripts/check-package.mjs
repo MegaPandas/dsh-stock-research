@@ -142,7 +142,7 @@ try {
   runs.syncProjections(run.runId, run.revision, [
     { target: { filename: "report.md" }, content: markdown },
   ]);
-  assert.match(markdown, /Price: 7 USD\/share\./);
+  assert.match(markdown, /Price: 7 USD\/股\./);
   assert.equal(
     readFileSync(
       join(
@@ -491,7 +491,7 @@ try {
   const digestContent = service.readArtifact(digestResult.refs[0]).content;
   assert.equal(digestContent.payload.numbers.length, 1);
   assert.equal(digestContent.payload.gaps[0].kind, "source");
-  assert.match(digestContent.body, /100 USD\/share/);
+  assert.match(digestContent.body, /100 USD\/股/);
   const sample = openDecisionSample(service, "decision-sample");
   const decided = new DecisionService(
     service,

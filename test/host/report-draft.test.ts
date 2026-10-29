@@ -86,7 +86,9 @@ describe("section report drafts", () => {
     );
     const write = session.tools[3]!;
     const exec = execution();
-    expect(write.description).toContain("目标450个Unicode字符，上限900字符");
+    expect(write.description).toContain(
+      "target 450 Unicode characters for the whole JSON, maximum 900",
+    );
     await write.execute({ ...handoff, keyPoints: ["中".repeat(650)] }, exec);
     const exact = structuredClone(handoff);
     exact.keyPoints[0] += "🚀".repeat(
@@ -197,6 +199,88 @@ describe("section report drafts", () => {
     expect(exec.concludeTurn).toHaveBeenCalledOnce();
   });
 
+  it("updates multiple sections atomically, preserves omitted sections and isolates input mutations", async () => {
+    const session = createReportDraft(
+      "analysis",
+      () => "saved",
+      report,
+      false,
+      {},
+    );
+    const [write, read, , writeHandoff] = session.tools;
+    const exec = execution();
+    await writeHandoff!.execute(handoff, exec);
+    const update = {
+      summary: "更新判断。",
+      currentState: ["新增观察。"],
+      risks: [],
+    };
+    await expect(write!.execute(update, exec)).resolves.toEqual({
+      sections: ["summary", "currentState", "risks"],
+    });
+    update.currentState.push("调用后外部修改。");
+    expect(await read!.execute({}, exec)).toEqual({
+      draft: {
+        summary: "更新判断。",
+        content: { ...report.content, currentState: ["新增观察。"] },
+      },
+      missingSections: [],
+      stageHandoff: handoff,
+      handoffConfirmed: false,
+    });
+    expect(report.summary).toBe("回款改善。");
+    expect(report.content.currentState).toEqual(["回款上升。"]);
+  });
+
+  it("leaves the whole draft and confirmed handoff unchanged when any batch field is invalid", async () => {
+    const session = createReportDraft(
+      "analysis",
+      () => "saved",
+      report,
+      false,
+      {},
+    );
+    const [write, read, submit, writeHandoff] = session.tools;
+    const exec = execution();
+    await writeHandoff!.execute(handoff, exec);
+    for (const update of [
+      { summary: "不应保存。", currentState: "invalid" },
+      { summary: "不应保存。", unknown: [] },
+    ]) {
+      await expect(write!.execute(update, exec)).rejects.toMatchObject({
+        code: "INVALID_INPUT",
+      });
+      expect(await read!.execute({}, exec)).toMatchObject({
+        draft: report,
+        stageHandoff: handoff,
+        handoffConfirmed: true,
+      });
+    }
+    await submit!.execute({}, exec);
+    expect(session.result()).toBe("saved");
+  });
+
+  it("treats an empty section patch as a no-op and preserves handoff confirmation", async () => {
+    const session = createReportDraft(
+      "analysis",
+      () => "saved",
+      report,
+      false,
+      {},
+    );
+    const [write, read, submit, writeHandoff] = session.tools;
+    const exec = execution();
+    await writeHandoff!.execute(handoff, exec);
+    await expect(write!.execute({}, exec)).resolves.toEqual({ sections: [] });
+    expect(await read!.execute({}, exec)).toMatchObject({
+      draft: report,
+      stageHandoff: handoff,
+      handoffConfirmed: true,
+    });
+    await submit!.execute({}, exec);
+    expect(session.result()).toBe("saved");
+  });
+
   it("revises seeded sections, clones drafts and preserves prior content on invalid writes", async () => {
     const session = createReportDraft("analysis", () => "saved", report);
     const [write, read, submit] = session.tools;
@@ -213,13 +297,6 @@ describe("section report drafts", () => {
       await expect(write!.execute(input, exec)).rejects.toMatchObject({
         code: "INVALID_INPUT",
       });
-    await expect(
-      write!.execute({ summary: "标题", risks: [] }, exec),
-    ).rejects.toMatchObject({
-      code: "INVALID_INPUT",
-      message:
-        "INVALID_INPUT: Provide exactly one report section per call; received 2: summary, risks. Write separate sections in separate stock_write_report calls.",
-    });
     const copy = session.draft();
     copy.content.currentState!.push("外部修改");
     expect(session.draft()).toEqual(expected);

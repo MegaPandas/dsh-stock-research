@@ -171,7 +171,8 @@ describe("stock-ask through real commands, runtime and AgentLoop", () => {
       }
     }
     expect(
-      h.ctx.tools.get("stock_get_market")!.parameters.properties,
+      h.runtime.tools.find(({ name }) => name === "stock_get_market")!
+        .parameters.properties,
     ).toHaveProperty("source");
     const reader = h.adapter.requests[0]!.tools!.find(
       (tool) => tool.name === "stock_read_collection",

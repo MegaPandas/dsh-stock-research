@@ -9,11 +9,37 @@ const displayNumber = new Intl.NumberFormat("zh-CN", {
   maximumSignificantDigits: DISPLAY_SIGNIFICANT_DIGITS,
   useGrouping: false,
 });
+const DISPLAY_SCALES = [
+  { value: 100_000_000, label: "亿" },
+  { value: 10_000, label: "万" },
+];
+
+export function formatNumber(value: number): string {
+  return displayNumber.format(value === 0 ? 0 : value);
+}
+
+function displayUnit(unit: string): string {
+  switch (unit) {
+    case "year":
+      return "年";
+    case "share":
+      return "股";
+    case "multiple":
+      return "倍";
+    default:
+      return unit.endsWith("/share") ? `${unit.slice(0, -6)}/股` : unit;
+  }
+}
 
 export function valueText(value: number, unit: string): string {
-  if (unit === "ratio") return `${displayNumber.format(value * 100)}%`;
-  if (unit === "percent") return `${displayNumber.format(value)}%`;
-  return `${displayNumber.format(value)} ${inline(unit)}`;
+  if (unit === "ratio") return `${formatNumber(value * 100)}%`;
+  if (unit === "percent") return `${formatNumber(value)}%`;
+  const magnitude = Math.abs(Number(formatNumber(value)));
+  const scale =
+    /^[A-Z]{3}$/.test(unit) || unit === "share"
+      ? DISPLAY_SCALES.find(({ value: threshold }) => magnitude >= threshold)
+      : undefined;
+  return `${formatNumber(value / (scale?.value ?? 1))} ${scale?.label ?? ""}${inline(displayUnit(unit))}`;
 }
 
 export function numberText(claim: NumericClaim): string {

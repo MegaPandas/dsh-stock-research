@@ -20,9 +20,13 @@ describe("research role instructions", () => {
     }),
   )("applies the requested writing rule to %s", (_role, prompt) => {
     expect(prompt).toContain(
-      "凡仅用于规避质疑、对描述现状无实际作用的保守性叙述和防御性写作，一律删除。",
+      "Delete defensive wording that only anticipates objections and adds no information about the subject.",
     );
-    expect(prompt).toContain("输出报告同样遵守这一要求。");
+    expect(prompt).toContain(
+      "Include only specific risks, assumptions, open questions and data limits that affect the judgment",
+    );
+    expect(prompt).toContain("in Chinese");
+    expect(prompt).not.toMatch(/\p{Script=Han}/u);
   });
 
   it("assigns the manager a target-price estimate under the supplied decision policy", () => {
@@ -31,24 +35,29 @@ describe("research role instructions", () => {
       SHARED_BRIEFS["manager.decision"],
     ]) {
       expect(prompt).toContain("context.decisionPolicy");
-      expect(prompt).toContain("评级由代码确定");
-      expect(prompt).not.toContain("投资决策给出评级");
-      expect(prompt).not.toContain("评级、基准价和目标价按各自依据填写");
+      expect(prompt).toMatch(/The code determines .*horizon and rating/);
     }
   });
 
   it("separates investor risk actions from company operating decisions", () => {
-    expect(ROLE_PROMPTS.discussion).toContain("投资者的暴露或仓位约束");
-    expect(ROLE_PROMPTS.discussion).toContain("公司经营动作作为观察事项");
+    expect(ROLE_PROMPTS.discussion).toContain(
+      "investor exposure or position constraints",
+    );
+    expect(ROLE_PROMPTS.discussion).toContain(
+      "Treat company operating actions such as capex, inventory management and credit policy as observations",
+    );
   });
 
   it("keeps public research focused on products and competition", () => {
-    for (const prompt of [PUBLIC_RESEARCH_BRIEF, PUBLIC_ANALYST_PROMPT]) {
-      expect(prompt).toContain("财报披露时间");
-      expect(prompt).toContain("本方向不检索或重建这些数据");
-    }
+    expect(PUBLIC_ANALYST_PROMPT).toContain("reporting schedules");
+    expect(PUBLIC_ANALYST_PROMPT).toContain(
+      "do not search for or reconstruct them here",
+    );
     expect(PUBLIC_RESEARCH_BRIEF).toContain(
-      "比较同细分市场、价格带、地区及期间的竞品",
+      "Pass financial questions affecting the judgment to the fundamentals analyst",
+    );
+    expect(PUBLIC_RESEARCH_BRIEF).toContain(
+      "Compare competitors in the same segment, price band, region and period",
     );
   });
 });

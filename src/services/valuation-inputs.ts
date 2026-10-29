@@ -27,38 +27,42 @@ const array = (items: JsonSchemaNode): JsonSchemaNode => ({
 });
 const date = {
   type: "string",
-  description: "严格YYYY-MM-DD真实日期；估值代码按ACT/365F处理日期。",
+  description:
+    "Valid calendar date in YYYY-MM-DD format; calculations use ACT/365F.",
 } as const;
 const flow = {
   type: "number",
   description:
-    "整个预测期间的总额，非估值日后的剩余额；代码按天数裁切；Gordon以末期流量除以整期ACT/365F年数年化。",
+    "Full forecast-period total. Code prorates the remaining portion by days; Gordon annualizes the final flow by dividing by the full period's ACT/365F years.",
 } as const;
 const balance = {
   type: "number",
-  description: "期间末余额，代码根据前期余额计算变动。",
+  description:
+    "Period-end balance; code computes changes from the previous balance.",
 } as const;
 const forecastStartDate = {
   ...date,
   description:
-    "首个期间起点，不晚于估值日；每期起点为前一期endDate，期间流量均匀发生。",
+    "Start of the first period, on or before the valuation date. Each later period starts at the previous endDate; flows accrue uniformly within periods.",
 };
 const openingBalance = {
   type: "number",
-  description: "forecastStartDate时点的期初余额。",
+  description: "Opening balance at forecastStartDate.",
 } as const;
 const ratio = {
   type: "number",
-  description: "比例使用小数，如13%填写0.13；Agent明确预测假设。",
+  description:
+    "Decimal ratio, e.g. 0.13 for 13%; state the forecast assumption.",
 } as const;
 const bridge = objectSchema({
   excessCash: {
     type: "number",
-    description: "独立列示超额现金，不含在其他非经营资产中；与债务分别桥接。",
+    description:
+      "Excess cash, excluded from other non-operating assets and bridged separately from debt.",
   },
   nonOperatingAssets: {
     type: "number",
-    description: "超额现金以外的非经营资产。",
+    description: "Non-operating assets excluding excess cash.",
   },
   debt: number,
   preferredEquity: number,
@@ -71,7 +75,7 @@ const operating = objectSchema({
   operatingMargin: {
     ...ratio,
     description:
-      "息税前经营利润率(EBIT/收入)，不直接等同中国报表营业利润率；以小数填写有依据的预测。",
+      "EBIT/revenue, which can differ from operating profit margin in Chinese statements. Provide a supported forecast as a decimal.",
   },
   taxRate: ratio,
   depreciation: flow,
@@ -96,7 +100,7 @@ const terminal = (
       recovery: {
         type: "number",
         description:
-          "最后预测日实际回收总额；RI代码扣除已纳入价值的期末账面权益。",
+          "Total recovery at the final forecast date; residual-income calculations subtract closing book equity already included in value.",
       },
     }),
     objectSchema({
@@ -128,7 +132,7 @@ const discountRate: JsonSchemaNode = {
     }),
   ],
   description:
-    "直接估计数值或明确CAPM/WACC分量；代码合成折现率，不填默认市场参数。",
+    "Explicit estimate or CAPM/WACC components from which code computes the rate. Supply supported market inputs.",
 };
 const operatingInputs = {
   forecastStartDate,
@@ -183,7 +187,7 @@ export const VALUATION_INPUT_SCHEMAS: Record<
         otherEquityChanges: {
           ...flow,
           description:
-            "非股东OCI等综合收益调整，同时计入综合收益与账面权益；不含净发行。",
+            "Non-owner comprehensive-income adjustments such as OCI, included in both comprehensive income and book equity; exclude net issuance.",
         },
       }),
     ),
@@ -208,7 +212,8 @@ export const VALUATION_INPUT_SCHEMAS: Record<
           kind: { type: "string", const: "finite" },
           amount: {
             type: "number",
-            description: "最后预测日发生的净融资金额，可为负数；代码折现。",
+            description:
+              "Net financing amount at the final forecast date, possibly negative; code discounts it.",
           },
           discountRate,
         }),
@@ -217,7 +222,7 @@ export const VALUATION_INPUT_SCHEMAS: Record<
           nextCashFlow: {
             type: "number",
             description:
-              "最后预测日之后下一完整年度融资净现金流，可为负数；代码计算终值和现值。",
+              "Net financing cash flow for the full year after the final forecast date, possibly negative; code computes terminal and present values.",
           },
           growthRate: ratio,
           discountRate,
@@ -285,7 +290,8 @@ export const VALUATION_INPUT_SCHEMAS: Record<
         kind: { type: "string", const: "project" },
         initialCashFlow: {
           type: "number",
-          description: "forecastStartDate时点现金流，后续估值日将其排除。",
+          description:
+            "Cash flow at forecastStartDate; excluded when valuing at a later date.",
         },
         forecastStartDate: date,
         periods: array(
@@ -317,7 +323,8 @@ export const VALUATION_INPUT_SCHEMAS: Record<
           terminal: terminal({}),
         }),
       ],
-      description: "明确无总部费用，或提供原始费用预测由代码计算现值。",
+      description:
+        "Declare no head-office costs, or supply cost forecasts for code to discount.",
     },
   }),
   real_options: objectSchema({
@@ -351,39 +358,45 @@ const fields = {
     type: "string",
     enum: ["valuation", "target_price"],
     description:
-      "valuation计算研究日价值，target_price计算六个月目标日期价值；日期由运行确定。",
+      "valuation computes research-date value; target_price computes value at the six-month target date. Dates come from the run.",
   } as JsonSchemaNode,
   amountUnit: {
     type: "string",
     enum: Object.keys(AMOUNT_SCALES),
     description:
-      "所有金额输入的数量级：unit=1、thousand=千、million=百万、hundred_million=亿；币种继承运行，计算结果统一为基础货币单位。",
+      "Scale for all monetary inputs: unit=1, thousand=1000, million=1000000, hundred_million=100000000. Currency comes from the run; results use base currency units.",
   } as JsonSchemaNode,
   shares: objectSchema({
     value: number,
     unit: {
       type: "string",
       enum: Object.keys(AMOUNT_SCALES),
-      description: "股数独立声明数量级，与金额单位无关。",
+      description: "Share-count scale, independent of the monetary scale.",
     },
   }),
-  inputs: { oneOf: Object.values(VALUATION_INPUT_SCHEMAS) } as JsonSchemaNode,
+  inputs: {
+    type: "object",
+    additionalProperties: true,
+    description:
+      "Inputs matching methodId. Read calculationInputSchema with stock_read_valuation_method for the method's required fields.",
+  } as JsonSchemaNode,
   assumptions: array({
     type: "string",
     description:
-      "适用条件及预测假设，包括终值、资本需要、目标日分红/融资/股数和定价情景的依据；目录不提供默认参数。",
+      "Applicability and forecast assumptions, including rationale for terminal value, capital needs, target-date dividends, financing, share count and pricing scenarios.",
   }),
   provenance: array(
     objectSchema({
       path: {
         type: "string",
         description:
-          "以/inputs或/shares开头的JSON Pointer；可指向一组同源输入，如/inputs/periods。",
+          "JSON Pointer starting with /inputs or /shares; may address inputs sharing a source, e.g. /inputs/periods.",
       },
       kind: { type: "string", enum: ["observed", "normalized", "assumed"] },
       basis: {
         type: "string",
-        description: "快照表/字段/日期、原报告定位，或正常化和预测的推导依据。",
+        description:
+          "Snapshot table/field/date, original report location, or derivation for normalized values and forecasts.",
       },
     }),
   ),
@@ -393,7 +406,7 @@ const fields = {
       path: {
         type: "string",
         description:
-          "替换一个现有数值参数的JSON Pointer，以/inputs或/shares开头。",
+          "JSON Pointer to an existing numeric parameter to replace, starting with /inputs or /shares.",
       },
       value: number,
       basis: stringSchema,

@@ -218,7 +218,7 @@ describe("ResearchSessions with the real DSH AgentLoop", () => {
     expect(h.calls()).toEqual({ probe: 1, unsafe: 0 });
   });
 
-  it("allows local preset tools in the catalog without granting execution", async () => {
+  it("hides local preset tools from model requests without granting execution", async () => {
     const h = await host();
     const handle = await h.create(
       "extra-preset-tool",
@@ -239,6 +239,16 @@ describe("ResearchSessions with the real DSH AgentLoop", () => {
     expect((await h.call(handle.agent, h.unsafe.name)).isError).toBe(true);
     expect((await h.call(handle.agent)).isError).toBe(false);
     expect(h.calls()).toEqual({ probe: 1, unsafe: 0 });
+    handle.agent.followup(
+      createUserMessage({
+        content: [{ type: "text", text: "Read the trusted task identity." }],
+        source: { kind: "user" },
+      }),
+    );
+    await handle.agent.whenIdle();
+    expect(h.adapter.requests).toHaveLength(2);
+    for (const request of h.adapter.requests)
+      expect(request.tools?.map(({ name }) => name)).toEqual([h.probe.name]);
     await handle.dispose();
     expect(() => h.bindings.require(handle.agent)).toThrowError(
       expect.objectContaining({ code: "ACCESS_DENIED" }),

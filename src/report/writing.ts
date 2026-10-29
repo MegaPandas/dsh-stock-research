@@ -1,2 +1,2 @@
-export const RESEARCH_WRITING_RULES = `凡仅用于规避质疑、对描述现状无实际作用的保守性叙述和防御性写作，一律删除。输出报告同样遵守这一要求。正文直接写判断、事实、变化、作用机制和预测条件，不写免责声明、角色自述或泛化的来源自检。
-风险、假设、未决问题和数据限制须指明具体事项及其对哪项判断的影响；无实质内容的列表用[]。不列未开展的分析维度，不重复数据目录、采集失败清单或校验状态。任务权限、输出范围和系统校验留在执行契约中。每项事实和限制只在最相关的位置表述一次。`;
+export const RESEARCH_WRITING_RULES = `Delete defensive wording that only anticipates objections and adds no information about the subject. State judgments, facts, changes, mechanisms and forecast conditions directly. Omit disclaimers, role descriptions and generic source checks.
+Include only specific risks, assumptions, open questions and data limits that affect the judgment; explain their impact. Use [] for lists without substantive items. State each fact or limit once, where most relevant. Omit unexamined topics, repeated data inventories, collection-failure lists and validation status.`;

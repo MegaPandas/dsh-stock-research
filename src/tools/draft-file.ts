@@ -20,7 +20,7 @@ export function draftFileTools(file: DraftFile): ToolDefinition[] {
     researchTool({
       name: "stock_read_draft",
       description:
-        "读取服务端固定草稿文件。文件以 JSON 元数据代码围栏开头，其后全部为 Markdown 正文；无路径参数。",
+        "Read the fixed server-side draft file: a leading JSON metadata code fence followed by the Markdown body. No path parameter.",
       parameters: objectSchema({}),
       output: resultOutput(
         objectSchema({ path: stringSchema, content: stringSchema }),
@@ -33,7 +33,7 @@ export function draftFileTools(file: DraftFile): ToolDefinition[] {
     researchTool({
       name: "stock_write_draft",
       description:
-        "写入服务端固定草稿文件的完整内容。使用开头 JSON 元数据围栏和其后的 Markdown 正文；无路径参数，提交时验证内容。",
+        "Write the complete fixed server-side draft: a leading JSON metadata code fence followed by the Markdown body. No path parameter; content is validated on submission.",
       parameters: objectSchema({ content: stringSchema }),
       output: pathOutput,
       async execute(value, exec) {
@@ -45,11 +45,12 @@ export function draftFileTools(file: DraftFile): ToolDefinition[] {
     researchTool({
       name: "stock_edit_draft",
       description:
-        "在服务端固定草稿文件中原子替换唯一匹配的 oldText。文件使用 JSON 元数据围栏和 Markdown 正文；oldText 非空，newText 可为空以删除，无路径参数。",
+        "Atomically replace the unique oldText match in the fixed server-side draft, which contains a JSON metadata fence and Markdown body. oldText must be nonempty; empty newText deletes it. No path parameter.",
       parameters: objectSchema({
         oldText: {
           ...stringSchema,
-          description: "非空且在当前文件中唯一匹配的原文。",
+          description:
+            "Nonempty original text matching exactly once in the current file.",
         },
         newText: stringSchema,
       }),

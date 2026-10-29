@@ -101,7 +101,7 @@ export function prepareUnifiedRole(
       : null;
   const publicRole = claim.taskId === PUBLIC_RESEARCH_TASK;
   let systemPrompt = profile.prompts[definition.executor.role];
-  const tools = [reader.tool];
+  const tools = reader.catalog.length === 0 ? [] : [reader.tool];
   const details: Record<string, unknown> = {};
   const valuationMethods =
     usesValuationMethods(claim.taskId) &&
@@ -111,6 +111,7 @@ export function prepareUnifiedRole(
       ? readValuationMethods(services.runs, claim.runId)
       : undefined;
   if (valuationMethods !== undefined) {
+    systemPrompt += `\n${profile.prompts.valuation}`;
     tools.push(createValuationMethodTool(valuationMethods));
     details.valuationMethods = valuationMethodContext(valuationMethods, scope);
   }
@@ -191,7 +192,7 @@ export function prepareUnifiedRole(
         })),
     };
   } else if (definition.executor.role === "analyst") {
-    tools.push(...collectionDataTools(tables));
+    if (tables.length > 0) tools.push(...collectionDataTools(tables));
     const collection = readCollection(services.runs, claim.runId);
     const assigned = new Set(collected.map(({ id }) => id));
     details.coverage = {

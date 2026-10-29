@@ -134,7 +134,12 @@ class ResearchApplication {
     if (!this.#coordinators.has(agent)) {
       const releases = [this.ctx.stockResearch.bindCoordinator(agent)];
       this.#coordinators.set(agent, releases);
+      releases.push(agent.ctx.tools.register(this.reviewTool()));
       for (const tool of this.ctx.stockResearch.tools) {
+        if (tool.name === "stock_read_artifact") {
+          releases.push(agent.ctx.tools.register(tool));
+          continue;
+        }
         if (tool.name === "stock_read_run") {
           releases.push(
             agent.ctx.tools.register({
@@ -443,7 +448,10 @@ class ResearchApplication {
         return {
           cancel: (reason) => {
             controller.abort(
-              new DOMException(reason ?? "调研操作已取消。", "AbortError"),
+              new DOMException(
+                reason ?? "Research operation cancelled.",
+                "AbortError",
+              ),
             );
             if (previous === undefined && research.finishedAt === undefined)
               void this.#cancel(research, "job-cancelled").catch((cause) =>
@@ -564,23 +572,48 @@ class ResearchApplication {
     }
   }
 
+  reviewTool(): ToolDefinition {
+    return researchTool({
+      name: "stock_review_stage",
+      description:
+        "Submit stage acceptance and feedback. refs must cover all current stage artifact versions. After accepted, advance downstream; after rejected, revise artifacts and review again.",
+      parameters: objectSchema({
+        runId: stringSchema,
+        stageId: stringSchema,
+        verdict: { type: "string", enum: ["accepted", "rejected"] },
+        feedback: stringSchema,
+        refs: { type: "array", items: artifactRefSchema },
+        requestId: stringSchema,
+      }),
+      output: resultOutput(opaqueObjectSchema),
+      execute: (value, exec) =>
+        runApplicationTool(
+          this.ctx,
+          "stock_review_stage",
+          value,
+          exec,
+          async () => this.review(value, exec),
+        ),
+    });
+  }
+
   controlTool(kind: ResearchControlKind): ToolDefinition {
     const definitions = {
       resume: [
         "stock_resume_research",
-        "恢复研究并修订待执行任务。input必须包含resolvedReasonIds和instructions，无变更时传空数组。返回任务计划，由当前主Agent继续推进。",
+        "Resume research, revise pending tasks and return the plan. Use [] for unchanged input.resolvedReasonIds and input.instructions.",
       ],
       cancel: [
         "stock_cancel_research",
-        "取消指定研究，停止相关执行并保留已提交内容。",
+        "Cancel the selected research and stop its executions, retaining submitted content.",
       ],
       recover: [
         "stock_recover_research",
-        "仅在用户明确确认旧执行丢失后登记指定中断尝试；不直接启动执行。",
+        "Record interrupted attempts after the user explicitly confirms their executions are lost. Does not start execution.",
       ],
       replay: [
         "stock_replay_research",
-        "使用指定研究的固定输入建立派生运行，返回任务计划，由当前主Agent继续推进。",
+        "Create a derived run from the selected research's fixed inputs and return its plan for the primary agent to execute.",
       ],
     } as const;
     const [name, description] = definitions[kind];
@@ -688,7 +721,7 @@ class ResearchApplication {
   async #cancel(research: ResearchExecution, requestId: string): Promise<void> {
     for (const operation of research.operations.values())
       operation.controller.abort(
-        new DOMException("研究已取消。", "AbortError"),
+        new DOMException("Research cancelled.", "AbortError"),
       );
     const results = await Promise.allSettled([
       ...(research.runId === undefined
@@ -729,7 +762,7 @@ class ResearchApplication {
         content: [
           {
             type: "text",
-            text: `请按${mode === "quick" ? "快速" : "深度"}研究流程调研 ${selection.security}，研究日期 ${selection.scope.date}。由你负责派工、阶段验收和最终回复。\n研究请求：${JSON.stringify({ kind: "fresh", security: selection.security, date: selection.scope.date, mode })}`,
+            text: `Research ${selection.security} as of ${selection.scope.date} using the ${mode} workflow. Dispatch tasks, review stages and deliver the final response in Chinese.\nResearch request: ${JSON.stringify({ kind: "fresh", security: selection.security, date: selection.scope.date, mode })}`,
           },
         ],
         source: { kind: "user" },
@@ -757,7 +790,7 @@ class ResearchApplication {
         content: [
           {
             type: "text",
-            text: `请继续推进这次研究，按真实状态派工和验收。\n研究请求：${JSON.stringify({ kind, operationId, ...result })}`,
+            text: `Continue this research, dispatching and reviewing tasks according to its current state.\nResearch request: ${JSON.stringify({ kind, operationId, ...result })}`,
           },
         ],
         source: { kind: "user" },
@@ -869,7 +902,7 @@ export function apply(ctx: Context, config?: ModelConfig): void {
       tool({
         name: "stock_start_research",
         description:
-          "开始用户明确提出的个股quick/deep研究。仅采集固定数据并建立计划，返回runId、任务和阶段验收要求；后续由当前主Agent逐步派工、验收和交付。省略date时采用标的市场当天。重试沿用requestId，新诉求使用新ID。",
+          "Start requested quick/deep single-stock research: collect fixed data and return runId, tasks and acceptance requirements for the primary agent to execute. date defaults to today in the security's market. Reuse requestId for retries; use a new ID for a new request.",
         parameters: objectSchema(
           {
             security: stringSchema,
@@ -881,23 +914,6 @@ export function apply(ctx: Context, config?: ModelConfig): void {
         ),
         output: resultOutput(opaqueObjectSchema),
         execute: (value, exec) => app.start(value, exec),
-      }),
-    );
-    yield ctx.tools.register(
-      tool({
-        name: "stock_review_stage",
-        description:
-          "主Agent审阅本阶段产物后提交通过或返工意见。refs必须恰为当前阶段产物版本。通过后才能进入下游；拒绝后明确redo并补充修订说明。",
-        parameters: objectSchema({
-          runId: stringSchema,
-          stageId: stringSchema,
-          verdict: { type: "string", enum: ["accepted", "rejected"] },
-          feedback: stringSchema,
-          refs: { type: "array", items: artifactRefSchema },
-          requestId: stringSchema,
-        }),
-        output: resultOutput(opaqueObjectSchema),
-        execute: async (value, exec) => app.review(value, exec),
       }),
     );
     for (const kind of ["resume", "cancel", "recover", "replay"] as const)

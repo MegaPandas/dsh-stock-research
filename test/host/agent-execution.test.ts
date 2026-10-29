@@ -77,7 +77,7 @@ describe("shared Agent submission", () => {
       REVIEW_PROMPT,
     ]) {
       expect(prompt).toContain(
-        "凡仅用于规避质疑、对描述现状无实际作用的保守性叙述和防御性写作，一律删除",
+        "Delete defensive wording that only anticipates objections and adds no information about the subject.",
       );
       expect(prompt).toContain("stock_submit");
       expect(prompt).not.toMatch(
@@ -89,7 +89,7 @@ describe("shared Agent submission", () => {
   it("lets the host main Agent orchestrate research and deliver ordinary chat responses", () => {
     expect(COORDINATOR_PROMPT).toContain("stock_start_research");
     expect(COORDINATOR_PROMPT).toContain("stock_review_stage");
-    expect(COORDINATOR_PROMPT).toContain("当前聊天");
+    expect(COORDINATOR_PROMPT).toContain("in this chat");
     expect(COORDINATOR_PROMPT).not.toContain("stock_submit");
   });
 });

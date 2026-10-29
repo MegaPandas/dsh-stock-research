@@ -187,7 +187,8 @@ class ReviewApplication {
           reader.tool,
           researchTool({
             name: "stock_select_review",
-            description: "为用户要求的修订选择当前运行的一条既有复盘。",
+            description:
+              "Select an existing review of this run for a user-requested revision.",
             parameters: objectSchema({
               entryId: stringSchema,
               revision: { type: "integer" },

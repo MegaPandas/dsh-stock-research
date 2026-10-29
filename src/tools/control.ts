@@ -63,10 +63,10 @@ export function createControlTools(
       name,
       description:
         name === "stock_dispatch_task"
-          ? "仅派发executor.kind=role的就绪角色任务。digest服务用stock_make_digest，finalize服务必须用stock_decide。等待执行和清理，以登记产物判定完成。"
+          ? "Dispatch a ready task with executor.kind=role; wait for execution and cleanup, then return status and artifact references. Use stock_make_digest for digests and stock_decide for finalization."
           : name === "stock_followup_task"
-            ? "向已经提交结果的同一个研究子Agent继续发送修改或补充要求，保留原会话和报告草稿，返回修订版本；受影响下游须重新推进和验收。resumeSearch仅在用户或主Agent明确决定恢复搜索时设为true，恢复不会重置搜索额度，超额仍需用户审批。"
-            : "重做获准运行中的任务及受影响下游，保留历史版本，等待失效角色执行释放后返回回执。",
+            ? "Request revisions from the original child agent after submission, preserving its session and draft; return a new version. Rerun and review affected downstream tasks. Set resumeSearch=true when the user or primary agent decides to resume search; retain usage and require approval for each search over budget."
+            : "Redo a task and affected downstream tasks in an authorized run, preserving historical versions. Wait for invalidated role executions to release before returning the receipt.",
       parameters:
         name === "stock_dispatch_task"
           ? objectSchema(fields)
@@ -141,7 +141,7 @@ export function createControlTools(
     researchTool({
       name: "stock_dispatch_stage",
       description:
-        "并行派发所选阶段的全部角色；阶段内所有角色都须就绪。等待各子任务执行与清理后返回逐项结果。独立多空同时就绪时必须使用本工具；单侧返工使用stock_dispatch_task。阶段验收仍由主Agent完成，不自动推进下游。",
+        "When all roles in a stage are ready, dispatch them in parallel; wait for execution and cleanup, then return individual results for primary-agent review. Use this for independent bull and bear tasks ready together; use stock_dispatch_task for one-sided rework.",
       parameters: objectSchema({
         runId: stringSchema,
         stageId: stringSchema,

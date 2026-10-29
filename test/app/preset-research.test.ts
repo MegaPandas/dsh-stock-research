@@ -23,7 +23,7 @@ afterEach(async () => {
   }
 });
 
-it("accepts standard-preset tools in the child catalog while enforcing research capabilities at execution", async () => {
+it("hides standard-preset tools from research requests and rejects forged delegation", async () => {
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(new Date("2024-01-03T08:00:00Z"));
   vi.stubGlobal(
@@ -109,7 +109,7 @@ it("accepts standard-preset tools in the child catalog while enforcing research 
     researchRequests.some((request) =>
       request.tools?.some(({ name }) => name === "subagent"),
     ),
-  ).toBe(true);
+  ).toBe(false);
   expect(h.ctx.tools.get("subagent", h.outside.agent)).toBeDefined();
   for (const request of researchRequests)
     expect(request.tools?.map(({ name }) => name)).not.toContain("host_marker");

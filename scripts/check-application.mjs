@@ -106,12 +106,19 @@ try {
   assert.equal(ctx.stockResearch.tools.length, 23);
   const mainAgentTools = [
     "stock_start_research",
-    "stock_review_stage",
     "stock_resume_research",
     "stock_cancel_research",
     "stock_recover_research",
     "stock_replay_research",
   ];
+  assert.deepEqual(
+    ctx.tools
+      .schemas(outside.agent)
+      .map(({ name }) => name)
+      .filter((name) => name.startsWith("stock_"))
+      .sort(),
+    [...mainAgentTools].sort(),
+  );
   for (const name of mainAgentTools)
     assert.ok(
       ctx.tools.schemas(outside.agent).some((tool) => tool.name === name),
@@ -134,7 +141,7 @@ try {
   assert.equal(deep.definition.mode, "deep");
   assert.equal(deep.definition.tasks.length, 22);
   assert.equal(deep.versions.mode, DEEP_MODE_VERSION);
-  assert.equal(deep.versions.prompts.roles, "26");
+  assert.equal(deep.versions.prompts.roles, "29");
   assert.ok(
     deep.inputs.some(
       ({ name, content }) =>

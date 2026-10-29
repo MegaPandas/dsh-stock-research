@@ -59,7 +59,7 @@ export function mainResearchRequest(
     .filter((block) => block.type === "text")
     .map((block) => block.text)
     .join("\n");
-  const marker = "研究请求：";
+  const marker = "Research request: ";
   if (text.includes(marker))
     return JSON.parse(text.slice(text.lastIndexOf(marker) + marker.length));
   const security =

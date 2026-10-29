@@ -27,7 +27,7 @@ const gapCodes = [
 ] as const;
 export const memoryRefSchema = objectSchema({
   entryId: stringSchema,
-  revision: { type: "integer", description: "正安全整数修订号。" },
+  revision: { type: "integer", description: "Positive safe integer revision." },
 });
 const returnsRequestProperties = {
   ...dataSchemas.stock_get_returns.properties!,

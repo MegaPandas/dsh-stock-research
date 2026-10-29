@@ -136,7 +136,6 @@ describe("public research analyst", () => {
     expect(result.status).toBe("succeeded");
     const request = h.adapter.requests[0]!;
     expect(request.tools!.map(({ name }) => name).sort()).toEqual([
-      "stock_read_report",
       "stock_read_report_draft",
       "stock_search_public",
       "stock_submit",
@@ -159,7 +158,7 @@ describe("public research analyst", () => {
     expect(
       request.tools!.find(({ name }) => name === "stock_search_public")!
         .description,
-    ).toContain(`前${limit}次免审批`);
+    ).toContain(`The first ${limit} searches need no approval`);
     expect(prompt).not.toHaveProperty("collectionSources");
     expect(h.nativeSearch).toHaveBeenCalledOnce();
     expect(h.nativeSearch.mock.calls[0]![0]).toEqual({
@@ -231,7 +230,7 @@ describe("public research analyst", () => {
     expect(
       provision.tools.find(({ name }) => name === "stock_search_public")!
         .description,
-    ).toContain("前2次免审批");
+    ).toContain("The first 2 searches need no approval");
     expect(h.nativeSearch).not.toHaveBeenCalled();
   });
 
@@ -350,9 +349,7 @@ describe("public research analyst", () => {
     expect(searchCountsAtApproval).toEqual([1, 1, 2, 2]);
     for (const response of closedResponses) {
       expect(response).toContain("Search is paused");
-      expect(response).toContain(
-        "Complete the draft using the existing data and materials",
-      );
+      expect(response).toContain("Complete the draft using existing materials");
     }
     await parent.dispose();
   });

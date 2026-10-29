@@ -30,6 +30,13 @@ export function setupResearchTools(
       .map(({ name }) => name),
   });
   for (const tool of tools) ctx.tools.register(tool);
+  ctx.on("system-prompt/assemble", async (_assembly, _context, next) => {
+    const assembly = await next();
+    return {
+      ...assembly,
+      tools: assembly.tools.filter(({ name }) => approved.has(name)),
+    };
+  });
   ctx.tools.guard((exec) => {
     const definition = approved.get(exec.name);
     if (
@@ -87,7 +94,7 @@ export function createSubmission<Kind extends AgentReportKind, Result>(
     tool: researchTool({
       name: "stock_submit",
       description:
-        "提交本角色的业务JSON。字段错误返回本会话修正，提交成功后结束。",
+        "Submit this role's business JSON. Correct reported field errors in this session; successful submission ends execution.",
       parameters: agentReportSchemas[kind],
       output: resultOutput(
         objectSchema({ status: { type: "string", const: "submitted" } }),

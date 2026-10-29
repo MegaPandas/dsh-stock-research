@@ -119,6 +119,8 @@ describe("main Agent research lifecycle", () => {
       ({ name }) => name === "stock_dispatch_task",
     )!;
     const read = h.runtime.tools.find(({ name }) => name === "stock_read_run")!;
+    expect(h.ctx.tools.get(dispatch.name, h.outside.agent)).toBeDefined();
+    expect(h.ctx.tools.get(read.name, h.outside.agent)).toBeDefined();
     expect(h.ctx.tools.get(dispatch.name, h.outside.agent)).not.toBe(dispatch);
     expect(h.ctx.tools.get(read.name, h.outside.agent)).not.toBe(read);
     expect(isApplicationBusy(h.runtime)).toBe(true);
@@ -132,8 +134,8 @@ describe("main Agent research lifecycle", () => {
     vi.spyOn(h.runtime.dispatch, "cancel").mockRejectedValueOnce(failure);
     await h.quickFiber.dispose();
     expect(logged.flatMap(causes)).toContain(failure);
-    expect(h.ctx.tools.get(dispatch.name, h.outside.agent)).toBe(dispatch);
-    expect(h.ctx.tools.get(read.name, h.outside.agent)).toBe(read);
+    expect(h.ctx.tools.get(dispatch.name, h.outside.agent)).toBeUndefined();
+    expect(h.ctx.tools.get(read.name, h.outside.agent)).toBeUndefined();
     expect(isApplicationBusy(h.runtime)).toBe(false);
     const scope = {
       security: {

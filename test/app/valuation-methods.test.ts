@@ -27,3 +27,53 @@ it("rejects unknown method IDs without returning another method", async () => {
     } as ToolRunContext),
   ).rejects.toMatchObject({ code: "INVALID_INPUT" });
 });
+
+it("returns the selected method's full input contract on demand", async () => {
+  const tool = createValuationMethodTool(VALUATION_METHODS);
+  const detail = await tool.execute({ methodId: "fcff_dcf" }, {
+    signal: new AbortController().signal,
+  } as ToolRunContext);
+  expect(detail).toMatchObject({
+    method: { id: "fcff_dcf" },
+    calculationInputSchema: {
+      type: "object",
+      required: [
+        "forecastStartDate",
+        "openingWorkingCapital",
+        "periods",
+        "discountRate",
+        "terminal",
+        "bridge",
+      ],
+      additionalProperties: false,
+      properties: {
+        periods: {
+          type: "array",
+          items: {
+            required: [
+              "endDate",
+              "revenue",
+              "operatingMargin",
+              "taxRate",
+              "depreciation",
+              "capex",
+              "workingCapital",
+            ],
+            additionalProperties: false,
+          },
+        },
+        bridge: {
+          required: [
+            "excessCash",
+            "nonOperatingAssets",
+            "debt",
+            "preferredEquity",
+            "minorityInterest",
+            "otherClaims",
+          ],
+          additionalProperties: false,
+        },
+      },
+    },
+  });
+});

@@ -723,7 +723,7 @@ describe("write tools", () => {
       kind: "digest",
       inputRefs: [g.analysisRef, g.riskRef],
     });
-    expect(content.body).toContain("Price 100 USD/share");
+    expect(content.body).toContain("Price 100 USD/股");
   });
   it("checks cancellation before bindings or storage for every write tool", async () => {
     const f = setup();

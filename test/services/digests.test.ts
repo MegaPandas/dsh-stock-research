@@ -122,7 +122,7 @@ describe("DigestService", () => {
     ).makeDigest(c.operation, "digest", "make");
     const output = content(c, saved.refs);
     expect(output.claims).toEqual([]);
-    expect(output.body).toContain("Price 100 USD/share");
+    expect(output.body).toContain("Price 100 USD/股");
     expect(output.body).not.toContain("数值与引用");
     expect(output.body).not.toContain(c.analysisRef.artifactId);
     const payload = output.payload as DigestPayload;
@@ -158,8 +158,8 @@ describe("DigestService", () => {
       oneDigest(generate),
     ).makeDigest(c.operation, "digest", "make");
     const output = content(c, saved.refs);
-    expect(output.body).toContain("Price 100 USD/share");
-    expect(output.body).not.toContain("999 USD/share");
+    expect(output.body).toContain("Price 100 USD/股");
+    expect(output.body).not.toContain("999 USD/股");
     expect(c.runs.readArtifact(c.analysisRef).content.claims).toContainEqual(
       expect.objectContaining({ id: "base", value: 100, unit: "USD/share" }),
     );

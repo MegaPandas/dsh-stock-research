@@ -15,11 +15,11 @@ import {
 export const QUICK_MODE_VERSION = "quick/9";
 const BRIEFS = {
   ...SHARED_BRIEFS,
-  "digest.analysis": `汇总四份分析的核心判断、驱动机制、展望与关键分歧，提炼影响后续讨论的具体问题，保留事实的期间与业务口径。${DIGEST_RISK_RULE}`,
-  "digest.debate.1": `汇总原分析摘要与本轮多空论点，提炼双方依据、反证和决定判断的分歧。${DIGEST_RISK_RULE}`,
+  "digest.analysis": `Combine the four analyses' core judgments, drivers, outlooks and key disagreements. Identify specific questions affecting the debate; preserve factual periods and business definitions. ${DIGEST_RISK_RULE}`,
+  "digest.debate.1": `Combine the original analysis digest and this round's bull/bear claims. Identify each side's evidence, counterevidence and disagreements that determine the judgment. ${DIGEST_RISK_RULE}`,
   "risk.main":
-    "基于固定辩论摘要检查财务、流动性、估值、事件和执行风险，逐项说明损失机制、影响、触发条件、投资者的暴露或仓位约束及重估或退出建议。资本开支、库存管理和授信等公司经营动作作为观察事项。需要展开细节时按目录读取原始报告。",
-  "digest.risk": `合并辩论摘要与风控意见，提炼影响决策的风险和未决问题。每项风险以一条综述保留关键影响、触发或处置约束，完整细节保存在原报告中，为经理逐项回应提供固定输入。${DIGEST_RISK_RULE}`,
+    "Review financial, liquidity, valuation, event and execution risks from the fixed debate digest. For each, explain loss mechanisms, impact, triggers, investor exposure or position constraints, and recommendations for reassessment or exit. Treat company operating actions such as capex, inventory management and credit policy as observations. Read original reports through the catalog for detail.",
+  "digest.risk": `Combine the debate digest and risk review to identify risks and open questions affecting the decision. Summarize each risk's key impact, trigger or action constraint in one entry; retain full detail in the original report. Supply fixed inputs for the manager's itemized responses. ${DIGEST_RISK_RULE}`,
 } as const;
 
 export function createQuickInput(

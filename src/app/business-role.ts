@@ -72,7 +72,8 @@ export function prepareBusinessRole(
       ...businessDraftTools(file),
       researchTool({
         ...submit,
-        description: "读取固定业务JSON草稿，校验并提交本阶段结果。",
+        description:
+          "Read the fixed business JSON draft, validate it and submit this stage's result.",
         parameters: objectSchema({ requestId: stringSchema }),
         output: resultOutput(
           objectSchema({ status: { type: "string", const: "submitted" } }),

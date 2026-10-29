@@ -77,43 +77,49 @@ export const DIGEST_MAX_CHARACTERS = 9000;
 export const DIGEST_TARGET_CHARACTERS = DIGEST_MAX_CHARACTERS / 2;
 
 const scenario = object({
-  conditions: texts("路径成立所需的业务条件。"),
-  expectation: text("预期变化及其对公司的影响。"),
+  conditions: texts("Business conditions required for this scenario."),
+  expectation: text("Expected changes and their impact on the company."),
 });
 const outlook = object({
-  horizon: text("预测的起止期间或时间跨度。"),
+  horizon: text("Forecast start and end periods or time horizon."),
   baseCase: scenario,
   alternativeCases: array(scenario),
-  watchPoints: texts("用于观察路径变化的具体信号。"),
+  watchPoints: texts("Specific signals of a change in the scenario."),
 });
 const risks = array(
   object({
-    factor: text("不利因素。"),
-    impact: text("不利因素造成损失的作用机制。"),
-    trigger: text("风险发生或明显上升的条件。"),
+    factor: text("Adverse factor."),
+    impact: text("How this factor causes losses."),
+    trigger: text("Conditions that trigger or materially increase the risk."),
   }),
 );
 const envelope = <Content extends ReportSchema>(content: Content) =>
   object({
     summary: text(
-      `交给下游的结论、主要驱动及改变判断的条件，目标${AGENT_SUMMARY_TARGET_CHARACTERS}个Unicode字符，上限${AGENT_SUMMARY_MAX_CHARACTERS}字符。`,
+      `Conclusions, key drivers and conditions that would change the assessment for downstream roles. Target ${AGENT_SUMMARY_TARGET_CHARACTERS} Unicode characters; maximum ${AGENT_SUMMARY_MAX_CHARACTERS}.`,
     ),
     content,
   });
 
 export const valuationRecordSchema = object({
   companyProfile: text(
-    "企业经营类型、发展阶段及判断依据；可保留多个特征及不确定性。",
+    "Business type, development stage and supporting rationale.",
   ),
-  valuationDate: text("研究日，YYYY-MM-DD；valueRange均为该日的价值。"),
+  valuationDate: text(
+    "Research date, YYYY-MM-DD; all valueRange results are valued at this date.",
+  ),
   targetDate: text(
-    "研究日后六个月的目标日期，采用context.valuationMethods.targetDate。",
+    "Target date six months after the research date: context.valuationMethods.targetDate.",
   ),
   methods: array(
     withOptional(
       {
-        methodId: text("内置方法目录中的编号；首项为主模型，其余为交叉核对。"),
-        suitability: text("方法适用的业务、阶段与数据条件，以及选择依据。"),
+        methodId: text(
+          "Built-in method ID. The first method is primary; others are cross-checks.",
+        ),
+        suitability: text(
+          "Applicable business, stage and data conditions, with selection rationale.",
+        ),
         valueObject: choices(
           "operating_assets",
           "common_equity",
@@ -122,46 +128,48 @@ export const valuationRecordSchema = object({
         ),
         inputs: array(
           object({
-            name: text("输入名称、期间和单位。"),
+            name: text("Input name, period and unit."),
             value: text(
-              "采用的输入值，保留单位；缺失输入写入limitations，不填零。",
+              "Input value with units. Record missing inputs in limitations, not as zero.",
             ),
             kind: choices("observed", "normalized", "assumed"),
             basis: text(
-              "观察值注明快照表、字段和日期或资料定位；正常化与假设注明推导依据，不以方法文献替代公司输入证据。",
+              "For observations, cite the snapshot table, field and date or source location. Explain derivations for normalized and assumed values; method literature does not substantiate company inputs.",
             ),
           }),
         ),
         assumptions: texts(
-          "增长、利润率、再投资、折现率、终值、股数等采用的具体假设。",
+          "Specific assumptions for growth, margins, reinvestment, discount rates, terminal value and share count.",
         ),
         calculation: texts(
-          "可复核的计算步骤；涉及折现时列逐期现金流、终值与折现，经营价值到股权或每股价值时列桥接。",
+          "Reproducible steps, including period cash flows, terminal value and discounting where applicable, and bridges from operating value to equity or per-share value.",
         ),
         valueRange: nullable(
           object({
             low: { type: "number" },
             high: { type: "number" },
             unit: text(
-              "证券币种的基础金额或每股单位，例如CNY、USD/share；与valueObject匹配，数量级体现在数值中。",
+              "Base currency or per-share unit, e.g. CNY or USD/share, matching valueObject. Express scale in the numeric value.",
             ),
           }),
         ),
-        sensitivity: texts("关键参数或替代情景变化对结果的影响。"),
+        sensitivity: texts(
+          "Effects of key parameter changes or alternative scenarios.",
+        ),
         limitations: texts(
-          "缺失的必要输入、未满足的适用条件与对结果的限制；不足以量化时valueRange为null。",
+          "Missing required inputs, unmet applicability conditions and their effects. Set valueRange to null when quantification is unsupported.",
         ),
       },
       {
         calculationIds: texts(
-          "程序保存的估值计算编号，数值与步骤由计算结果装配。",
+          "Saved calculation IDs; code assembles values and steps from these results.",
         ),
       },
     ),
   ),
   targetPriceBasis: nullable(
     text(
-      "经理解释目标价对应的情景、股息、融资、股数及从研究日价值到目标日期价格的关系；未设目标价时为null。",
+      "Manager's rationale for the target-price scenario, dividends, financing, share count and the relationship between research-date value and target-date price. Null when no target price is set.",
     ),
   ),
 });
@@ -178,19 +186,25 @@ export function calculatedReportSections<
   if (properties.valuation !== undefined)
     properties.valuation = nullable(
       object({
-        companyProfile: text("经营类型、发展阶段与判断依据。"),
+        companyProfile: text(
+          "Business type, development stage and supporting rationale.",
+        ),
         methods: array(
           object({
-            methodId: text("内置方法编号；首项为主模型。"),
-            suitability: text("方法适用性与选择依据。"),
+            methodId: text("Built-in method ID; the first method is primary."),
+            suitability: text("Method applicability and selection rationale."),
             calculationIds: texts(
-              "研究日估值计算编号。缺少必要输入时使用空列表，并在limitations说明缺口。",
+              "Research-date calculation IDs. Use [] when required inputs are missing and explain the gaps in limitations.",
             ),
-            limitations: texts("缺失输入与结果限制。"),
+            limitations: texts(
+              "Missing inputs and limitations of the results.",
+            ),
           }),
         ),
         targetPriceBasis: nullable(
-          text("目标日情景、期间分配、融资与股数等依据；无目标价时为null。"),
+          text(
+            "Rationale for the target-date scenario, interim distributions, financing and share count. Null when no target price is set.",
+          ),
         ),
       }),
     );
@@ -198,7 +212,7 @@ export function calculatedReportSections<
     properties.targetPrice = nullable(
       object({
         calculationId: text(
-          "purpose=target_price且输出为单个每股结果的计算编号。",
+          "ID of a purpose=target_price calculation with a single per-share result.",
         ),
       }),
     );
@@ -218,19 +232,29 @@ function withValuation<const Properties extends Record<string, ReportSchema>>(
 export const agentReportSchemas = {
   analysis: envelope(
     withValuation({
-      currentState: texts("关键事实、期间变化及其业务含义，至少一项。"),
+      currentState: texts(
+        "Key facts, period changes and business implications; at least one item.",
+      ),
       analysisModel: object({
-        drivers: texts("决定结果的主要业务变量，至少一项。"),
-        mechanism: text("变量之间的作用关系及公司影响。"),
-        assumptions: texts("模型成立所需的假设。"),
-        alternativeExplanations: texts("对同一观察的其他实质解释。"),
+        drivers: texts(
+          "Main business variables driving outcomes; at least one item.",
+        ),
+        mechanism: text("How the variables interact and affect the company."),
+        assumptions: texts("Assumptions required by the model."),
+        alternativeExplanations: texts(
+          "Other substantive explanations for the same observations.",
+        ),
       }),
       outlook,
       risks,
       handoff: object({
-        implications: texts("后续研究应采用的业务结论。"),
-        openQuestions: texts("尚需解决且会影响判断的问题。"),
-        limitations: texts("具体材料缺口及其对判断的影响。"),
+        implications: texts("Business conclusions for downstream research."),
+        openQuestions: texts(
+          "Unresolved questions that affect the assessment.",
+        ),
+        limitations: texts(
+          "Specific evidence gaps and their effects on the assessment.",
+        ),
       }),
     }),
   ),
@@ -238,31 +262,33 @@ export const agentReportSchemas = {
     object({
       arguments: array(
         object({
-          claim: text("本方论点。"),
-          mechanism: text("论点影响公司或价格的作用机制。"),
-          conditions: texts("论点成立的条件。"),
+          claim: text("This side's argument."),
+          mechanism: text("How the argument affects the company or its price."),
+          conditions: texts("Conditions required for the argument to hold."),
         }),
       ),
       responses: array(
         object({
-          point: text("输入中需要回应的对方具体论点。"),
-          response: text("本方回应及其理由。"),
+          point: text("Specific opposing argument from the inputs to address."),
+          response: text("This side's response and rationale."),
         }),
       ),
       outlook,
       risks,
-      openQuestions: texts("决定争议结论的未决问题。"),
+      openQuestions: texts(
+        "Unresolved questions that determine the disputed conclusion.",
+      ),
     }),
   ),
   risk: envelope(
     object({
       issues: array(
         object({
-          description: text("需要处置的损失来源。"),
-          impact: text("风险的影响及传导机制。"),
-          trigger: text("风险发生或上升的条件。"),
-          constraint: text("建议纳入决策的约束。"),
-          recommendation: text("建议采取的处置。"),
+          description: text("Source of loss requiring action."),
+          impact: text("Risk impact and transmission mechanism."),
+          trigger: text("Conditions that trigger or increase the risk."),
+          constraint: text("Proposed decision constraint."),
+          recommendation: text("Recommended action."),
         }),
       ),
     }),
@@ -271,75 +297,101 @@ export const agentReportSchemas = {
     object({
       questions: array(
         object({
-          question: text("需要解决的研究问题。"),
-          whyItMatters: text("该问题如何影响研究判断。"),
-          nextStep: text("解决问题的研究路径及检查点。"),
+          question: text("Research question to resolve."),
+          whyItMatters: text("How the question affects the assessment."),
+          nextStep: text(
+            "Research steps and checkpoints for resolving the question.",
+          ),
         }),
       ),
-      constraints: texts("研究范围、数据与执行条件。"),
+      constraints: texts("Research scope, data and execution constraints."),
     }),
   ),
   decision_draft: envelope(
     withValuation({
-      thesis: texts("投资判断的主要依据与经营驱动，至少一项。"),
+      thesis: texts(
+        "Main investment rationale and business drivers; at least one item.",
+      ),
       targetPrice: nullable(
         withOptional(
           {
             value: {
               type: "number",
               description:
-                "context.decisionPolicy.horizonEndDate对应的同币种非负目标价格。",
+                "Nonnegative target price in the security's currency for context.decisionPolicy.horizonEndDate.",
             },
-            method: text("目标价格的估值方法。"),
-            assumptions: texts("估值方法采用的具体假设，至少一项。"),
+            method: text("Valuation method for the target price."),
+            assumptions: texts(
+              "Specific valuation assumptions; at least one item.",
+            ),
           },
-          { calculationId: text("生成目标价的程序计算编号。") },
+          {
+            calculationId: text(
+              "ID of the calculation producing the target price.",
+            ),
+          },
         ),
       ),
-      risks: texts("决定投资结果的主要损失风险。"),
+      risks: texts("Main loss risks determining investment outcomes."),
       riskResponses: array(
         object({
-          issueId: text("输入中需要回应的风险业务编号。"),
+          issueId: text("Risk business ID from the inputs to address."),
           disposition: choices("accepted", "constrained", "unresolved"),
-          reason: text("接受风险、纳入决策约束或保留未决的理由。"),
+          reason: text(
+            "Rationale for accepting the risk, constraining the decision or leaving it unresolved.",
+          ),
         }),
       ),
       invalidationConditions: texts(
-        "改变投资判断或触发投资者调整敞口、重估的具体观察条件。",
+        "Specific observations that change the investment thesis or trigger exposure adjustments or revaluation.",
       ),
-      limitations: texts("影响决策的具体材料缺口。"),
+      limitations: texts("Specific evidence gaps affecting the decision."),
     }),
   ),
   digest: envelope(
     object({
-      keyPoints: texts("供下一阶段使用的关键事实、机制与预测条件。"),
-      disagreements: texts("尚未解决的实质分歧及其影响。"),
+      keyPoints: texts(
+        "Key facts, mechanisms and forecast conditions for the next stage.",
+      ),
+      disagreements: texts(
+        "Unresolved substantive disagreements and their effects.",
+      ),
       riskSummaries: array(
         object({
-          issueId: text("输入中的风险业务编号。"),
-          text: text("风险的主要影响、触发条件或决策约束。"),
+          issueId: text("Risk business ID from the inputs."),
+          text: text(
+            "Main risk impact, trigger conditions or decision constraints.",
+          ),
         }),
       ),
-      openQuestions: texts("交给下一阶段的问题。"),
+      openQuestions: texts("Questions for the next stage."),
     }),
   ),
   ask: envelope(
     object({
-      explanation: texts("直接解释用户问题的事实与作用关系。"),
-      limitations: texts("影响当前答案的具体材料缺口。"),
+      explanation: texts(
+        "Facts and causal relationships that directly answer the user's question.",
+      ),
+      limitations: texts("Specific evidence gaps affecting this answer."),
     }),
   ),
   review: envelope(
     object({
       comparisons: array(
         object({
-          original: text("原研究的判断或预测条件。"),
-          observed: text("后续实际观察，包含对应期间与口径。"),
-          implication: text("后续观察对原判断的检验结果。"),
+          original: text(
+            "Original research conclusion or forecast conditions.",
+          ),
+          observed: text(
+            "Subsequent observations with their periods and measurement basis.",
+          ),
+          implication: text(
+            "How the observations validate or challenge the original conclusion.",
+          ),
         }),
       ),
-      lessons: texts("复盘得出的具体经验。"),
-      followUp: texts("后续需要采取的研究行动。"),
+      lessons: texts("Specific lessons from the review."),
+      followUp: texts("Research actions to take next."),
     }),
   ),
   coordinator: envelope(object({})),
@@ -357,7 +409,7 @@ export const legacyDecisionReportSchema = envelope(
     rating: nullable(
       choices("strong_buy", "buy", "hold", "sell", "strong_sell"),
     ),
-    horizonEndDate: text("已保存的判断期限。"),
+    horizonEndDate: text("Saved assessment horizon end date."),
     thesis:
       agentReportSchemas.decision_draft.properties.content.properties.thesis,
     targetPrice:

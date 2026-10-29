@@ -5,7 +5,11 @@ import { serializeJson } from "../cache/json.js";
 import type { RunService } from "../services/runs.js";
 import type { SourceDescription } from "../services/query-sources.js";
 import type { QueryToolPolicy } from "../tools/query-inputs.js";
-import { ARTIFACT_GUIDES, ROLE_PROMPTS } from "./research-prompts.js";
+import {
+  ARTIFACT_GUIDES,
+  CALCULATION_RULES,
+  ROLE_PROMPTS,
+} from "./research-prompts.js";
 import { PUBLIC_SEARCH_LIMITS } from "./public-research.js";
 
 export const APPLICATION_INPUT_NAME = "stock-research:application";
@@ -24,7 +28,7 @@ const policy = z
   .required();
 const schema = z
   .object({
-    schemaVersion: z.const(1).required(),
+    schemaVersion: z.const(2).required(),
     publicSearchLimit: z
       .natural()
       .max(Number.MAX_SAFE_INTEGER)
@@ -32,7 +36,12 @@ const schema = z
     policy,
     sourceCatalogue: z.array(z.any().required()).required(),
     prompts: z
-      .object({ analyst: text, discussion: text, manager: text })
+      .object({
+        analyst: text,
+        discussion: text,
+        manager: text,
+        valuation: text,
+      })
       .required(),
     guides: z
       .object({
@@ -53,7 +62,7 @@ export function captureApplicationInput(
 ): JsonValue {
   return JSON.parse(
     serializeJson({
-      schemaVersion: 1,
+      schemaVersion: 2,
       publicSearchLimit,
       policy,
       sourceCatalogue: sources
@@ -63,7 +72,7 @@ export function captureApplicationInput(
           provider,
           capability,
         })),
-      prompts: ROLE_PROMPTS,
+      prompts: { ...ROLE_PROMPTS, valuation: CALCULATION_RULES },
       guides: ARTIFACT_GUIDES,
     }),
   ) as JsonValue;
@@ -83,7 +92,7 @@ export function readApplicationInput(runs: RunService, runId: string) {
     typeof input === "object" &&
     input !== null &&
     "schemaVersion" in input &&
-    input.schemaVersion !== 1
+    input.schemaVersion !== 2
   )
     throw new ResearchError(
       "VERSION_UNAVAILABLE",

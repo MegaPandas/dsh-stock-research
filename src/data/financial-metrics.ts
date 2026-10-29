@@ -119,14 +119,14 @@ export function deriveFinancialMetrics(
       const prior = read(find(yearBefore(start), yearBefore(date)), s.field);
       put(
         `${name}_YTD`,
-        `${name} 原报告期间数值（期间见本行periodStart/date）`,
+        `${name} as reported; period defined by this row's periodStart/date`,
         s.unit,
         current,
         `Missing ${s.field} for ${start}/${date}.`,
       );
       put(
         `${name}_YOY`,
-        `${name} 原报告同口径同比=(本期-上年同期)/abs(上年同期)×100`,
+        `${name} reported YoY on a comparable basis=(current-prior-year same period)/abs(prior-year same period)×100`,
         "percent",
         current !== null && prior !== null && prior !== 0
           ? ((current - prior) / Math.abs(prior)) * 100
@@ -155,7 +155,7 @@ export function deriveFinancialMetrics(
             : null;
       amounts[`${name}_QUARTER`] = put(
         `${name}_QUARTER`,
-        `${name} 单季度=累计-上一季度累计；首季取原值`,
+        `${name} single quarter=current cumulative-prior-quarter cumulative; first quarter uses the reported value`,
         s.unit,
         quarter,
         `Missing matching preceding cumulative ${s.field} for a single quarter.`,
@@ -213,7 +213,7 @@ export function deriveFinancialMetrics(
       }
       amounts[`${name}_TTM`] = put(
         `${name}_TTM`,
-        `${name} TTM：全年取原值；累计用上年全年-上年同口径累计+本期累计；独立季度用连续四个无重叠季度合计`,
+        `${name} TTM: use reported annual values; for cumulative periods use prior fiscal year-prior-year comparable cumulative+current cumulative; for standalone quarters sum four contiguous non-overlapping quarters`,
         s.unit,
         ttm,
         `Missing matching fiscal annual/prior-year cumulative ${s.field}, or four contiguous non-overlapping quarters.`,
@@ -253,28 +253,28 @@ export function deriveFinancialMetrics(
         "FREE_CASH_FLOW",
         "OCF",
         "CAPEX",
-        "自由现金流=经营现金流-购建长期资产现金",
+        "Free cash flow=operating cash flow-cash paid for long-term assets",
         false,
       );
       combine(
         "CASH_CONVERSION",
         "OCF",
         "NET_INCOME",
-        "现金含量=经营现金流/归母净利润",
+        "Cash conversion=operating cash flow/net income attributable to the parent",
         true,
       );
       combine(
         "NET_MARGIN",
         "NET_INCOME",
         "REVENUE",
-        "归母净利率=归母净利润/收入",
+        "Parent net margin=net income attributable to the parent/revenue",
         true,
       );
       combine(
         "OPERATING_MARGIN",
         "OPERATING_PROFIT",
         "REVENUE",
-        "营业利润率=营业利润/收入",
+        "Operating margin=reported operating profit/revenue",
         true,
       );
       const revenue = amounts[`REVENUE_${basis}`] ?? null,
@@ -282,7 +282,7 @@ export function deriveFinancialMetrics(
       if (series.REVENUE)
         put(
           `GROSS_MARGIN_${basis}`,
-          `毛利率=(收入-营业成本)/收入 (${basis})`,
+          `Gross margin=(revenue-operating cost)/revenue (${basis})`,
           "ratio",
           compatible("REVENUE", "COST") &&
             revenue !== null &&
@@ -311,7 +311,7 @@ export function deriveFinancialMetrics(
       const current = wc(balance);
       put(
         "SIMPLIFIED_WORKING_CAPITAL",
-        "简化营运资本=应收账款+存货-应付账款",
+        "Simplified working capital=accounts receivable+inventory-accounts payable",
         unit,
         current,
         "Missing ACCOUNTS_RECE, INVENTORY or ACCOUNTS_PAYABLE.",
@@ -324,7 +324,7 @@ export function deriveFinancialMetrics(
       );
       put(
         "SIMPLIFIED_WORKING_CAPITAL_CHANGE",
-        "简化营运资本较上一报告期变化=本期-上期",
+        "Simplified working capital change=current-prior reporting period",
         unit,
         current !== null && prior !== null ? current - prior : null,
         "Missing complete previous reporting-period working capital.",
@@ -340,7 +340,7 @@ export function deriveFinancialMetrics(
         `${scope.security.currency}/share`;
       put(
         "BPS",
-        "来源每股净资产；BPS日期=本行date",
+        "Source book value per share; BPS date=this row's date",
         bpsUnit,
         bps,
         "Missing BPS.",
@@ -357,7 +357,7 @@ export function deriveFinancialMetrics(
       const shares = read(sharesInput, "TOTAL_SHARES");
       put(
         "CURRENT_TOTAL_SHARES",
-        "当前总股本；观察日期见attributes.currentSharesDate",
+        "Current total shares; observation date in attributes.currentSharesDate",
         "shares",
         shares,
         "Missing valuation.history TOTAL_SHARES.",
@@ -371,7 +371,7 @@ export function deriveFinancialMetrics(
           : null;
       put(
         "PARENT_EQUITY_COMPARISON",
-        "归母权益推导对照=BPS(本行date)×当前总股本；股本日期见attributes.currentSharesDate，非原报权益",
+        "Derived parent equity comparison=BPS(this row's date)×current total shares; share date in attributes.currentSharesDate; not reported equity",
         scope.security.currency,
         equity,
         "Missing compatible BPS/share units or current shares.",
@@ -386,7 +386,7 @@ export function deriveFinancialMetrics(
           : null;
       put(
         "MINORITY_EQUITY_ESTIMATE",
-        "少数权益估算=TOTAL_EQUITY-BPS×当前总股本；非原报值",
+        "Estimated minority equity=TOTAL_EQUITY-BPS×current total shares; not a reported value",
         scope.security.currency,
         total !== null && equity !== null ? total - equity : null,
         "Missing same-provider TOTAL_EQUITY or parent equity comparison.",
@@ -394,7 +394,7 @@ export function deriveFinancialMetrics(
       const ni = amounts.NET_INCOME_TTM ?? null;
       put(
         "ROE_TTM_END_EQUITY_COMPARISON",
-        "TTM归母净利/期末BPS×当前股本权益对照；非加权ROE",
+        "TTM parent net income/(period-end BPS×current total shares) equity comparison; not weighted ROE",
         "ratio",
         ni !== null &&
           equity !== null &&
@@ -432,7 +432,7 @@ export function deriveFinancialMetrics(
       if (!columns[field] || columns[field]!.unit === "ratio") continue;
       const growth = `${field}_YOY`;
       columns[growth] = {
-        label: `${columns[field]!.label} 同口径同比=(本期-上年同期)/abs(上年同期)×100`,
+        label: `${columns[field]!.label} comparable YoY=(current-prior-year same period)/abs(prior-year same period)×100`,
         unit: "percent",
       };
       const previous = prior?.values[field] ?? null;
@@ -481,7 +481,7 @@ export function deriveFinancialMetrics(
       for (const [statistic, value] of Object.entries(statistics)) {
         const key = `${name}_${statistic}`;
         columns[key] = {
-          label: `valuation.history已有窗口 ${field} 非空样本${statistic}；偶数样本中位数取中间两值平均，窗口见attributes`,
+          label: `valuation.history retained-window ${field} non-null sample ${statistic}; even-sample median averages the middle two values; window in attributes`,
           unit:
             statistic === "COUNT"
               ? "count"

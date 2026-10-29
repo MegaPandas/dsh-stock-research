@@ -234,7 +234,7 @@ export function prepareResearchRole(
         researchTool({
           ...submit,
           description:
-            "校验并发布本任务固定JSON草稿；只检查业务结构与提交资格，不接受正文或引用参数。成功后结束本任务。",
+            "Validate the business structure and submission eligibility of this task's fixed JSON draft, then publish it. Accepts no body or reference arguments. Success ends the task.",
           parameters: objectSchema({ requestId: stringSchema }),
           output: resultOutput(
             objectSchema({ status: { type: "string", const: "submitted" } }),
@@ -324,7 +324,7 @@ export function prepareResearchRole(
         return researchTool({
           ...tool,
           description:
-            "读取本任务固定Markdown草稿，校验并发布。错误返回具体字段和原因，草稿仍在文件中，修改后可重新提交；不接收正文或任意路径。",
+            "Read, validate and publish this task's fixed Markdown draft. Errors identify fields and reasons; edit the retained draft and resubmit. Accepts no body or path arguments.",
           parameters: objectSchema({ requestId: stringSchema }),
           async execute(value, exec) {
             const item = object(value, ["requestId"]);

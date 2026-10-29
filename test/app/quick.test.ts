@@ -260,7 +260,7 @@ describe("stock-quick real command boundary", () => {
       .outputRefs.map((ref) => h.runtime.runs.readArtifact(ref).content)
       .find((content) => content.kind === "report")!;
     expect(report.body).toContain("## 估值依据");
-    expect(report.body).toContain("研究日价值区间：192 至 240 CNY/share");
+    expect(report.body).toContain("研究日价值区间：192 CNY/股 至 240 CNY/股");
     expect(report.body).toContain("六个月目标价依据");
     expect(report).toMatchObject({
       payload: {
@@ -424,19 +424,14 @@ describe("stock-quick real command boundary", () => {
     ).toHaveLength(1);
     expect(
       h.adapter.requests[0]!.tools!.map((tool) => tool.name).sort(),
-    ).toEqual(
-      expect.arrayContaining(
-        [
-          "stock_start_research",
-          "host_marker",
-          "stock_read_run",
-          "stock_data_health",
-          "stock_dispatch_task",
-          "stock_make_digest",
-          "stock_decide",
-        ].sort(),
-      ),
-    );
+    ).toEqual([
+      "host_marker",
+      "stock_cancel_research",
+      "stock_recover_research",
+      "stock_replay_research",
+      "stock_resume_research",
+      "stock_start_research",
+    ]);
     expect(fetch).toHaveBeenCalledTimes(3);
   });
 

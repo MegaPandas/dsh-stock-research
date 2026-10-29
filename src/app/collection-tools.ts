@@ -95,8 +95,8 @@ function createCollectionTools(
     researchTool({
       name: "stock_describe_collection",
       description: dataOnly
-        ? "查看固定采集表的数值字段、单位、口径及自动附带的日期元字段，不返回数据行，不发起网络请求。"
-        : "查看固定采集表的字段、单位、口径及质量信息，不返回数据行，不发起网络请求。",
+        ? "Inspect numeric fields, units, definitions and date metadata in a fixed snapshot. Read rows with stock_read_collection."
+        : "Inspect fields, units, definitions and quality information in a fixed snapshot. Read rows with stock_read_collection.",
       parameters: objectSchema({ table: stringSchema }),
       output: resultOutput(opaqueObjectSchema),
       async execute(value, exec) {
@@ -109,8 +109,8 @@ function createCollectionTools(
     researchTool({
       name: "stock_read_collection",
       description: dataOnly
-        ? "只读固定采集表的业务数据。按fields选择字段，先按dateFrom/dateTo筛选，再从offset分页读取1至100行。日期、报告期和原始行号随每行自动返回；缺失值保持null，不发起网络请求。字段口径用stock_describe_collection查看。"
-        : "只读固定采集表的数据行。按fields选择字段，先按dateFrom/dateTo筛选，再从offset分页读取1至100行。返回原始行号、相关缺口和适用的固定数字引用，不发起网络请求。字段口径用stock_describe_collection查看。",
+        ? "Read a fixed snapshot without network access. Select columns with fields, filter by dateFrom/dateTo, then paginate from offset. Rows include dates, reporting periods and original row indices; missing values are null. Read field definitions with stock_describe_collection."
+        : "Read a fixed snapshot without network access. Select columns with fields, filter by dateFrom/dateTo, then paginate from offset. Return original row indices, relevant gaps and fixed numeric references. Read field definitions with stock_describe_collection.",
       parameters: objectSchema(
         {
           table: stringSchema,
@@ -118,24 +118,24 @@ function createCollectionTools(
             type: "array",
             items: stringSchema,
             description: dataOnly
-              ? "非空、不重复的字段名，须存在于columns或rowFields。日期元字段随行自动返回，也可显式列出。"
-              : "非空、不重复的字段名，须存在于表结构中。",
+              ? "Nonempty, unique field names from columns or rowFields. Date metadata is returned automatically and may also be listed explicitly."
+              : "Nonempty, unique field names present in the table schema.",
           },
           offset: {
             type: "integer",
-            description: "日期筛选后的行偏移，从0开始。",
+            description: "Zero-based row offset after date filtering.",
           },
           limit: {
             type: "integer",
-            description: `每页1至${MAX_PAGE_SIZE}行。`,
+            description: `Rows per page, from 1 to ${MAX_PAGE_SIZE}.`,
           },
           dateFrom: {
             type: "string",
-            description: "可选起始日期YYYY-MM-DD，包含当天。",
+            description: "Optional inclusive start date, YYYY-MM-DD.",
           },
           dateTo: {
             type: "string",
-            description: "可选结束日期YYYY-MM-DD，包含当天。",
+            description: "Optional inclusive end date, YYYY-MM-DD.",
           },
         },
         ["table", "fields", "offset", "limit"],

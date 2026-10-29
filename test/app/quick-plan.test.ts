@@ -88,7 +88,7 @@ describe("quick application plan", () => {
     expect(
       input.instructions?.find((item) => item.taskId === "analysis.market")
         ?.instruction,
-    ).toContain("最新已完成日线");
+    ).toContain("latest completed daily bar");
     expect(input.versions.mode).toBe(QUICK_MODE_VERSION);
     expect(QUICK_MODE_VERSION).toBe("quick/9");
     expect(
@@ -104,21 +104,25 @@ describe("quick application plan", () => {
     const instructions = new Map(
       input.instructions!.map((item) => [item.taskId, item.instruction]),
     );
-    expect(instructions.get("analysis.market")).toContain("60根日线");
-    expect(instructions.get("analysis.market")).toContain("52根周线");
-    expect(instructions.get("analysis.market")).toContain("36根月线");
-    expect(instructions.get("analysis.fundamentals")).toContain("12个报告期");
-    expect(instructions.get("analysis.macro")).toContain("中国GDP");
-    expect(ROLE_PROMPTS.analyst).toContain("数据目录");
+    expect(instructions.get("analysis.market")).toContain("60 daily");
+    expect(instructions.get("analysis.market")).toContain("52 weekly");
+    expect(instructions.get("analysis.market")).toContain("36 monthly");
+    expect(instructions.get("analysis.fundamentals")).toContain(
+      "12 reporting periods",
+    );
+    expect(instructions.get("analysis.macro")).toContain("China's GDP");
+    expect(ROLE_PROMPTS.analyst).toContain("context.dataCatalog");
     expect(ROLE_PROMPTS.analyst).toContain("stock_describe_collection");
     expect(ROLE_PROMPTS.analyst).toContain("stock_read_collection");
-    expect(ROLE_PROMPTS.analyst).toContain("采用快照已有值");
+    expect(ROLE_PROMPTS.analyst).toContain(
+      "use the snapshot's existing technical indicators and financial ratios",
+    );
     expect(ROLE_PROMPTS.analyst).not.toContain("fixedQueries");
     for (const [role, prompt] of Object.entries(ROLE_PROMPTS)) {
       if (role === "analyst") continue;
-      expect(prompt).toContain("固定原始报告");
+      expect(prompt).toContain("fixed reports");
       expect(prompt).toContain("stock_submit");
-      expect(prompt).toContain("业务JSON");
+      expect(prompt).toContain("tool schema");
       expect(prompt).not.toContain("collectionSources");
       expect(prompt).not.toContain("inputRefs");
       expect(prompt).not.toContain("fixedQueries");
@@ -135,7 +139,7 @@ describe("quick application plan", () => {
     expect(input).toEqual(saved);
     expect(input.inputs[0]?.name).toBe(APPLICATION_INPUT_NAME);
     expect(input.inputs[0]?.content).toMatchObject({
-      schemaVersion: 1,
+      schemaVersion: 2,
       policy: policy(),
       prompts: ROLE_PROMPTS,
     });

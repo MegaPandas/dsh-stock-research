@@ -268,6 +268,10 @@ describe("public role follow-up contract", () => {
       });
       const release = h.ctx.stockResearch.bindCoordinator(parent.agent);
       parent.agent.ctx.effect(() => release);
+      for (const tool of h.ctx.stockResearch.tools.filter(({ name }) =>
+        ["stock_dispatch_task", "stock_followup_task"].includes(name),
+      ))
+        parent.agent.ctx.tools.register(tool);
       h.ctx.stockResearch.authorizeCoordinatorRun(parent.agent, runId);
       const approvalCounts: number[] = [];
       h.ctx.on("approval/request", async () => {

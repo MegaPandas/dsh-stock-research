@@ -21,13 +21,14 @@ const resumeInputSchema = objectSchema({
   resolvedReasonIds: {
     type: "array",
     items: stringSchema,
-    description: "run_view中已解决的blockReasons.id；没有待解除原因时传[]。",
+    description:
+      "Resolved blockReasons.id values from run_view; use [] when there are none to clear.",
   },
   instructions: {
     type: "array",
     items: objectSchema({ taskId: stringSchema, instruction: stringSchema }),
     description:
-      "待执行任务的新说明；没有修订时传[]。仅更新pending或failed任务。",
+      "New instructions for pending or failed tasks only; use [] when no revisions are needed.",
   },
 });
 const attemptsSchema = {

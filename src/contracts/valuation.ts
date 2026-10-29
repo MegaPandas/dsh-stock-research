@@ -1,7 +1,7 @@
 import type { ISOTime } from "./data.js";
 
 export const VALUATION_ENGINE_VERSION = "2";
-export const DETERMINISTIC_VALUATION_PROTOCOL = "26";
+export const DETERMINISTIC_VALUATION_PROTOCOL = "29";
 export const VALUATION_METHODS_INPUT = "stock-research:valuation-methods";
 export const AMOUNT_SCALES = {
   unit: 1,

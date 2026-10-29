@@ -10,11 +10,10 @@ import { workflowModel } from "../fixtures/research-workflow.js";
 import { initialInput, researchCommands } from "../fixtures/quick-host.js";
 import { readApplicationInput } from "../../src/app/research-input.js";
 import { askAnswerResponse, askCollection } from "../fixtures/ask-host.js";
-import {
-  Config,
-  Configuration,
-  type ApplicationConfig,
-} from "../../src/plugin.js";
+import * as Application from "../../src/plugin.js";
+
+const { Config, Configuration } = Application;
+type ApplicationConfig = Application.ApplicationConfig;
 
 const cleanups: (() => Promise<void>)[] = [];
 afterEach(async () => {
@@ -38,8 +37,9 @@ async function host(
   };
   delete config.runtime.digestModel;
   const userPresets = await h.ctx.agentPresets.remoteExportList();
+  h.ctx.loader.builtins["stock-research"] = Application;
   await h.ctx.loader.root.update([
-    { id: "stock-research", name: "@megapandas/dsh-stock-research", config },
+    { id: "stock-research", name: "cordis:stock-research", config },
   ]);
   await h.ctx.loader.await();
   const entry = h.ctx.loader.resolve("stock-research");

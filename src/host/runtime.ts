@@ -147,7 +147,6 @@ class Runtime implements ResearchRuntime {
   readonly memory: MemoryService;
   readonly dispatch: DispatchBridge;
   readonly tools: readonly ToolDefinition[];
-  readonly contributions: Dispose[] = [];
   readonly #pending = new Set<PendingAgent>();
   readonly #agents = new Map<Agent, AgentHandle>();
   #closing: Promise<void> | undefined;
@@ -424,7 +423,6 @@ class Runtime implements ResearchRuntime {
         }),
       ])),
     );
-    failures.push(...(await settle(this.contributions)));
     failures.push(...(await settle([sessions.dispose])));
     failures.push(...(await settle([() => cache.close()])));
     failures.push(...(await settle([() => root.close()])));
@@ -545,12 +543,6 @@ export function createResearchPlugin(prepareRole: PrepareRole) {
           config.policy,
           config.enabledSources.includes("dsh-web"),
         );
-        for (const tool of runtime.tools) {
-          const unregister = ctx.tools.register(tool);
-          acquired.push(unregister);
-          runtime.contributions.push(unregister);
-          yield unregister;
-        }
         const withdraw = ctx.provide("stockResearch", runtime);
         runtime.withdraw = withdraw;
         acquired.push(withdraw);

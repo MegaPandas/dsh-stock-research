@@ -84,7 +84,9 @@ describe("public search budget tool", () => {
         async () => true,
         limit,
       );
-      expect(tool.description).toContain(`前${limit}次免审批`);
+      expect(tool.description).toContain(
+        `The first ${limit} searches need no approval`,
+      );
       for (let used = 1; used <= limit + 3; used += 1) {
         const exec = context();
         await expect(
@@ -149,7 +151,7 @@ describe("public search budget tool", () => {
       tool.execute({ query: "additional product deliveries" }, context()),
     ).rejects.toMatchObject({
       code: "ACCESS_DENIED",
-      message: expect.stringContaining("1/2 rejections"),
+      message: expect.stringContaining("Search approval denied (1/2)"),
     });
     for (const query of [
       "latest product deliveries",
@@ -207,7 +209,9 @@ describe("public search budget tool", () => {
     approve.mockResolvedValue(true);
     for (let turn = 0; turn < 3; turn += 1) {
       expect(session.tool).toBe(tool);
-      expect(tool.description).toContain("子Agent不能自行恢复搜索");
+      expect(tool.description).toContain(
+        "resumption requires a decision by the primary agent or user",
+      );
       await expect(
         tool.execute({ query: `follow-up ${turn}` }, context()),
       ).rejects.toThrow("Search is paused");
@@ -225,7 +229,7 @@ describe("public search budget tool", () => {
     approve.mockResolvedValue(false);
     await expect(
       tool.execute({ query: "new refusal" }, context()),
-    ).rejects.toThrow("1/2 rejections");
+    ).rejects.toThrow("Search approval denied (1/2)");
     await expect(
       tool.execute({ query: "second new refusal" }, context()),
     ).rejects.toThrow("Search is paused");

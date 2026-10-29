@@ -16,6 +16,8 @@ import {
 } from "../../src/app/valuation-methods.js";
 import { quickHost } from "../fixtures/quick-host.js";
 import { textResponse } from "../fixtures/runtime-host.js";
+import { askCollection } from "../fixtures/ask-host.js";
+import { US_SECURITY } from "../fixtures/market.js";
 
 const cleanups: (() => Promise<void>)[] = [];
 afterEach(async () => {
@@ -107,9 +109,6 @@ it.each(protocols)(
         },
       },
     });
-    const declarations: ToolSchema[] = h.ctx.tools
-      .schemas(h.outside.agent)
-      .filter(({ name }) => name.startsWith("stock_"));
     const roleTools = [
       createValuationMethodTool(VALUATION_METHODS),
       scopedCalculationReader(
@@ -118,7 +117,13 @@ it.each(protocols)(
         )!,
         "fixture-run",
       ),
-      ...collectionDataTools([]),
+      ...collectionDataTools(
+        askCollection({
+          security: US_SECURITY,
+          date: "2024-01-03",
+          cutoff: "2024-01-03T21:00:00.000Z",
+        }).packets,
+      ),
       createReportReader([], []).tool,
       createPublicSearchSession({
         search: async () => {
@@ -133,16 +138,15 @@ it.each(protocols)(
         "fixture-run",
       ),
     ];
-    for (let i = declarations.length - 1; i >= 0; i--)
-      if (roleTools.some(({ name }) => name === declarations[i]!.name))
-        declarations.splice(i, 1);
-    declarations.push(
-      ...roleTools.map(({ name, description, parameters }) => ({
-        name,
-        description,
-        parameters,
-      })),
+    const agent = await h.ctx.agents.create(h.agentOptions("protocol-tools"));
+    const definitions = new Map(
+      [...h.runtime.tools, ...roleTools].map((tool) => [tool.name, tool]),
     );
+    for (const tool of definitions.values())
+      agent.agent.ctx.tools.register(tool);
+    const declarations: ToolSchema[] = h.ctx.tools
+      .schemas(agent.agent)
+      .filter(({ name }) => name.startsWith("stock_"));
     for (const name of [
       "stock_read_run",
       "stock_read_artifact",

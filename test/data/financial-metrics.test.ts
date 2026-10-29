@@ -235,7 +235,7 @@ describe("snapshot financial metrics", () => {
     expect(values.REVENUE_TTM_YOY).toBe(100);
     expect(values.REVENUE_QUARTER).toBe(80);
     expect(result.data.columns.REVENUE_TTM!.label).toContain(
-      "连续四个无重叠季度合计",
+      "sum four contiguous non-overlapping quarters",
     );
     source.envelope.data.rows = source.envelope.data.rows.filter(
       (r) => r.date !== "2025-06-30",
@@ -306,7 +306,7 @@ describe("snapshot financial metrics", () => {
     )!.values;
     expect(quarter.NET_INCOME_QUARTER_YOY).toBe(50);
     expect(result.data.columns.NET_INCOME_YOY!.label).toContain(
-      "abs(上年同期)",
+      "abs(prior-year same period)",
     );
   });
   it("precomputes valuation-window statistics once, counting only non-null samples", () => {

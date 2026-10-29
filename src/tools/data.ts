@@ -40,20 +40,23 @@ function dataScope(caller: BoundCaller, runs: RunService): ResearchScope {
 const definitions: readonly [DataToolName, string][] = [
   [
     "stock_get_market",
-    "查询明确选择来源的日线及所需指标；任务继承研究范围，返回已登记证据与候选。",
+    "Query daily prices and requested indicators from an explicitly selected source. Tasks inherit the research scope; return registered evidence and candidate claims.",
   ],
   [
     "stock_get_fundamentals",
-    "按所选SEC/东方财富/新浪查询必要财务字段；SEC发行人由可信标的映射确定。",
+    "Query required financial fields from SEC, Eastmoney or Sina. SEC issuers are resolved through trusted security mappings.",
   ],
-  ["stock_get_macro", "只查询指定FRED序列与日期区间，保留原单位和时间缺口。"],
+  [
+    "stock_get_macro",
+    "Query a specified FRED series and date range; return original units and temporal gaps.",
+  ],
   [
     "stock_get_returns",
-    "查询明确来源及区间的价格收益端点。现有源未核实公司行动，收益保留可比性缺口。",
+    "Query price-return endpoints for an explicit source and interval. Current sources do not verify corporate actions, so returns retain comparability gaps.",
   ],
   [
     "stock_research",
-    "通过宿主检索明确查询词及结果上限；任务登记实际片段，不自动扩大检索。",
+    "Call host search with a query and result limit; research tasks register the returned snippets.",
   ],
 ];
 export function createDataTools(

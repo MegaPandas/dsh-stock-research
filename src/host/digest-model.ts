@@ -30,13 +30,13 @@ import { readResearchModels } from "../app/research-models.js";
 
 export const DIGEST_PROMPT_VERSION = "12";
 const LEGACY_DIGEST_PROTOCOL =
-  sharedResearchPrompt(`固定研究上下文的阶段摘要，压缩核心判断、驱动机制、展望和分歧，供后续角色使用。
-keyPoints保留决定判断的事实和机制；disagreements保留各方分歧；openQuestions保存决定后续方向的待答问题。
-整份summary/content业务JSON目标${DIGEST_TARGET_CHARACTERS}个Unicode字符，允许最多${DIGEST_MAX_CHARACTERS}字符，包含字段名与标点；summary目标${AGENT_SUMMARY_TARGET_CHARACTERS}字符，上限${AGENT_SUMMARY_MAX_CHARACTERS}字符。按重要性压缩当前结论、关键事实、假设和分歧，原报告保存完整分析。压缩时保持上游事实、推断和分歧的性质。
-riskSummaries逐项对应给定requiredRisks的issueId，以短条目保留影响、触发条件或处置约束。完整风险保存在原报告中，按reportCatalog中的id读取。`);
+  sharedResearchPrompt(`Create a stage digest from the fixed research context for downstream roles, condensing key conclusions, drivers, outlook and disagreements.
+keyPoints retains decisive facts and mechanisms; disagreements retains opposing views; openQuestions retains questions that determine the next research steps.
+Target ${DIGEST_TARGET_CHARACTERS} Unicode characters for the entire summary/content JSON, maximum ${DIGEST_MAX_CHARACTERS}, including keys and punctuation. Target ${AGENT_SUMMARY_TARGET_CHARACTERS} for summary, maximum ${AGENT_SUMMARY_MAX_CHARACTERS}. Prioritize conclusions, key facts, assumptions and disagreements; full analysis remains in the original reports. Preserve the distinction between upstream facts, inferences and disagreements.
+For each requiredRisks issueId, include a riskSummaries entry retaining its impact, triggers or action constraints. Read full risks from original reports using reportCatalog IDs.`);
 const DIGEST_PROTOCOL = `${LEGACY_DIGEST_PROTOCOL}
-先根据materials中的报告摘要整理交接；当依据、分歧、具体风险或限制不清楚时，按reportCatalog中的id调用stock_read_report读取完整报告。不得把摘要中没有提及的事项当成不存在。
-预留JSON字段名、标点和转义空间，根据实际风险调整各字段长度，确保每个requiredRisks均有准确回应，不为凑预算删去关键条件。超限时按工具返回的实际长度和字段用量修改。`;
+Start with report summaries in materials. Use stock_read_report with reportCatalog IDs when evidence, disagreements, specific risks or limitations need clarification; omission from a summary does not establish absence.
+Budget for JSON keys, punctuation and escaping. Allocate space to accurately cover every requiredRisks item and retain key conditions. If over budget, revise using the tool's actual length and field usage feedback.`;
 
 /** DSH owns the context and tool loop; the domain callback validates and publishes. */
 export class HostDigestModel {
@@ -145,7 +145,8 @@ export class HostDigestModel {
               id: input.taskId,
               role: "digest",
               objective:
-                input.instruction ?? "提炼当前阶段的核心结论、分歧和风险。",
+                input.instruction ??
+                "Summarize this stage's key conclusions, disagreements and risks.",
             },
             context: {
               materials: input.artifacts.map(({ content, ref }) => {

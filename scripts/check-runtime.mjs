@@ -83,6 +83,10 @@ try {
   assert.deepEqual(await ctx.agentPresets.remoteExportList(), presetRoster);
   const runtime = ctx.stockResearch;
   assert.equal(runtime.tools.length, 23);
+  assert.deepEqual(
+    ctx.tools.schemas().filter(({ name }) => name.startsWith("stock_")),
+    [],
+  );
   const scope = {
     security: {
       id: "CN:002594.SZ",
@@ -132,7 +136,7 @@ try {
     "@megapandas/dsh-stock-research/package.json",
   );
   assert.equal(input.versions.plugin, manifest.version);
-  assert.equal(input.versions.prompts.roles, "26");
+  assert.equal(input.versions.prompts.roles, "29");
   assert.equal(input.versions.prompts.digest, "12");
   assert.equal(input.definition.tasks.length, 12);
   assert.equal(input.instructions.length, 12);
@@ -148,9 +152,6 @@ try {
   assert.deepEqual(
     provision.tools.map((tool) => tool.name).sort(),
     [
-      "stock_describe_collection",
-      "stock_read_collection",
-      "stock_read_report",
       "stock_read_report_draft",
       "stock_submit",
       "stock_write_handoff",
@@ -167,7 +168,6 @@ try {
     ),
   );
   assert.deepEqual(publicProvision.tools.map((tool) => tool.name).sort(), [
-    "stock_read_report",
     "stock_read_report_draft",
     "stock_search_public",
     "stock_submit",
@@ -188,7 +188,7 @@ try {
   const reopened = new DataRoot(directory);
   reopened.close();
   console.log(
-    "Runtime/ask/review/application/role public entries: 23 tools, ask/review commands, real SDK Agent health call, quick plan and recorded role preparation, zero source/model requests, ordered teardown; consuming SDKs resolve Zod 4.6.6.",
+    "Runtime/ask/review/application/role public entries: 23 internal tool definitions, no global tools, ask/review commands, real SDK Agent health call, quick plan and recorded role preparation, zero source/model requests, ordered teardown; consuming SDKs resolve Zod 4.6.6.",
   );
 } finally {
   await plugin?.dispose();

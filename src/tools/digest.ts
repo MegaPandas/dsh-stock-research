@@ -38,7 +38,7 @@ export function createDigestTool(
   return researchTool({
     name: "stock_submit_digest",
     description:
-      "校验并发布固定上游产物的摘要。校验失败时保留原草稿，根据具体错误修正后重新提交。",
+      "Validate and publish a digest of fixed upstream artifacts. On validation failure, the draft is retained; correct the reported errors and resubmit.",
     parameters: objectSchema({}),
     output: resultOutput(
       objectSchema({

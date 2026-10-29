@@ -224,7 +224,7 @@ describe("artifact submission boundary", () => {
         ),
         "utf8",
       ),
-    ).toContain("Price 100 USD/share.");
+    ).toContain("Price 100 USD/股.");
   });
 
   it("returns detailed numeric failures without publishing or changing task state", () => {
@@ -319,9 +319,7 @@ describe("artifact submission boundary", () => {
       ),
     ).toEqual(committed);
     expect(numbers.calls).toBe(0);
-    expect(fs.readFileSync(projection, "utf8")).toContain(
-      "Price 100 USD/share.",
-    );
+    expect(fs.readFileSync(projection, "utf8")).toContain("Price 100 USD/股.");
   });
 
   it.each(["{{number:missing}}", "{{number:}}", "{{number:base", "{{number}}"])(

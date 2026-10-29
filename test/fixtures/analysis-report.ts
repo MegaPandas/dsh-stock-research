@@ -89,26 +89,27 @@ export async function* reportSubmission(
     [
       {
         name: "stock_write_report",
-        arguments: { summary: report.summary },
-      },
-      ...Object.entries(report.content).map(([section, value]) => ({
-        name: "stock_write_report",
         arguments: {
-          [section]:
-            section === "valuation" && value !== null
-              ? valuationSelection(
-                  value as NonNullable<
-                    AgentReport<"analysis">["content"]["valuation"]
-                  >,
-                )
-              : section === "targetPrice" &&
-                  value !== null &&
-                  typeof value === "object" &&
-                  "calculationId" in value
-                ? { calculationId: value.calculationId }
-                : value,
+          summary: report.summary,
+          ...Object.fromEntries(
+            Object.entries(report.content).map(([section, value]) => [
+              section,
+              section === "valuation" && value !== null
+                ? valuationSelection(
+                    value as NonNullable<
+                      AgentReport<"analysis">["content"]["valuation"]
+                    >,
+                  )
+                : section === "targetPrice" &&
+                    value !== null &&
+                    typeof value === "object" &&
+                    "calculationId" in value
+                  ? { calculationId: value.calculationId }
+                  : value,
+            ]),
+          ),
         },
-      })),
+      },
       ...(includeHandoff
         ? [{ name: "stock_write_handoff", arguments: reportHandoff(report) }]
         : []),

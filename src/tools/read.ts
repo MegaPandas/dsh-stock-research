@@ -84,7 +84,7 @@ export function createReadTools(
   const tools: ToolDefinition[] = [
     {
       name: "stock_read_run",
-      description: "读取绑定允许的运行视图。没有文件路径参数。",
+      description: "Read an authorized run's status, tasks and artifact index.",
       parameters: objectSchema({ runId: stringSchema }),
       output: output(
         objectSchema({ kind: kind("run_view"), view: opaqueObject }),
@@ -100,7 +100,8 @@ export function createReadTools(
     },
     {
       name: "stock_read_artifact",
-      description: "读取绑定允许的固定产物。没有文件路径参数。",
+      description:
+        "Read a fixed artifact version by reference in an authorized run.",
       parameters: objectSchema({ ref: artifactRefSchema }),
       output: output(
         objectSchema({ kind: kind("artifact"), artifact: opaqueObject }),
@@ -116,7 +117,8 @@ export function createReadTools(
     },
     {
       name: "stock_read_evidence",
-      description: "读取绑定允许的证据字段。没有文件路径参数。",
+      description:
+        "Read authorized evidence fields and source metadata by reference.",
       parameters: objectSchema({ ref: sourceRefSchema }),
       output: output(
         objectSchema({
@@ -156,8 +158,17 @@ export function createReadTools(
     {
       name: "stock_data_health",
       description:
-        "读取已装配来源的能力、缺口和调用计数，不发起取数。调度员须提供获准 runId，其他角色继承绑定范围。",
-      parameters: objectSchema({ runId: stringSchema }, []),
+        "Read configured source capabilities, gaps and call counts without fetching data.",
+      parameters: objectSchema(
+        {
+          runId: {
+            ...stringSchema,
+            description:
+              "Coordinators supply an authorized runId; other roles inherit their bound scope.",
+          },
+        },
+        [],
+      ),
       output: output(
         objectSchema({
           scope: opaqueObject,
@@ -173,16 +184,23 @@ export function createReadTools(
     {
       name: "stock_recall",
       description:
-        "按绑定标的及截止时间检索记忆。relatedRunId筛选关联运行；text只匹配outcome/note正文，不按entryId匹配，text=null不限制关键词。正式任务保存完整快照，重跑可用source明确选择旧输入。",
+        "Recall memory for the bound security and cutoff. relatedRunId filters associated runs; text searches outcome/note content, with null allowing any keyword. Return notes and version references.",
       parameters: objectSchema(
         {
           relatedRunId: { oneOf: [stringSchema, { type: "null" }] },
           text: { oneOf: [stringSchema, { type: "null" }] },
-          limit: { type: "integer", description: "正安全整数，限制返回条数。" },
-          source: objectSchema({
-            runId: stringSchema,
-            inputRef: objectSchema({ kind: kind("input"), id: stringSchema }),
-          }),
+          limit: {
+            type: "integer",
+            description:
+              "Positive safe integer limiting the number of results.",
+          },
+          source: {
+            ...objectSchema({
+              runId: stringSchema,
+              inputRef: objectSchema({ kind: kind("input"), id: stringSchema }),
+            }),
+            description: "Saved memory snapshot selected for task replay.",
+          },
         },
         ["relatedRunId", "text", "limit"],
       ),
@@ -247,7 +265,8 @@ export function createReadTools(
     },
     {
       name: "stock_check_numbers",
-      description: "只读核验获准的固定产物。不会提交或自动修正声明。",
+      description:
+        "Check numeric claims in an authorized fixed artifact and return results without modifying it.",
       parameters: checkNumbersParameters(),
       output: output(numberCheckOutput),
       async execute(value, exec) {
@@ -265,7 +284,7 @@ export function createReadTools(
     {
       name: "stock_check_pending_numbers",
       description:
-        "只读核验当前绑定任务的完整待提交产物。不会提交或自动修正声明。",
+        "Check numeric claims in the current task's complete pending artifact and return results without modifying it.",
       parameters: checkPendingNumbersParameters(),
       output: output(numberCheckOutput),
       async execute(value, exec) {

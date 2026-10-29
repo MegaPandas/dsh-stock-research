@@ -33,7 +33,8 @@ export function createReportReader(
     })),
     tool: researchTool({
       name: "stock_read_report",
-      description: "按目录id读取尚未直接提供在上下文中的固定版本报告。",
+      description:
+        "Read a fixed report version by catalog id when it is not already provided in context.",
       parameters: objectSchema({ id: stringSchema }),
       output: resultOutput(opaqueObjectSchema),
       async execute(value) {

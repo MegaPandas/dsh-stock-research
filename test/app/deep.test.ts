@@ -11,6 +11,7 @@ import {
   isMainResearchRequest,
 } from "../fixtures/research-workflow.js";
 import { textResponse } from "../fixtures/runtime-host.js";
+import { expectRoleTools } from "../fixtures/role-tools.js";
 
 const cleanups: (() => Promise<void>)[] = [];
 const fetch = vi.fn<typeof globalThis.fetch>(
@@ -100,6 +101,11 @@ describe("stock-deep command and resume", () => {
       ),
     ).toBe(true);
     expect(model.state.taskIds).toHaveLength(22);
+    const roleRequests = h.adapter.requests.filter(
+      (request) => !isMainResearchRequest(request),
+    );
+    expect(roleRequests.length).toBeGreaterThan(0);
+    for (const request of roleRequests) expectRoleTools(request);
     expect(readCollection(h.runtime.runs, view.runId)).toEqual(collection);
     expect(fetch).toHaveBeenCalledTimes(3);
     const contentFor = (id: string) =>

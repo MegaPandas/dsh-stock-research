@@ -57,8 +57,8 @@ export function createWriteTools(
     name,
     description:
       name === "stock_make_digest"
-        ? "仅执行executor={kind:service,service:digest}的摘要任务，保留固定数字、风险与缺口并提交。"
-        : "执行executor={kind:service,service:finalize}的定档任务（内置taskId为finalize）。消费已验证经理稿，保留评级或空值、缺口，成对发布decision与report；此任务不能用stock_dispatch_task。",
+        ? "Execute an executor={kind:service,service:digest} task: combine and submit handoffs, preserving fixed numbers, risks and gaps."
+        : "Execute an executor={kind:service,service:finalize} task (built-in taskId=finalize). Use the validated manager draft, preserve its rating or null and gaps, and publish decision and report together.",
     parameters: serviceParameters,
     output: commitOutput,
     async execute(value, exec) {
@@ -84,7 +84,7 @@ export function createWriteTools(
     {
       name: "stock_save_report",
       description:
-        "提交当前角色任务声明的完整产物数组，经一次核数门禁原子登记；不允许提交服务专用产物。",
+        "Submit the current role task's complete artifact array; check numbers and register atomically. Service artifacts are submitted through the digest and finalization tools.",
       parameters: saveReportParameters(),
       output: commitOutput,
       async execute(value, exec) {
@@ -111,7 +111,7 @@ export function createWriteTools(
     {
       name: "stock_remember",
       description:
-        "为绑定的历史运行写独立复盘记忆或修订。收益须明确请求，取不到时可提交带明确缺口的笔记。",
+        "Write or revise independent review memory for the bound historical run. Request returns explicitly; if unavailable, submit a note identifying the gaps.",
       parameters: objectSchema({
         requestId: stringSchema,
         input: rememberInputSchema,

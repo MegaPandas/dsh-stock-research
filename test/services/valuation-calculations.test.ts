@@ -2,7 +2,11 @@ import fs from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Agent } from "@deepseek-ai/dsh-agent";
-import type { ToolRunContext } from "@deepseek-ai/dsh-tools";
+import {
+  assertSupportedJsonSchema,
+  validateJsonSchemaValue,
+  type ToolRunContext,
+} from "@deepseek-ai/dsh-tools";
 import { afterEach, expect, it } from "vitest";
 import catalogue from "../../src/valuation/methods.json" with { type: "json" };
 import type {
@@ -15,6 +19,7 @@ import type {
   ValuationInputs,
   ValuationRequest,
 } from "../../src/contracts/valuation.js";
+import { DETERMINISTIC_VALUATION_PROTOCOL } from "../../src/contracts/valuation.js";
 import { SessionBindings } from "../../src/host/bindings.js";
 import { RunStore } from "../../src/runs/store.js";
 import { RunService } from "../../src/services/runs.js";
@@ -34,6 +39,7 @@ import { DataRoot } from "../../src/storage/data-root.js";
 import { createValuationTools } from "../../src/tools/valuation.js";
 import { agentAnalysisReport } from "../fixtures/analysis-report.js";
 import { US_SECURITY } from "../fixtures/market.js";
+import { renderValuation } from "../../src/report/valuation.js";
 
 const cleanups: (() => void)[] = [];
 afterEach(() => {
@@ -106,7 +112,7 @@ function setup(tasks?: OpenRunInput["definition"]["tasks"]) {
       plugin: "1",
       mode: "quick-1",
       prompts: {
-        roles: "26",
+        roles: DETERMINISTIC_VALUATION_PROTOCOL,
         valuationEngine: "2",
         valuationMethods: catalogue.version,
       },
@@ -317,9 +323,12 @@ it("saves negative equity residuals and their diagnostics without treating them 
     selection,
   );
   expect(report.content.valuation.methods[0]!.valueRange).toBeNull();
-  expect(report.content.valuation.methods[0]!.limitations).toEqual(
-    saved.result.diagnostics,
-  );
+  expect(saved.result.diagnostics).toEqual([
+    "Negative equity residual is not a usable target share price; analyze solvency and allocation of claims.",
+  ]);
+  expect(report.content.valuation.methods[0]!.limitations).toEqual([
+    "股权残值为负，不能作为目标股价；应分析偿付能力和索取权分配。",
+  ]);
   expect(() =>
     validateCalculatedReport(f.runs, f.operation, report),
   ).not.toThrow();
@@ -381,6 +390,53 @@ it("rejects mismatched multiple denominators and equity-value debt bridges", () 
   ).toThrowError(expect.objectContaining({ code: "INVALID_INPUT" }));
 });
 
+it("formats report values while preserving exact calculations and range endpoints", () => {
+  const f = setup();
+  const input = request();
+  input.amountUnit = "million";
+  input.shares = { value: 100, unit: "million" };
+  input.inputs = {
+    multipleType: "ps",
+    revenue: 773.9999999999999,
+    multiples: [1],
+  };
+  input.sensitivities[0]!.value = 619.1999999999999;
+  const saved = calculateValuation(f.runs, f.operation, input, "display");
+  const original = structuredClone(saved);
+  const valuation = materializeValuation(f.runs, f.operation.runId, {
+    companyProfile: "Synthetic company",
+    methods: [
+      {
+        methodId: "comparable_multiples",
+        suitability: "Revenue comparison",
+        calculationIds: [saved.calculationId],
+        limitations: [],
+      },
+    ],
+    targetPriceBasis: null,
+  });
+  const text = renderValuation(valuation).join("\n");
+  expect(text).toContain("倍数法经济指标=7.74 亿USD");
+  expect(text).toContain("普通股每股价值1=7.74 USD/股");
+  expect(text).toContain("研究日价值区间：7.74 USD/股 至 7.74 USD/股。");
+  expect(text).toContain("/inputs/revenue=619.2；每股结果=6.192 USD/股");
+  expect(text).toContain('"revenue":774');
+  expect(text).not.toContain("999999999");
+  expect(valuation.methods[0]!.valueRange!.low).toBe(
+    saved.result.perShareValues[0],
+  );
+  expect(saved.result.equityValues[0]).toBe(773999999.9999999);
+  expect(saved.request.inputs).toEqual(input.inputs);
+  expect(
+    readValuationCalculation(f.runs, f.operation.runId, saved.calculationId),
+  ).toEqual(original);
+  const report = agentAnalysisReport();
+  report.content.valuation = valuation;
+  expect(() =>
+    validateCalculatedReport(f.runs, f.operation, report),
+  ).not.toThrow();
+});
+
 it("materializes reports from calculation references and rejects forged or unreferenced results under the current protocol", () => {
   const f = setup();
   const saved = calculateValuation(f.runs, f.operation, request(), "ps");
@@ -401,6 +457,13 @@ it("materializes reports from calculation references and rejects forged or unref
     high: 22.5,
     unit: "USD/share",
   });
+  expect(saved.result.steps[0]!.label).toBe("Comparable metric");
+  expect(valuation.methods[0]!.calculation).toContain(
+    "倍数法经济指标=450 亿USD",
+  );
+  expect(valuation.methods[0]!.calculation).toContain(
+    "普通股每股价值1=13.5 USD/股",
+  );
   const report = agentAnalysisReport();
   report.content.valuation = valuation;
   expect(() =>
@@ -499,6 +562,39 @@ it("calculates selected methods separately and preserves their values and order 
   expect(() =>
     validateCalculatedReport(f.runs, f.operation, report),
   ).not.toThrow();
+});
+
+it("keeps the native calculation schema compact while enforcing selected-method inputs", async () => {
+  const f = setup();
+  const bindings = new SessionBindings();
+  const agent = { id: "worker" } as Agent;
+  bindings.bind(agent, {
+    kind: "task",
+    runId: f.operation.runId,
+    taskId: f.operation.taskId,
+    attempt: f.operation.attempt,
+  });
+  const calculate = createValuationTools(f.runs, bindings).find(
+    ({ name }) => name === "stock_calculate_valuation",
+  )!;
+  assertSupportedJsonSchema(calculate.parameters);
+  expect(JSON.stringify(calculate.parameters).length).toBeLessThan(8000);
+  expect(calculate.parameters).toMatchObject({
+    properties: { inputs: { type: "object", additionalProperties: true } },
+  });
+  for (const value of [
+    { ...request(), methodId: "adjusted_net_assets" },
+    { ...request(), inputs: { ...request().inputs, unknown: 1 } },
+  ]) {
+    expect(validateJsonSchemaValue(calculate.parameters, value)).toEqual([]);
+    await expect(
+      calculate.execute(value, {
+        agent,
+        callId: "invalid-inputs",
+        signal: new AbortController().signal,
+      } as ToolRunContext),
+    ).rejects.toMatchObject({ code: "INVALID_INPUT" });
+  }
 });
 
 it("binds calculation tools to trusted tasks and authorizes all run reads", async () => {

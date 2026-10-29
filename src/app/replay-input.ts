@@ -31,23 +31,6 @@ export function createReplayInput(
     { ...SOURCE_VERSIONS, ...COLLECTION_SOURCE_VERSIONS },
   );
   const supported = {
-    roles: [
-      "11",
-      "12",
-      "13",
-      "14",
-      "15",
-      "16",
-      "17",
-      "19",
-      "20",
-      "21",
-      "22",
-      "23",
-      "24",
-      "25",
-      "26",
-    ],
     digest: ["10", "11", "12"],
     coordinator: ["4", "5", "6", "7", "8", "9", "10", "11", "12"],
   };
@@ -65,7 +48,7 @@ export function createReplayInput(
   // Method knowledge is replayed from the saved input, independent of the installed catalogue.
   if (saved.valuationMethods !== undefined)
     versions.prompts.valuationMethods = saved.valuationMethods;
-  for (const key of ["roles", "digest", "coordinator"] as const) {
+  for (const key of ["digest", "coordinator"] as const) {
     const version = saved[key];
     if (version !== undefined && supported[key].includes(version))
       versions.prompts[key] = version;

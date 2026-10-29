@@ -13,7 +13,10 @@ import type { CollectionSnapshot } from "../../src/contracts/collection.js";
 import type { ResearchScope } from "../../src/contracts/data.js";
 import { agentReportSchemas } from "../../src/contracts/agent-reports.js";
 import { prepareResearchRole } from "../../src/app/prepare-role.js";
-import { ROLE_PROMPTS } from "../../src/app/research-prompts.js";
+import {
+  CALCULATION_RULES,
+  ROLE_PROMPTS,
+} from "../../src/app/research-prompts.js";
 import {
   VALUATION_METHODS_INPUT,
   type ValuationMethods,
@@ -316,13 +319,9 @@ describe("persisted research role preparation", () => {
       { title: content.title, body: content.body },
     ]);
     expect(input.context.reportCatalog).toEqual([]);
-    const reader = provision.tools.find(
-      (tool) => tool.name === "stock_read_report",
-    )!;
-    const exec = { signal: new AbortController().signal } as ToolRunContext;
-    await expect(
-      reader.execute({ id: "report-1" }, exec),
-    ).rejects.toMatchObject({ code: "INVALID_INPUT" });
+    expect(provision.tools.map(({ name }) => name)).not.toContain(
+      "stock_read_report",
+    );
     expect(input.context.referencePrice).toBeNull();
     expect(JSON.stringify(input)).not.toContain(runId);
   });
@@ -620,7 +619,7 @@ describe("persisted research role preparation", () => {
     )!.instruction = "Caller mutation";
     const provision = prepareResearchRole(h.runtime, context);
     const prepared = prompt(provision);
-    expect(prepared.task.objective).toContain("12个报告期");
+    expect(prepared.task.objective).toContain("12 reporting periods");
     expect(prepared).not.toHaveProperty("inputRefs");
     expect(prepared.context.materials).toEqual([
       { title: content.title, body: content.body },
@@ -628,14 +627,18 @@ describe("persisted research role preparation", () => {
     expect(prepared.scope).toEqual(h.scope);
     expect(prepared).not.toHaveProperty("secIssuerConfigured");
     expect(provision.agentPreset).toBeUndefined();
-    expect(provision.systemPrompt).toBe(ROLE_PROMPTS.analyst);
-    expect(provision.tools).toHaveLength(10);
-    expect(provision.tools.map(({ name }) => name)).toEqual(
-      expect.arrayContaining([
-        "stock_describe_collection",
-        "stock_read_collection",
-      ]),
+    expect(provision.systemPrompt).toBe(
+      `${ROLE_PROMPTS.analyst}\n${CALCULATION_RULES}`,
     );
+    expect(provision.tools.map(({ name }) => name).sort()).toEqual([
+      "stock_calculate_valuation",
+      "stock_read_report_draft",
+      "stock_read_valuation_calculation",
+      "stock_read_valuation_method",
+      "stock_submit",
+      "stock_write_handoff",
+      "stock_write_report",
+    ]);
     const save = provision.tools.find(
       (tool) => tool.name === "stock_submit",
     )!.parameters;
@@ -756,8 +759,8 @@ describe("persisted research role preparation", () => {
       const h = await host();
       if (problem === "missing") h.input.inputs = [];
       else if (problem === "unsupported")
-        h.input.inputs[0]!.content = { schemaVersion: 2 };
-      else h.input.inputs[0]!.content = { schemaVersion: 1, policy: {} };
+        h.input.inputs[0]!.content = { schemaVersion: 1 };
+      else h.input.inputs[0]!.content = { schemaVersion: 2, policy: {} };
       const { runId } = h.runtime.runs.open("owner", h.input, "open");
       const context = h.runtime.runs.dispatchForCall(
         { runId, identity: "owner" },
@@ -821,9 +824,6 @@ describe("persisted research role preparation", () => {
       h.adapter.requests[0]!.tools?.map((tool) => tool.name).sort(),
     ).toEqual(
       [
-        "stock_describe_collection",
-        "stock_read_collection",
-        "stock_read_report",
         "stock_read_report_draft",
         "stock_submit",
         "stock_write_handoff",
@@ -876,12 +876,7 @@ describe("persisted research role preparation", () => {
     expect(result).toMatchObject({ status: "succeeded", failure: null });
     expect(h.adapter.requests).toHaveLength(1);
     const request = h.adapter.requests[0]!;
-    expect(request.tools!.map(({ name }) => name).sort()).toEqual([
-      "stock_describe_collection",
-      "stock_read_collection",
-      "stock_read_report",
-      "stock_submit",
-    ]);
+    expect(request.tools!.map(({ name }) => name)).toEqual(["stock_submit"]);
     const schema = request.tools!.find(
       ({ name }) => name === "stock_submit",
     )!.parameters;

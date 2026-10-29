@@ -1,5 +1,5 @@
 import type { ValuationRecord } from "../contracts/agent-reports.js";
-import { inline } from "./render.js";
+import { inline, valueText } from "./render.js";
 
 export function renderValuation(
   record: ValuationRecord | null | undefined,
@@ -46,7 +46,7 @@ export function renderValuation(
       "",
       method.valueRange === null
         ? "研究日价值区间：未量化。"
-        : `研究日价值区间：${method.valueRange.low} 至 ${method.valueRange.high} ${inline(method.valueRange.unit)}。`,
+        : `研究日价值区间：${valueText(method.valueRange.low, method.valueRange.unit)} 至 ${valueText(method.valueRange.high, method.valueRange.unit)}。`,
       ...list("敏感性与替代情景", method.sensitivity),
       ...list("输入缺口与适用限制", method.limitations),
     ]),

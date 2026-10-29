@@ -62,13 +62,18 @@ export function createReportDraft<Kind extends AgentReportKind, Result>(
   const legacySchema = objectSchema({
     section: {
       type: "string",
-      description: `章节名称，可选：${Object.keys(sections).join("、")}。`,
+      description: `Section name: ${Object.keys(sections).join(", ")}.`,
     },
     value: {
-      description: `章节内容，使用原生 JSON 值。各章节的 JSON Schema：\n${sectionFormats}`,
+      description: `Section content as a native JSON value. Section JSON schemas:\n${sectionFormats}`,
     },
   });
-  const writeSchema = legacy ? legacySchema : objectSchema(sections, []);
+  const writeSchema = legacy
+    ? legacySchema
+    : {
+        ...objectSchema(sections, []),
+        description: "Report sections to update; {} makes no changes.",
+      };
   const emptySchema = objectSchema({});
   const stored: ReportDraft<Kind> =
     seed === undefined ? { content: {} } : parseAgentReport(kind, seed);
@@ -87,47 +92,53 @@ export function createReportDraft<Kind extends AgentReportKind, Result>(
     researchTool({
       name: "stock_write_report",
       description: legacy
-        ? "写入或替换一个报告章节。section为summary或content的一级字段名；章节仅保存为草稿。"
-        : "写入或替换一个报告章节。每次只传入一个章节字段，字段值的结构见参数 Schema；仅保存为草稿。",
+        ? "Write or replace one draft section; section is summary or a top-level content field."
+        : "Write or replace supplied draft sections atomically; omitted sections stay unchanged. {} makes no changes.",
       parameters: writeSchema,
-      output: resultOutput(objectSchema({ section: { type: "string" } })),
+      output: resultOutput(
+        legacy
+          ? objectSchema({ section: { type: "string" } })
+          : objectSchema({
+              sections: { type: "array", items: { type: "string" } },
+            }),
+      ),
       async execute(value, exec) {
         exec.signal.throwIfAborted();
         validate(writeSchema, value);
         const input = value as Record<string, unknown>;
-        const names = Object.keys(input);
-        if (!legacy && names.length !== 1)
-          throw new ResearchError(
-            "INVALID_INPUT",
-            `Provide exactly one report section per call; received ${names.length}: ${names.join(", ") || "(none)"}. Write separate sections in separate stock_write_report calls.`,
+        const names = legacy ? [input.section as string] : Object.keys(input);
+        if (legacy) {
+          const section = names[0]!;
+          if (!Object.hasOwn(sections, section))
+            throw new ResearchError(
+              "INVALID_INPUT",
+              `Unknown report section ${section}. Allowed sections: ${Object.keys(sections).join(", ")}.`,
+            );
+          const errors = validateJsonSchemaValue(
+            sections[section]!,
+            input.value,
+            section,
           );
-        const section = legacy ? (input.section as string) : names[0]!;
-        const sectionValue = legacy ? input.value : input[section];
-        if (!Object.hasOwn(sections, section))
-          throw new ResearchError(
-            "INVALID_INPUT",
-            `Unknown report section ${section}. Allowed sections: ${Object.keys(sections).join(", ")}.`,
-          );
-        const errors = validateJsonSchemaValue(
-          sections[section]!,
-          sectionValue,
-          section,
+          if (errors.length > 0)
+            throw new ResearchError(
+              "INVALID_INPUT",
+              `${errors.join("\n")}\nSchema for ${section}: ${JSON.stringify(sections[section], (key, value: unknown) => (key === "description" ? undefined : value))}`,
+            );
+        }
+        const updates = structuredClone(
+          legacy ? { [names[0]!]: input.value } : input,
         );
-        if (errors.length > 0)
-          throw new ResearchError(
-            "INVALID_INPUT",
-            `${errors.join("\n")}\nSchema for ${section}: ${JSON.stringify(sections[section], (key, value: unknown) => (key === "description" ? undefined : value))}`,
-          );
         const content = stored.content as Record<string, unknown>;
-        if (section === "summary") stored.summary = sectionValue as string;
-        else content[section] = structuredClone(sectionValue);
-        handoffConfirmed = false;
-        return { section };
+        for (const [section, sectionValue] of Object.entries(updates))
+          if (section === "summary") stored.summary = sectionValue as string;
+          else content[section] = sectionValue;
+        if (names.length > 0) handoffConfirmed = false;
+        return legacy ? { section: names[0]! } : { sections: names };
       },
     }),
     researchTool({
       name: "stock_read_report_draft",
-      description: "读取当前业务草稿及尚未写入的章节；不会发布报告。",
+      description: "Read the current draft and missing sections.",
       parameters: emptySchema,
       output: resultOutput(
         objectSchema({
@@ -171,7 +182,8 @@ export function createReportDraft<Kind extends AgentReportKind, Result>(
     }),
     researchTool({
       ...submission.tool,
-      description: "提交完整业务草稿；仅接受空对象，成功保存后结束。",
+      description:
+        "Submit the complete draft with {}; successful saving ends the current execution.",
       parameters: emptySchema,
       execute(value, exec) {
         exec.signal.throwIfAborted();
@@ -201,7 +213,7 @@ export function createReportDraft<Kind extends AgentReportKind, Result>(
     tools.push(
       researchTool({
         name: "stock_write_handoff",
-        description: `写入或重新确认本报告的结构化交接摘要，整份JSON目标${STAGE_HANDOFF_TARGET_CHARACTERS}个Unicode字符，上限${STAGE_HANDOFF_MAX_CHARACTERS}字符。正文完成后写入，正文再次修改后须重新确认；风控risks按正文issues顺序逐项对应，不填写系统编号。`,
+        description: `Write or reconfirm the handoff summary; target ${STAGE_HANDOFF_TARGET_CHARACTERS} Unicode characters for the whole JSON, maximum ${STAGE_HANDOFF_MAX_CHARACTERS}. Reconfirm after editing the report. For risk reports, risks correspond one-to-one with report issues in order; the system assigns IDs.`,
         parameters: stageHandoffSchema,
         output: resultOutput(
           objectSchema({ status: { type: "string", const: "saved" } }),

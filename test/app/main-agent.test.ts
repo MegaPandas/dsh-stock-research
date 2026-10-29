@@ -7,8 +7,9 @@ import {
   isMainResearchRequest,
   type RoleInput,
 } from "../fixtures/research-workflow.js";
-import { deferred } from "../fixtures/runtime-host.js";
+import { deferred, textResponse } from "../fixtures/runtime-host.js";
 import { isApplicationBusy } from "../../src/app/activity.js";
+import { expectRoleTools } from "../fixtures/role-tools.js";
 
 const cleanups: (() => Promise<void>)[] = [];
 beforeEach(() => {
@@ -43,8 +44,31 @@ afterEach(async () => {
 describe("research from an ordinary DSH chat", () => {
   it("uses the receiving main Agent for natural-language planning, review and final delivery", async () => {
     const model = workflowModel();
-    const h = await quickHost(model.respond);
+    const h = await quickHost(async function* (request) {
+      if (request.sessionId === "other-chat") yield* textResponse("普通聊天。");
+      else yield* model.respond(request);
+    });
     cleanups.push(h.close);
+    const entryTools = [
+      "stock_start_research",
+      "stock_resume_research",
+      "stock_cancel_research",
+      "stock_recover_research",
+      "stock_replay_research",
+    ].sort();
+    const coordinatorTools = [
+      ...entryTools,
+      "stock_read_run",
+      "stock_read_artifact",
+      "stock_dispatch_task",
+      "stock_dispatch_stage",
+      "stock_followup_task",
+      "stock_make_digest",
+      "stock_decide",
+      "stock_redo_task",
+      "stock_review_stage",
+    ].sort();
+    const other = await h.ctx.agents.create(h.agentOptions("other-chat"));
     const turns: string[] = [];
     h.ctx.on("session/event", (session, event) => {
       if (session === h.outside.agent.session) turns.push(event.type);
@@ -71,8 +95,38 @@ describe("research from an ordinary DSH chat", () => {
     expect(view.stages?.every((stage) => stage.accepted)).toBe(true);
     expect(parents).toHaveLength(8);
     expect(parents.every((parent) => parent === h.outside.agent.id)).toBe(true);
-    expect(h.created).toHaveLength(8);
+    expect(h.created.filter((agent) => agent !== other.agent)).toHaveLength(8);
     expect(h.outside.agent.options).toEqual(mainOptions);
+    const mainRequests = h.adapter.requests.filter(
+      ({ sessionId }) => sessionId === h.outside.agent.id,
+    );
+    for (const request of h.adapter.requests.filter(
+      (request) => !isMainResearchRequest(request),
+    ))
+      expectRoleTools(request);
+    const stockTools = (request: (typeof mainRequests)[number]) =>
+      request
+        .tools!.map(({ name }) => name)
+        .filter((name) => name.startsWith("stock_"))
+        .sort();
+    expect(stockTools(mainRequests[0]!)).toEqual(entryTools);
+    for (const request of mainRequests.slice(1))
+      expect(stockTools(request)).toEqual(coordinatorTools);
+    other.agent.followup(
+      createUserMessage({
+        content: [{ type: "text", text: "普通聊天。" }],
+        source: { kind: "user" },
+      }),
+    );
+    await other.agent.whenIdle();
+    const otherRequest = h.adapter.requests.find(
+      ({ sessionId }) => sessionId === other.agent.id,
+    )!;
+    expect(stockTools(otherRequest)).toEqual(entryTools);
+    expect(otherRequest.tools?.map(({ name }) => name)).toContain(
+      "host_marker",
+    );
+    await other.dispose();
     expect(
       h.ctx.tools.schemas(h.outside.agent).map(({ name }) => name),
     ).toContain("host_marker");

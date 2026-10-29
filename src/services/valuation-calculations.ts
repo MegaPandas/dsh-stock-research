@@ -18,7 +18,12 @@ import type { TaskOperation } from "../contracts/runs.js";
 import { ResearchError } from "../contracts/errors.js";
 import { decisionPolicy } from "../contracts/rating-policy.js";
 import { evaluateValuation } from "../valuation/index.js";
+import { formatNumber, valueText } from "../report/render.js";
 import { valuationDependencyIds } from "../valuation/dependencies.js";
+import {
+  formatValuationDiagnostic,
+  formatValuationStep,
+} from "../report/valuation-labels.js";
 import type { RunService } from "./runs.js";
 import {
   parseValuationRequest,
@@ -227,20 +232,27 @@ function materializeMethod(
     calculationIds: [...selection.calculationIds],
     valueObject: "per_share",
     inputs: records.flatMap(({ request, calculationId }) =>
-      request.provenance.map((entry) => ({
-        name: `${calculationId}:${entry.path}`,
-        value: `${JSON.stringify(valuationInputAt(request, entry.path))} (amountUnit=${request.amountUnit}; shareUnit=${request.shares.unit})`,
-        kind: entry.kind,
-        basis: entry.basis,
-      })),
+      request.provenance.map((entry) => {
+        const value = JSON.stringify(
+          valuationInputAt(request, entry.path),
+          (_key, input: unknown) =>
+            typeof input === "number" ? Number(formatNumber(input)) : input,
+        );
+        return {
+          name: `${calculationId}:${entry.path}`,
+          value: `${value} (amountUnit=${request.amountUnit}; shareUnit=${request.shares.unit})`,
+          kind: entry.kind,
+          basis: entry.basis,
+        };
+      }),
     ),
     assumptions: [
       ...new Set(records.flatMap(({ request }) => request.assumptions)),
     ],
     calculation: records.flatMap((record) => [
       `计算 ${record.calculationId}；算法版本 ${record.engineVersion}`,
-      ...record.result.steps.map(
-        ({ label, value, unit }) => `${label}=${value} ${unit}`,
+      ...record.result.steps.map((step) =>
+        formatValuationStep(step, record.request.methodId),
       ),
     ]),
     valueRange:
@@ -252,15 +264,19 @@ function materializeMethod(
             unit: `${scope.security.currency}/share`,
           },
     sensitivity: records.flatMap((record) =>
-      record.sensitivities.map(
-        (scenario) =>
-          `${scenario.label}：${scenario.path}=${scenario.value}；每股结果=${scenario.result.perShareValues.join(", ")} ${record.currency}/share；依据：${scenario.basis}`,
-      ),
+      record.sensitivities.map((scenario) => {
+        const values = scenario.result.perShareValues
+          .map((value) => valueText(value, `${record.currency}/share`))
+          .join(", ");
+        return `${scenario.label}：${scenario.path}=${formatNumber(scenario.value)}；每股结果=${values}；依据：${scenario.basis}`;
+      }),
     ),
     limitations: [
       ...new Set([
         ...selection.limitations,
-        ...records.flatMap(({ result }) => result.diagnostics),
+        ...records.flatMap(({ result }) =>
+          result.diagnostics.map(formatValuationDiagnostic),
+        ),
       ]),
     ],
   };

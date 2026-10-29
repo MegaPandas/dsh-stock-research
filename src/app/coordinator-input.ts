@@ -1,6 +1,7 @@
 import { ResearchError } from "../contracts/errors.js";
 import type { RunService } from "../services/runs.js";
 import { COORDINATOR_PROMPT_VERSION } from "./coordinator-prompt.js";
+import { ROLE_PROMPT_VERSION } from "./research-prompts.js";
 
 export function savedCoordinator(runs: RunService, runId: string) {
   const definition = runs.readDefinition(runId);
@@ -10,6 +11,7 @@ export function savedCoordinator(runs: RunService, runId: string) {
   );
   const version = catalog.versions.prompts.coordinator;
   if (
+    catalog.versions.prompts.roles !== ROLE_PROMPT_VERSION ||
     (version !== "4" &&
       version !== "5" &&
       version !== "6" &&

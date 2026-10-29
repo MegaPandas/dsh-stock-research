@@ -158,7 +158,7 @@ describe("renderDecisionReport", () => {
     );
     expect(report).toContain("评级：未评级");
     expect(report).toContain("基准价格：未设定");
-    expect(report).toContain("目标价格：120 USD/share");
+    expect(report).toContain("目标价格：120 USD/股");
     expect(report).not.toContain("预期收益");
   });
   it("preserves rating, horizon and ordinary security/date text", () => {
@@ -174,8 +174,8 @@ describe("renderDecisionReport", () => {
       { base, target },
       [],
     );
-    expect(report).toContain("基准价格：100 USD/share");
-    expect(report).toContain("目标价格：120 USD/share（估计）");
+    expect(report).toContain("基准价格：100 USD/股");
+    expect(report).toContain("目标价格：120 USD/股（估计）");
     expect(report).toContain("预期收益（基于估计）：12.5%");
     expect(report).not.toContain("20%");
   });

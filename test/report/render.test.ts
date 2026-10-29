@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ArtifactInput } from "../../src/contracts/artifacts.js";
-import { renderArtifact } from "../../src/report/render.js";
+import { renderArtifact, valueText } from "../../src/report/render.js";
 
 const artifact = { runId: "run-one", artifactId: "analysis-one", revision: 3 };
 const source = {
@@ -21,6 +21,25 @@ function input(overrides: Partial<ArtifactInput> = {}): ArtifactInput {
 }
 
 describe("verified artifact rendering", () => {
+  it.each([
+    [773999999.9999999, "CNY", "7.74 亿CNY"],
+    [-154799999.99999997, "USD", "-1.548 亿USD"],
+    [12345.6789, "HKD", "1.23457 万HKD"],
+    [99999999.99999999, "CNY", "1 亿CNY"],
+    [9999.999999999998, "CNY", "1 万CNY"],
+    [8925037165, "share", "89.2504 亿股"],
+    [2.1628490119447714, "CNY/share", "2.16285 CNY/股"],
+    [12345678.9, "USD/share", "12345700 USD/股"],
+    [0.07760000000000002, "ratio", "7.76%"],
+    [7.760000000000002, "percent", "7.76%"],
+    [0.1726027397260274, "year", "0.172603 年"],
+    [0.5770000000000001, "multiple", "0.577 倍"],
+    [0.000000123456789, "USD", "0.000000123457 USD"],
+    [-0, "CNY", "0 CNY"],
+  ])("formats %s %s for display", (value, unit, expected) => {
+    expect(valueText(value, unit)).toBe(expected);
+  });
+
   it("renders observed, calculated and estimated values with their distinct unit semantics", () => {
     const result = renderArtifact(
       input({
@@ -92,7 +111,7 @@ describe("verified artifact rendering", () => {
         ],
       }),
     );
-    expect(result).toContain("-2 USD/share（估计）");
+    expect(result).toContain("-2 USD/股（估计）");
     expect(result).not.toContain("Discounted cash flow");
     expect(result).not.toContain("run-one");
   });
@@ -150,7 +169,7 @@ describe("verified artifact rendering", () => {
     });
     const result = renderArtifact(value);
     expect(result).toContain(
-      "SMA20：83.153 CNY/share；RSI：0.000000123457 index。",
+      "SMA20：83.153 CNY/股；RSI：0.000000123457 index。",
     );
     expect(result).not.toContain("<details>");
     expect(result).not.toContain("数值与引用");

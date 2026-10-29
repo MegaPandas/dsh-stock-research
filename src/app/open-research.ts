@@ -31,7 +31,7 @@ export function openResearchTool(
   return researchTool({
     name: "stock_open_run",
     description:
-      "为本次用户已选标的、日期与模式开立正式研究；同一命令只开立一个运行，不请求数据。返回状态和任务清单。",
+      "Open research for the security, date and mode selected by the user. Open one run per command without requesting data; return status and tasks.",
     parameters: objectSchema({
       requestId: stringSchema,
       kind: { type: "string", const: expected.kind },

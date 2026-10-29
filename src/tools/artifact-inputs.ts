@@ -158,7 +158,7 @@ function artifactSchema(kinds: readonly RoleArtifactKind[]): JsonSchemaNode {
       inputRefs: {
         ...list(artifactRefSchema),
         description:
-          "仅已采用的固定产物版本；来源引用放在payload.evidence或claims.source，无上游产物用[]。",
+          "Only fixed artifact versions used in this report. Put source references in payload.evidence or claims.source; use [] when there are no upstream artifacts.",
       },
       claims,
       payload: payloads[kind],

@@ -167,13 +167,25 @@ export function readCollectionTable(
 }
 
 const ROW_FIELDS = {
-  index: { label: "原始行号", type: "integer" },
-  date: { label: "观察日期或报告期末", type: "date" },
-  periodStart: { label: "报告期初（来源提供时返回）", type: "date" },
-  publishedDate: { label: "公告日期（来源提供时返回，可为空）", type: "date" },
-  asOf: { label: "观察时点", type: "datetime" },
-  availableAt: { label: "公开可得时点（可为空）", type: "datetime" },
-  complete: { label: "观察周期是否完成", type: "boolean" },
+  index: { label: "Original row index", type: "integer" },
+  date: { label: "Observation date or reporting period end", type: "date" },
+  periodStart: {
+    label: "Reporting period start, when supplied by the source",
+    type: "date",
+  },
+  publishedDate: {
+    label: "Publication date, when supplied by the source; nullable",
+    type: "date",
+  },
+  asOf: { label: "Observation time", type: "datetime" },
+  availableAt: {
+    label: "Public availability time; nullable",
+    type: "datetime",
+  },
+  complete: {
+    label: "Whether the observation period is complete",
+    type: "boolean",
+  },
 } as const;
 
 export function isCollectionRowField(field: string): boolean {

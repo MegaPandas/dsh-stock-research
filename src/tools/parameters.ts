@@ -53,7 +53,10 @@ export function objectSchema(
 export const artifactRefSchema = objectSchema({
   runId: stringSchema,
   artifactId: stringSchema,
-  revision: { type: "integer", description: "已登记的正安全整数修订号。" },
+  revision: {
+    type: "integer",
+    description: "Registered positive safe integer revision.",
+  },
 });
 export const sourceRefSchema = objectSchema({
   runId: stringSchema,

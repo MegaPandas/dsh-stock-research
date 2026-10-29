@@ -21,11 +21,9 @@ export type ValuationMethods = typeof catalogue;
 export function usesValuationMethods(taskId: string): boolean {
   return (
     taskId === "analysis.fundamentals" ||
-    taskId === "analysis.business" ||
     taskId.startsWith("debate.") ||
     taskId === "risk.main" ||
     taskId === "risk.valuation" ||
-    taskId === "manager.research" ||
     taskId === "manager.decision"
   );
 }
@@ -107,7 +105,7 @@ export function createValuationMethodTool(methods: ValuationMethods) {
   return researchTool({
     name: "stock_read_valuation_method",
     description:
-      "读取本次研究保存的估值方法、输入要求、禁用条件及文献。方法资料不包含公司输入或实时参数。",
+      "Read one selected valuation method's formulas, required input schema, applicability and references. Supply company data and forecast assumptions through the research.",
     parameters: objectSchema({
       methodId: { type: "string", enum: methods.methods.map(({ id }) => id) },
     }),

@@ -310,7 +310,7 @@ describe("stock-replay command", () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
-  it("replays supported saved role and digest protocols after a protocol upgrade", async () => {
+  it("rejects a previous role protocol before creating a replay", async () => {
     const h = await quickHost(workflowModel().respond);
     cleanups.push(h.close);
     const input = createQuickInput(scope, h.runtime.policy, []);
@@ -327,16 +327,12 @@ describe("stock-replay command", () => {
       input,
       "old-source",
     );
-    const replay = createReplayInput(h.runtime.runs, runId);
-    expect(replay.versions.mode).toBe("quick/7");
-    expect(replay.versions.prompts).toMatchObject({
-      roles: "21",
-      digest: "11",
-      coordinator: "10",
-    });
-    expect(
-      h.runtime.runs.open(h.outside.agent.id, replay, "old-replay").runId,
-    ).toBeTruthy();
+    const files = h.runFiles();
+    expect(() => createReplayInput(h.runtime.runs, runId)).toThrowError(
+      expect.objectContaining({ code: "VERSION_UNAVAILABLE" }),
+    );
+    expect(h.runFiles()).toEqual(files);
+    expect(h.adapter.requests).toEqual([]);
   });
 
   it("opens an offline replay whose installed SEC code is disabled and unconfigured", async () => {

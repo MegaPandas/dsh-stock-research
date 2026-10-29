@@ -25,10 +25,10 @@ export function businessDraftTools(file: DraftFile): ToolDefinition[] {
     ...tool,
     description:
       tool.name === "stock_read_draft"
-        ? "读取本任务固定业务JSON草稿；没有路径参数。首次尚未写稿时无需读取。"
+        ? "Read this task's fixed business JSON draft. No path parameter; reading is unnecessary before the first write."
         : tool.name === "stock_write_draft"
-          ? "写入本任务完整业务JSON，只含给定业务字段，不使用Markdown围栏或额外正文；没有路径参数。"
-          : "替换本任务JSON草稿中唯一匹配的片段；没有路径参数。",
+          ? "Write this task's complete business JSON using only the specified business fields, without Markdown fences or extra prose. No path parameter."
+          : "Replace a uniquely matching fragment in this task's JSON draft. No path parameter.",
     output: resultOutput(
       tool.name === "stock_read_draft"
         ? objectSchema({ content: stringSchema })

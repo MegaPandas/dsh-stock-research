@@ -637,7 +637,7 @@ export class DispatchBridge {
                 [
                   {
                     type: "text",
-                    text: `${continuation.message}\n请结合原会话完成补充或修订，检查后提交新稿。${continuation.resumeSearch ? "主Agent明确恢复搜索；保留原搜索消耗与额度，超额仍需用户单次批准。" : "本次追问不解除搜索暂停，也不重置搜索额度。"}`,
+                    text: `${continuation.message}\nUse the existing conversation to complete the requested additions or revisions, check the draft and submit it. ${continuation.resumeSearch ? "The primary agent has resumed search. Previous usage and limits remain; each over-budget search requires user approval." : "Search pause and usage remain unchanged."}`,
                   },
                 ],
                 signal,

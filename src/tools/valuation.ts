@@ -58,7 +58,7 @@ export function createValuationTools(
     researchTool({
       name: "stock_calculate_valuation",
       description:
-        "在当前研究任务内确定性计算并保存估值、目标日期估值及参数敏感性。提供基础预测与明确日期；代码推导利润、税、营运资本变化、权益滚存、再投资、终值、CAPM/WACC及按天折现，裁切已过期间。金额与股数独立声明数量级，利率/概率用小数，币种继承运行。PE/PB/PS/P-CF直接给权益价值，EV倍数才桥接债务与现金。负残值正常保存并返回diagnostics，不能作为目标价；不要求调参取得正值。返回calculationId、每股结果及步骤；模型不能覆盖结果。主Agent通过派工调用，读取已保存结果。",
+        "Calculate and save research-date valuations, target-date prices and sensitivities for the current task; return calculationId, per-share results, steps and diagnostics. Read the selected method's input schema with stock_read_valuation_method; inputs are validated against methodId. Declare amount and share scales separately; use decimal rates and probabilities. Currency comes from the run. Code discounts by day and clips elapsed periods. Equity multiples yield equity value directly; EV multiples require a debt/cash bridge. Retain negative residual equity for solvency analysis; target prices must be nonnegative.",
       parameters:
         valuationCalculationParameters as typeof valuationCalculationParameters &
           Record<string, unknown>,
@@ -76,7 +76,7 @@ export function createValuationTools(
     researchTool({
       name: "stock_read_valuation_calculation",
       description:
-        "读取获准运行中不可变的估值计算、输入依据、算法版本及中间步骤。",
+        "Read an immutable valuation calculation, input rationale, algorithm version and intermediate steps from an authorized run.",
       parameters: objectSchema({
         runId: stringSchema,
         calculationId: stringSchema,
@@ -97,7 +97,7 @@ export function createValuationTools(
     researchTool({
       name: "stock_read_valuation_method",
       description:
-        "读取获准运行保存的估值方法、输入约束、文献及计算输入Schema。",
+        "Read valuation methods, input constraints, references and calculation input schemas saved in an authorized run.",
       parameters: objectSchema({ runId: stringSchema, methodId: stringSchema }),
       output: resultOutput(opaqueObjectSchema),
       async execute(value, exec) {

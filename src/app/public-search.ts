@@ -35,12 +35,12 @@ export function createPublicSearchSession(
     if (rejectedApprovals >= PUBLIC_SEARCH_LIMITS.maxRejectedApprovals)
       throw new ResearchError(
         "ACCESS_DENIED",
-        `Search is paused: the user has rejected ${rejectedApprovals} search approvals during this public research. Complete the draft using the existing data and materials, and record information gaps and their impact in content.handoff.openQuestions and limitations. Only the primary agent or the user may decide whether a new search is needed; subagents must not resume searching or request permission again.`,
+        `Search is paused after ${rejectedApprovals} denied approvals. Complete the draft using existing materials. Record only gaps affecting conclusions in content.handoff.openQuestions or content.handoff.limitations. Resumption requires a decision by the primary agent or user.`,
       );
   }
   const tool = researchTool({
     name: "stock_search_public",
-    description: `检索公开信息，前${maxSearches}次免审批，之后每次检索均需用户单次批准；累计${PUBLIC_SEARCH_LIMITS.maxRejectedApprovals}次拒绝后暂停搜索，须先基于已有材料成稿并说明信息缺口。必要的新搜索由主Agent或用户决定，子Agent不能自行恢复搜索。结果条数沿用原生搜索配置，返回标题、链接、摘要、时间提示、检索时点及剩余免审批额度。`,
+    description: `Search public information. The first ${maxSearches} searches need no approval; each additional search requires approval. Pause after ${PUBLIC_SEARCH_LIMITS.maxRejectedApprovals} denials; resumption requires a decision by the primary agent or user. Use the host's result-count setting. Return titles, links, snippets, time hints, retrieval time and remaining budget.`,
     parameters: objectSchema({ query: stringSchema }),
     output: resultOutput(opaqueObjectSchema),
     async execute(value, exec) {
@@ -59,7 +59,7 @@ export function createPublicSearchSession(
             requireSearchOpen();
             throw new ResearchError(
               "ACCESS_DENIED",
-              `The user rejected this search (${rejectedApprovals}/${PUBLIC_SEARCH_LIMITS.maxRejectedApprovals} rejections so far). Complete the analysis using the existing materials, explain the information gaps, and do not request the same or a similar query again.`,
+              `Search approval denied (${rejectedApprovals}/${PUBLIC_SEARCH_LIMITS.maxRejectedApprovals}). Complete the analysis using existing materials; record gaps only when they affect conclusions. Do not repeat the same or a similar query.`,
             );
           }
           used += 1;

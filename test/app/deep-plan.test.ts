@@ -103,7 +103,7 @@ describe("deep application plan", () => {
       input.inputs.find((item) => item.name === APPLICATION_INPUT_NAME)
         ?.content,
     ).toMatchObject({
-      schemaVersion: 1,
+      schemaVersion: 2,
       policy: policy(),
     });
     const another = createDeepInput(scope, policy(), []);

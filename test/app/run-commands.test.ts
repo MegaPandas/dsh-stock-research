@@ -279,17 +279,23 @@ describe("explicit run control commands", () => {
         savedPrompt,
       );
       expect(coordinator.sessionId).toBe(h.outside.agent.id);
-      expect(coordinator.tools!.map((tool) => tool.name).sort()).toEqual(
-        expect.arrayContaining(
-          [
-            "stock_read_run",
-            "stock_data_health",
-            "stock_dispatch_task",
-            "stock_make_digest",
-            "stock_decide",
-          ].sort(),
-        ),
-      );
+      expect(coordinator.tools!.map((tool) => tool.name).sort()).toEqual([
+        "host_marker",
+        "stock_cancel_research",
+        "stock_decide",
+        "stock_dispatch_stage",
+        "stock_dispatch_task",
+        "stock_followup_task",
+        "stock_make_digest",
+        "stock_read_artifact",
+        "stock_read_run",
+        "stock_recover_research",
+        "stock_redo_task",
+        "stock_replay_research",
+        "stock_resume_research",
+        "stock_review_stage",
+        "stock_start_research",
+      ]);
       expect(mainResearchRequest(coordinator)).toMatchObject({
         runId: seeded.runId,
         view: expect.objectContaining({ scope }),

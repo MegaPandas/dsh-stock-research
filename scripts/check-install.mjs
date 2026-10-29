@@ -167,14 +167,19 @@ async function probe(directory, targetVersion) {
       assert.equal(ctx.commands.find(outside.agent, name).name, name);
     const mainAgentTools = [
       "stock_start_research",
-      "stock_review_stage",
       "stock_resume_research",
       "stock_cancel_research",
       "stock_recover_research",
       "stock_replay_research",
-      "stock_followup_task",
-      "stock_dispatch_stage",
     ];
+    assert.deepEqual(
+      ctx.tools
+        .schemas(outside.agent)
+        .map(({ name }) => name)
+        .filter((name) => name.startsWith("stock_"))
+        .sort(),
+      [...mainAgentTools].sort(),
+    );
     for (const name of mainAgentTools)
       assert.ok(
         ctx.tools.schemas(outside.agent).some((tool) => tool.name === name),
