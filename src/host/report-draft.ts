@@ -48,39 +48,32 @@ export function createReportDraft<Kind extends AgentReportKind, Result>(
     exec: ToolRunContext,
     handoff?: StageHandoff,
   ) => Result | Promise<Result>,
-  seed?: AgentReport<Kind>,
-  legacy = false,
-  handoffOptions?: { seed?: StageHandoff },
-  requiredContentSections: readonly string[] = [],
-  inputContract?: ReportDraftInput,
+  options: {
+    seed?: AgentReport<Kind>;
+    handoff?: { seed?: StageHandoff };
+    requiredContentSections?: readonly string[];
+    input?: ReportDraftInput;
+  } = {},
 ): {
   tools: ToolDefinition[];
   result(): Result;
   draft(): ReportDraft<Kind>;
 } {
+  const {
+    seed,
+    handoff: handoffOptions,
+    requiredContentSections = [],
+    input: inputContract,
+  } = options;
   const schema = agentReportSchemas[kind];
   const sections: Record<string, JsonSchemaNode> = inputContract?.sections ?? {
     summary: schema.properties.summary,
     ...schema.properties.content.properties,
   };
-  const sectionFormats = Object.entries(sections)
-    .map(([section, value]) => `${section}: ${JSON.stringify(value)}`)
-    .join("\n");
-  const legacySchema = objectSchema({
-    section: {
-      type: "string",
-      description: `Section name: ${Object.keys(sections).join(", ")}.`,
-    },
-    value: {
-      description: `Section content as a native JSON value. Section JSON schemas:\n${sectionFormats}`,
-    },
-  });
-  const writeSchema = legacy
-    ? legacySchema
-    : {
-        ...objectSchema(sections, []),
-        description: "Report sections to update; {} makes no changes.",
-      };
+  const writeSchema = {
+    ...objectSchema(sections, []),
+    description: "Report sections to update; {} makes no changes.",
+  };
   const emptySchema = objectSchema({});
   const stored: ReportDraft<Kind> =
     seed === undefined ? { content: {} } : parseAgentReport(kind, seed);
@@ -98,50 +91,28 @@ export function createReportDraft<Kind extends AgentReportKind, Result>(
   const tools: ToolDefinition[] = [
     researchTool({
       name: "stock_write_report",
-      description: legacy
-        ? "Write or replace one draft section; section is summary or a top-level content field."
-        : "Write or replace supplied draft sections atomically; omitted sections stay unchanged. {} makes no changes.",
+      description:
+        "Write or replace supplied draft sections atomically; omitted sections stay unchanged. {} makes no changes.",
       parameters: writeSchema,
       output: resultOutput(
-        legacy
-          ? objectSchema({ section: { type: "string" } })
-          : objectSchema({
-              sections: { type: "array", items: { type: "string" } },
-            }),
+        objectSchema({
+          sections: { type: "array", items: { type: "string" } },
+        }),
       ),
       async execute(value, exec) {
         exec.signal.throwIfAborted();
         validate(writeSchema, value);
         const input = value as Record<string, unknown>;
-        const names = legacy ? [input.section as string] : Object.keys(input);
-        if (legacy) {
-          const section = names[0]!;
-          if (!Object.hasOwn(sections, section))
-            throw new ResearchError(
-              "INVALID_INPUT",
-              `Unknown report section ${section}. Allowed sections: ${Object.keys(sections).join(", ")}.`,
-            );
-          const errors = validateJsonSchemaValue(
-            sections[section]!,
-            input.value,
-            section,
-          );
-          if (errors.length > 0)
-            throw new ResearchError(
-              "INVALID_INPUT",
-              `${errors.join("\n")}\nSchema for ${section}: ${JSON.stringify(sections[section], (key, value: unknown) => (key === "description" ? undefined : value))}`,
-            );
-        }
-        const patch = legacy ? { [names[0]!]: input.value } : input;
+        const names = Object.keys(input);
         const updates = structuredClone(
-          inputContract === undefined ? patch : inputContract.resolve(patch),
+          inputContract === undefined ? input : inputContract.resolve(input),
         );
         const content = stored.content as Record<string, unknown>;
         for (const [section, sectionValue] of Object.entries(updates))
           if (section === "summary") stored.summary = sectionValue as string;
           else content[section] = sectionValue;
         if (names.length > 0) handoffConfirmed = false;
-        return legacy ? { section: names[0]! } : { sections: names };
+        return { sections: names };
       },
     }),
     researchTool({

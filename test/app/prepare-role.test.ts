@@ -11,7 +11,6 @@ import { createReplayInput } from "../../src/app/replay-input.js";
 import { attachCollection } from "../../src/app/collection-input.js";
 import type { CollectionSnapshot } from "../../src/contracts/collection.js";
 import type { ResearchScope } from "../../src/contracts/data.js";
-import { agentReportSchemas } from "../../src/contracts/agent-reports.js";
 import { prepareResearchRole } from "../../src/app/prepare-role.js";
 import {
   CALCULATION_RULES,
@@ -28,7 +27,6 @@ import { NumberService } from "../../src/services/numbers.js";
 import { analysis } from "../fixtures/dispatch-host.js";
 import { MARKET_FIXTURE } from "../fixtures/market.js";
 import { runtimeHost, textResponse } from "../fixtures/runtime-host.js";
-import { draftSubmission } from "../fixtures/draft-stream.js";
 import {
   initialInput,
   lastToolResult,
@@ -37,7 +35,6 @@ import {
 import {
   analysisReport,
   agentAnalysisReport,
-  legacyAnalysisSubmission,
   analysisSubmission,
   reportHandoff,
   reportSubmission,
@@ -275,18 +272,21 @@ describe("persisted research role preparation", () => {
     await parent.dispose();
   });
 
-  it("rejects a missing valuation catalogue even when prompt metadata names an older protocol", async () => {
+  it("rejects a missing recorded valuation catalogue", async () => {
     const h = await host();
-    h.input.versions.prompts.roles = "23";
     delete h.input.versions.prompts.valuationMethods;
     h.input.inputs = h.input.inputs.filter(
       ({ name }) => name !== VALUATION_METHODS_INPUT,
     );
-    const { runId } = h.runtime.runs.open("owner", h.input, "open-v23");
+    const { runId } = h.runtime.runs.open(
+      "owner",
+      h.input,
+      "open-missing-methods",
+    );
     const context = h.runtime.runs.dispatchForCall(
       { runId, identity: "owner" },
       "analysis.fundamentals",
-      "claim-v23",
+      "claim-missing-methods",
     );
     expect(() => prepareResearchRole(h.runtime, context)).toThrowError(
       expect.objectContaining({ code: "VERSION_UNAVAILABLE" }),
@@ -331,110 +331,100 @@ describe("persisted research role preparation", () => {
     expect(JSON.stringify(input)).not.toContain(runId);
   });
 
-  it.each(["22", "23"])(
-    "assigns equity benchmarks to market and external prices and rates to macro under role protocol %s",
-    async (version) => {
-      const h = await host();
-      h.input.versions.prompts.roles = version;
-      const snapshot = collection(h.scope);
-      for (const [id, title, unit, dataset, attributes] of [
-        [
-          "benchmark.shanghai.daily",
-          "上证指数日线",
-          "index",
-          "market",
-          { assetCode: "CN:000001.SH", assetType: "index" },
-        ],
-        [
-          "benchmark.gold.daily",
-          "现货黄金日线",
-          "USD/troy_ounce",
-          "market",
-          { assetCode: "XAU/USD", assetType: "gold", instrument: "spot" },
-        ],
-        [
-          "benchmark.bondYields",
-          "中美10年期收益率",
-          "percent",
-          "macro",
-          undefined,
-        ],
-      ] as const) {
-        const envelope = structuredClone(snapshot.packets[0]!.envelope);
-        envelope.dataset = dataset;
-        envelope.data = {
-          table: id,
-          title,
-          interval: "1d",
-          columns: { close: { label: title, unit } },
-          basis: "source_reported",
-          ...(attributes && { attributes: { ...attributes } }),
-          rows: [
-            {
-              date: "2024-01-03",
-              asOf: envelope.asOf,
-              availableAt: null,
-              complete: true,
-              values: { close: 100 },
-            },
-          ],
-        };
-        snapshot.packets.push({ id, envelope });
-      }
-      attachCollection(h.input, snapshot);
-      const { runId } = h.runtime.runs.open(
-        "owner",
-        h.input,
-        "open-benchmarks",
-      );
-      for (const [taskId, expected] of [
-        ["analysis.market", ["market.daily", "benchmark.shanghai.daily"]],
-        [
-          "analysis.macro",
-          ["macro.dgs10", "benchmark.gold.daily", "benchmark.bondYields"],
-        ],
-      ] as const) {
-        const context = h.runtime.runs.dispatchForCall(
-          { runId, identity: "owner" },
-          taskId,
-          taskId,
-        );
-        const prepared = prompt(prepareResearchRole(h.runtime, context));
-        expect(
-          prepared.context.dataCatalog.map(
-            (source: { id: string }) => source.id,
-          ),
-        ).toEqual(expected);
-        if (taskId === "analysis.market") continue;
-        expect(prepared.context.dataCatalog).toContainEqual(
-          expect.objectContaining({
-            id: "benchmark.gold.daily",
-            title: "现货黄金日线",
-            interval: "1d",
-            basis: "source_reported",
-          }),
-        );
-        const gold = h.runtime.runs
-          .numberContext(runId)
-          .evidence.find(
-            (entry) =>
-              entry.taskId === taskId &&
-              entry.callId === "collection:benchmark.gold.daily",
-          )!;
-        expect(
-          h.runtime.runs.readEvidence({ runId, evidenceId: gold.evidenceId })
-            .envelope.data,
-        ).toMatchObject({
-          attributes: {
-            assetCode: "XAU/USD",
-            assetType: "gold",
-            instrument: "spot",
+  it("assigns equity benchmarks to market and external prices and rates to macro", async () => {
+    const h = await host();
+    const snapshot = collection(h.scope);
+    for (const [id, title, unit, dataset, attributes] of [
+      [
+        "benchmark.shanghai.daily",
+        "上证指数日线",
+        "index",
+        "market",
+        { assetCode: "CN:000001.SH", assetType: "index" },
+      ],
+      [
+        "benchmark.gold.daily",
+        "现货黄金日线",
+        "USD/troy_ounce",
+        "market",
+        { assetCode: "XAU/USD", assetType: "gold", instrument: "spot" },
+      ],
+      [
+        "benchmark.bondYields",
+        "中美10年期收益率",
+        "percent",
+        "macro",
+        undefined,
+      ],
+    ] as const) {
+      const envelope = structuredClone(snapshot.packets[0]!.envelope);
+      envelope.dataset = dataset;
+      envelope.data = {
+        table: id,
+        title,
+        interval: "1d",
+        columns: { close: { label: title, unit } },
+        basis: "source_reported",
+        ...(attributes && { attributes: { ...attributes } }),
+        rows: [
+          {
+            date: "2024-01-03",
+            asOf: envelope.asOf,
+            availableAt: null,
+            complete: true,
+            values: { close: 100 },
           },
-          columns: { close: { label: "现货黄金日线", unit: "USD/troy_ounce" } },
-        });
-      }
-    },
-  );
+        ],
+      };
+      snapshot.packets.push({ id, envelope });
+    }
+    attachCollection(h.input, snapshot);
+    const { runId } = h.runtime.runs.open("owner", h.input, "open-benchmarks");
+    for (const [taskId, expected] of [
+      ["analysis.market", ["market.daily", "benchmark.shanghai.daily"]],
+      [
+        "analysis.macro",
+        ["macro.dgs10", "benchmark.gold.daily", "benchmark.bondYields"],
+      ],
+    ] as const) {
+      const context = h.runtime.runs.dispatchForCall(
+        { runId, identity: "owner" },
+        taskId,
+        taskId,
+      );
+      const prepared = prompt(prepareResearchRole(h.runtime, context));
+      expect(
+        prepared.context.dataCatalog.map((source: { id: string }) => source.id),
+      ).toEqual(expected);
+      if (taskId === "analysis.market") continue;
+      expect(prepared.context.dataCatalog).toContainEqual(
+        expect.objectContaining({
+          id: "benchmark.gold.daily",
+          title: "现货黄金日线",
+          interval: "1d",
+          basis: "source_reported",
+        }),
+      );
+      const gold = h.runtime.runs
+        .numberContext(runId)
+        .evidence.find(
+          (entry) =>
+            entry.taskId === taskId &&
+            entry.callId === "collection:benchmark.gold.daily",
+        )!;
+      expect(
+        h.runtime.runs.readEvidence({ runId, evidenceId: gold.evidenceId })
+          .envelope.data,
+      ).toMatchObject({
+        attributes: {
+          assetCode: "XAU/USD",
+          assetType: "gold",
+          instrument: "spot",
+        },
+        columns: { close: { label: "现货黄金日线", unit: "USD/troy_ounce" } },
+      });
+    }
+  });
 
   it("shares the appropriate collected datasets with the additional deep analysts", async () => {
     const h = await host();
@@ -853,55 +843,6 @@ describe("persisted research role preparation", () => {
     await parent.dispose();
   });
 
-  it("submits saved protocol 19 business JSON with its recorded prompt and input", async () => {
-    const report = agentAnalysisReport();
-    const h = await host(async function* () {
-      yield* toolCall("stock_submit", report, "submit-v19");
-    });
-    h.input.versions.prompts.roles = "19";
-    const savedPrompt = "Saved version 19 analyst policy.";
-    const savedObjective = "Saved version 19 research objective.";
-    (
-      h.input.inputs[0]!.content as { prompts: { analyst: string } }
-    ).prompts.analyst = savedPrompt;
-    h.input.instructions!.find(
-      ({ taskId }) => taskId === "analysis.market",
-    )!.instruction = savedObjective;
-    const { runId } = h.runtime.runs.open("owner", h.input, "open-v19");
-    const parent = await h.runtime.createAgent(
-      h.agentOptions("v19-coordinator"),
-      { kind: "coordinator", runIds: [runId] },
-      [],
-    );
-    const result = await h.runtime.dispatch.dispatch(
-      parent.agent,
-      runId,
-      "analysis.market",
-      "dispatch-v19",
-      new AbortController().signal,
-    );
-    expect(result).toMatchObject({ status: "succeeded", failure: null });
-    expect(h.adapter.requests).toHaveLength(1);
-    const request = h.adapter.requests[0]!;
-    expect(request.tools!.map(({ name }) => name)).toEqual(["stock_submit"]);
-    const schema = request.tools!.find(
-      ({ name }) => name === "stock_submit",
-    )!.parameters;
-    expect(schema).toEqual(agentReportSchemas.analysis);
-    expect(validateJsonSchemaValue(schema, report)).toEqual([]);
-    expect(validateJsonSchemaValue(schema, {}).length).toBeGreaterThan(0);
-    expect(
-      JSON.stringify(request.messages.filter(({ role }) => role === "system")),
-    ).toContain(savedPrompt);
-    expect(
-      initialInput<{ task: { objective: string } }>(request).task.objective,
-    ).toBe(savedObjective);
-    expect(
-      h.runtime.runs.readArtifact(result.refs[0]!).content.payload,
-    ).toMatchObject({ schemaVersion: 3, report });
-    await parent.dispose();
-  });
-
   it("publishes the six business sections and a code-selected closing price without model references", async () => {
     const report = analysisReport();
     report.current_state = ["人工快照最近完整日线收盘为12美元/股。"];
@@ -1010,162 +951,24 @@ describe("persisted research role preparation", () => {
     },
   );
 
-  it.each(["12", "13"])(
-    "uses the saved version %s business prompt and tool protocol",
+  it.each(["24", "unknown"])(
+    "rejects non-current role protocol %s",
     async (version) => {
-      const h = await host(async function* () {
-        yield* legacyAnalysisSubmission();
-      });
+      const h = await host();
       h.input.versions.prompts.roles = version;
-      const profile = h.input.inputs[0]!.content as {
-        prompts: { analyst: string };
-      };
-      profile.prompts.analyst = "Saved version 12 analyst policy.";
-      const { runId } = h.runtime.runs.open("owner", h.input, "open-v12");
-      const parent = await h.runtime.createAgent(
-        h.agentOptions("v12-coordinator"),
-        { kind: "coordinator", runIds: [runId] },
-        [],
+      const { runId } = h.runtime.runs.open(
+        "owner",
+        h.input,
+        "unknown-role-protocol",
       );
-      const result = await h.runtime.dispatch.dispatch(
-        parent.agent,
-        runId,
+      const context = h.runtime.runs.dispatchForCall(
+        { runId, identity: "owner" },
         "analysis.market",
-        "dispatch-v12",
-        new AbortController().signal,
+        "unknown",
       );
-      expect(result.status).toBe("succeeded");
-      expect(h.adapter.requests[0]!.tools).toHaveLength(6);
-      expect(h.adapter.requests[0]!.tools!.map(({ name }) => name)).toEqual(
-        expect.arrayContaining([
-          "stock_describe_collection",
-          "stock_read_collection",
-        ]),
+      expect(() => prepareResearchRole(h.runtime, context)).toThrowError(
+        expect.objectContaining({ code: "VERSION_UNAVAILABLE" }),
       );
-      expect(JSON.stringify(h.adapter.requests[0]!.messages)).toContain(
-        profile.prompts.analyst,
-      );
-      expect(
-        h.runtime.runs.readArtifact(result.refs[0]!).content.payload,
-      ).toMatchObject({
-        schemaVersion: 2,
-        assessment: analysisReport().assessment,
-      });
-      await parent.dispose();
     },
   );
-
-  it.each(["16", "17"])(
-    "submits a saved version %s business role through its fixed draft",
-    async (version) => {
-      const issue = {
-        description: "Demand uncertainty",
-        impact: "Lower cash generation",
-        trigger: "Orders decline",
-        constraint: "Limit exposure",
-        recommendation: "Reassess when results arrive",
-      };
-      const h = await host(async function* () {
-        yield* draftSubmission(
-          "stock_save_report",
-          { issues: [issue] },
-          "risk-save",
-          "risk-save",
-          "json",
-        );
-      });
-      h.input.versions.prompts.roles = version;
-      h.input.definition.tasks = h.input.definition.tasks.filter(
-        ({ id }) => id === "risk.main",
-      );
-      h.input.definition.tasks[0]!.dependsOn = [];
-      h.input.definition.tasks[0]!.inputTasks = [];
-      h.input.instructions = h.input.instructions!.filter(
-        ({ taskId }) => taskId === "risk.main",
-      );
-      const { runId } = h.runtime.runs.open("owner", h.input, "open-risk");
-      const parent = await h.runtime.createAgent(
-        h.agentOptions("risk-coordinator"),
-        { kind: "coordinator", runIds: [runId] },
-        [],
-      );
-      const result = await h.runtime.dispatch.dispatch(
-        parent.agent,
-        runId,
-        "risk.main",
-        "dispatch-risk",
-        new AbortController().signal,
-      );
-      expect(result).toMatchObject({ status: "succeeded", failure: null });
-      expect(
-        h.runtime.runs.readArtifact(result.refs[0]!).content,
-      ).toMatchObject({
-        kind: "risk",
-        payload: {
-          issues: [
-            { ...issue, issueId: "risk.main.1", evidence: [], numbers: [] },
-          ],
-        },
-      });
-      await parent.dispose();
-    },
-  );
-
-  it("uses the saved version 11 draft and tool protocol for historical roles", async () => {
-    const h = await host(async function* () {
-      yield* draftSubmission(
-        "stock_save_report",
-        analysis(),
-        "legacy-analysis",
-      );
-    });
-    h.input.versions.prompts.roles = "11";
-    const profile = h.input.inputs[0]!.content as {
-      prompts: { analyst: string };
-      guides: { analysis: string };
-    };
-    profile.prompts.analyst =
-      "Saved legacy analyst policy with Markdown drafts.";
-    profile.guides.analysis = "Saved legacy analysis container contract.";
-    const { runId } = h.runtime.runs.open("owner", h.input, "open-legacy");
-    const parent = await h.runtime.createAgent(
-      h.agentOptions("legacy-coordinator"),
-      { kind: "coordinator", runIds: [runId] },
-      [],
-    );
-    const result = await h.runtime.dispatch.dispatch(
-      parent.agent,
-      runId,
-      "analysis.market",
-      "dispatch-legacy",
-      new AbortController().signal,
-    );
-    expect(result.status).toBe("succeeded");
-    expect(h.adapter.requests[0]!.tools).toHaveLength(11);
-    expect(JSON.stringify(h.adapter.requests[0]!.messages)).toContain(
-      profile.prompts.analyst,
-    );
-    expect(
-      h.runtime.runs.readArtifact(result.refs[0]!).content.payload,
-    ).toEqual(analysis().payload);
-    await parent.dispose();
-  });
-
-  it("rejects an unknown saved role protocol instead of substituting the current contract", async () => {
-    const h = await host();
-    h.input.versions.prompts.roles = "unknown";
-    const { runId } = h.runtime.runs.open(
-      "owner",
-      h.input,
-      "unknown-role-protocol",
-    );
-    const context = h.runtime.runs.dispatchForCall(
-      { runId, identity: "owner" },
-      "analysis.market",
-      "unknown",
-    );
-    expect(() => prepareResearchRole(h.runtime, context)).toThrowError(
-      expect.objectContaining({ code: "VERSION_UNAVAILABLE" }),
-    );
-  });
 });

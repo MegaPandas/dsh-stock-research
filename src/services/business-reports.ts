@@ -9,9 +9,8 @@ import type { StageHandoff } from "../contracts/stage-handoff.js";
 import { renderAgentReport } from "../report/agent-report.js";
 import type { ArtifactRef, ResearchScope } from "../contracts/data.js";
 import { decisionPolicy, priceRating } from "../contracts/rating-policy.js";
-import { assembleDebate, parseAnalysisReport } from "./analysis-report.js";
 import { parseArtifactInput } from "./artifact-schema.js";
-import { invalid, list, object, text } from "./artifact-shape.js";
+import { list, object, text } from "./artifact-shape.js";
 
 type BusinessRisk = Omit<RiskIssue, "issueId" | "evidence" | "numbers">;
 type TargetPrice = {
@@ -24,7 +23,7 @@ type BusinessDecision = Omit<
   DecisionProposal,
   "thesis" | "basePrice" | "targetPrice"
 > & { thesis: string[]; targetPrice: TargetPrice | null };
-export type BusinessRoleKind = "debate" | "risk" | "plan" | "decision_draft";
+export type BusinessRoleKind = "risk" | "plan" | "decision_draft";
 export interface BusinessReportContext {
   kind: BusinessRoleKind;
   taskId: string;
@@ -67,16 +66,6 @@ export function assembleBusinessReport(
   context: BusinessReportContext,
 ): ResearchArtifactInput {
   const { kind, title, inputRefs } = context;
-  if (kind === "debate") {
-    if (context.specialty !== "bull" && context.specialty !== "bear")
-      invalid("debate/side", "expected the task to select bull or bear");
-    return assembleDebate(
-      parseAnalysisReport(value, "debate"),
-      title,
-      inputRefs,
-      context.specialty,
-    );
-  }
   const statement = (text: string) => ({
     text,
     evidence: [],
@@ -178,8 +167,8 @@ export function assembleBusinessReport(
 }
 
 export function assembleAgentArtifact(
-  kind: "analysis" | BusinessRoleKind,
-  report: AgentReport<"analysis" | BusinessRoleKind>,
+  kind: "analysis" | "debate" | BusinessRoleKind,
+  report: AgentReport<"analysis" | "debate" | BusinessRoleKind>,
   context: Omit<BusinessReportContext, "kind"> & { scope: ResearchScope },
   claims: NumericClaim[] = [],
   stageHandoff?: StageHandoff,

@@ -52,7 +52,10 @@ describe("section report drafts", () => {
 
   it("requires a bounded handoff after the final report edit and saves it with the report", async () => {
     const accept = vi.fn(() => "saved");
-    const session = createReportDraft("analysis", accept, report, false, {});
+    const session = createReportDraft("analysis", accept, {
+      seed: report,
+      handoff: {},
+    });
     const [write, read, submit, writeHandoff] = session.tools;
     const exec = execution();
     for (const tool of session.tools)
@@ -77,13 +80,10 @@ describe("section report drafts", () => {
   });
 
   it("reports the actual handoff budget without truncating and preserves prior content", async () => {
-    const session = createReportDraft(
-      "analysis",
-      () => "saved",
-      report,
-      false,
-      {},
-    );
+    const session = createReportDraft("analysis", () => "saved", {
+      seed: report,
+      handoff: {},
+    });
     const write = session.tools[3]!;
     const exec = execution();
     expect(write.description).toContain(
@@ -115,13 +115,10 @@ describe("section report drafts", () => {
   });
 
   it("retains seeded handoffs but requires confirmation in a follow-up", async () => {
-    const session = createReportDraft(
-      "analysis",
-      () => "saved",
-      report,
-      false,
-      { seed: handoff },
-    );
+    const session = createReportDraft("analysis", () => "saved", {
+      seed: report,
+      handoff: { seed: handoff },
+    });
     const exec = execution();
     expect(await session.tools[1]!.execute({}, exec)).toMatchObject({
       stageHandoff: handoff,
@@ -150,13 +147,10 @@ describe("section report drafts", () => {
         ],
       },
     };
-    const session = createReportDraft(
-      "risk",
-      () => "saved",
-      riskReport,
-      false,
-      {},
-    );
+    const session = createReportDraft("risk", () => "saved", {
+      seed: riskReport,
+      handoff: {},
+    });
     const exec = execution();
     await session.tools[3]!.execute(handoff, exec);
     await expect(session.tools[2]!.execute({}, exec)).rejects.toThrow(
@@ -205,13 +199,10 @@ describe("section report drafts", () => {
   });
 
   it("updates multiple sections atomically, preserves omitted sections and isolates input mutations", async () => {
-    const session = createReportDraft(
-      "analysis",
-      () => "saved",
-      report,
-      false,
-      {},
-    );
+    const session = createReportDraft("analysis", () => "saved", {
+      seed: report,
+      handoff: {},
+    });
     const [write, read, , writeHandoff] = session.tools;
     const exec = execution();
     await writeHandoff!.execute(handoff, exec);
@@ -238,13 +229,10 @@ describe("section report drafts", () => {
   });
 
   it("leaves the whole draft and confirmed handoff unchanged when any batch field is invalid", async () => {
-    const session = createReportDraft(
-      "analysis",
-      () => "saved",
-      report,
-      false,
-      {},
-    );
+    const session = createReportDraft("analysis", () => "saved", {
+      seed: report,
+      handoff: {},
+    });
     const [write, read, submit, writeHandoff] = session.tools;
     const exec = execution();
     await writeHandoff!.execute(handoff, exec);
@@ -266,13 +254,10 @@ describe("section report drafts", () => {
   });
 
   it("treats an empty section patch as a no-op and preserves handoff confirmation", async () => {
-    const session = createReportDraft(
-      "analysis",
-      () => "saved",
-      report,
-      false,
-      {},
-    );
+    const session = createReportDraft("analysis", () => "saved", {
+      seed: report,
+      handoff: {},
+    });
     const [write, read, submit, writeHandoff] = session.tools;
     const exec = execution();
     await writeHandoff!.execute(handoff, exec);
@@ -287,7 +272,9 @@ describe("section report drafts", () => {
   });
 
   it("revises seeded sections, clones drafts and preserves prior content on invalid writes", async () => {
-    const session = createReportDraft("analysis", () => "saved", report);
+    const session = createReportDraft("analysis", () => "saved", {
+      seed: report,
+    });
     const [write, read, submit] = session.tools;
     const exec = execution();
     await write!.execute({ currentState: ["新观察。"] }, exec);
@@ -333,7 +320,7 @@ describe("section report drafts", () => {
 
   it("enforces business rules at submission and accepts corrected sections", async () => {
     const accept = vi.fn(() => "saved");
-    const session = createReportDraft("analysis", accept, report);
+    const session = createReportDraft("analysis", accept, { seed: report });
     const [write, , submit] = session.tools;
     const exec = execution();
     await write!.execute({ currentState: [] }, exec);
@@ -344,20 +331,22 @@ describe("section report drafts", () => {
     expect(session.result()).toBe("saved");
   });
 
-  it("keeps the saved version 20 section/value contract", async () => {
-    const session = createReportDraft("analysis", () => "saved", report, true);
-    await session.tools[0]!.execute(
-      { section: "currentState", value: ["旧版继续写入。"] },
-      execution(),
-    );
-    expect(session.draft().content.currentState).toEqual(["旧版继续写入。"]);
-    await session.tools[2]!.execute({}, execution());
-    expect(session.result()).toBe("saved");
+  it("rejects section/value input without changing the current draft", async () => {
+    const session = createReportDraft("analysis", () => "saved", {
+      seed: report,
+    });
+    await expect(
+      session.tools[0]!.execute(
+        { section: "currentState", value: ["不应写入。"] },
+        execution(),
+      ),
+    ).rejects.toMatchObject({ code: "INVALID_INPUT" });
+    expect(session.draft()).toEqual(report);
   });
 
   it("does not mutate or save when cancelled", async () => {
     const accept = vi.fn();
-    const session = createReportDraft("analysis", accept, report);
+    const session = createReportDraft("analysis", accept, { seed: report });
     const controller = new AbortController();
     controller.abort();
     const exec = execution(controller);
@@ -376,7 +365,7 @@ describe("section report drafts", () => {
       () => {
         throw cause;
       },
-      report,
+      { seed: report },
     );
     const exec = execution();
     await expect(session.tools[2]!.execute({}, exec)).rejects.toMatchObject({

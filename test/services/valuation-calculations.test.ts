@@ -225,6 +225,40 @@ it("rejects foreign and invalidated references while preserving same-call receip
   ).toThrow();
 });
 
+it("reads the current calculation catalogue in order with isolated results after redo", () => {
+  const f = setup();
+  const first = calculateValuation(f.runs, f.operation, request(), "first");
+  const doubled = request();
+  doubled.inputs.revenue = 900;
+  const second = calculateValuation(f.runs, f.operation, doubled, "second");
+  const catalog = () => valuationCalculationCatalog(f.runs, f.operation.runId);
+  const selected = catalog();
+  expect(
+    selected.map(({ calculationId, perShareValues }) => ({
+      calculationId,
+      perShareValues,
+    })),
+  ).toEqual([
+    { calculationId: first.calculationId, perShareValues: [13.5, 22.5] },
+    { calculationId: second.calculationId, perShareValues: [27, 45] },
+  ]);
+  selected[0]!.perShareValues.push(999);
+  expect(catalog()[0]!.perShareValues).toEqual([13.5, 22.5]);
+  const owner = { runId: f.operation.runId, identity: "coordinator" };
+  f.runs.redo(owner, f.operation.taskId, "redo-catalog");
+  expect(catalog()).toEqual([]);
+  const claim = f.runs.claim(owner, f.operation.taskId, "next-attempt");
+  const next = calculateValuation(
+    f.runs,
+    { ...f.operation, attempt: claim.attempt },
+    request(),
+    "next",
+  );
+  expect(catalog().map(({ calculationId }) => calculationId)).toEqual([
+    next.calculationId,
+  ]);
+});
+
 it("requires one target-date value for target prices", () => {
   const f = setup();
   const valuation = calculateValuation(
@@ -545,13 +579,55 @@ it("does not infer a required valuation from a reserved task name", () => {
   expect(f.runs.view(f.operation).tasks[0]!.status).toBe("succeeded");
 });
 
-it.each([DETERMINISTIC_VALUATION_PROTOCOL, "23"])(
-  "validates calculated results regardless of prompt version %s",
-  (roleVersion) => {
-    const f = setup(undefined, roleVersion);
-    const saved = calculateValuation(f.runs, f.operation, request(), "ps");
-    const valuation = materializeValuation(f.runs, f.operation.runId, {
-      companyProfile: "Synthetic company",
+it("validates calculated results against their saved calculations", () => {
+  const f = setup();
+  const saved = calculateValuation(f.runs, f.operation, request(), "ps");
+  const valuation = materializeValuation(f.runs, f.operation.runId, {
+    companyProfile: "Synthetic company",
+    methods: [
+      {
+        methodId: "comparable_multiples",
+        suitability: "Revenue comparison",
+        calculationIds: [saved.calculationId],
+        limitations: [],
+      },
+    ],
+    targetPriceBasis: null,
+  });
+  expect(valuation.methods[0]!.valueRange).toEqual({
+    low: 13.5,
+    high: 22.5,
+    unit: "USD/share",
+  });
+  expect(saved.result.steps[0]!.label).toBe("Comparable metric");
+  expect(valuation.methods[0]!.calculation).toContain(
+    "倍数法经济指标=450 亿USD",
+  );
+  expect(valuation.methods[0]!.calculation).toContain(
+    "普通股每股价值1=13.5 USD/股",
+  );
+  const report = agentAnalysisReport();
+  report.content.valuation = valuation;
+  expect(() =>
+    validateCalculatedReport(f.runs, f.operation.runId, report, "research"),
+  ).not.toThrow();
+  valuation.methods[0]!.valueRange!.high = 99;
+  expect(() =>
+    validateCalculatedReport(f.runs, f.operation.runId, report, "research"),
+  ).toThrow(/valueRange/);
+  delete valuation.methods[0]!.calculationIds;
+  expect(() =>
+    validateCalculatedReport(f.runs, f.operation.runId, report, "research"),
+  ).toThrow(/calculationIds/);
+  valuation.methods[0]!.calculationIds = [saved.calculationId];
+  f.runs.redo(
+    { runId: f.operation.runId, identity: "coordinator" },
+    f.operation.taskId,
+    "redo",
+  );
+  expect(() =>
+    materializeValuation(f.runs, f.operation.runId, {
+      companyProfile: valuation.companyProfile,
       methods: [
         {
           methodId: "comparable_multiples",
@@ -561,54 +637,9 @@ it.each([DETERMINISTIC_VALUATION_PROTOCOL, "23"])(
         },
       ],
       targetPriceBasis: null,
-    });
-    expect(valuation.methods[0]!.valueRange).toEqual({
-      low: 13.5,
-      high: 22.5,
-      unit: "USD/share",
-    });
-    expect(saved.result.steps[0]!.label).toBe("Comparable metric");
-    expect(valuation.methods[0]!.calculation).toContain(
-      "倍数法经济指标=450 亿USD",
-    );
-    expect(valuation.methods[0]!.calculation).toContain(
-      "普通股每股价值1=13.5 USD/股",
-    );
-    const report = agentAnalysisReport();
-    report.content.valuation = valuation;
-    expect(() =>
-      validateCalculatedReport(f.runs, f.operation.runId, report, "research"),
-    ).not.toThrow();
-    valuation.methods[0]!.valueRange!.high = 99;
-    expect(() =>
-      validateCalculatedReport(f.runs, f.operation.runId, report, "research"),
-    ).toThrow(/valueRange/);
-    delete valuation.methods[0]!.calculationIds;
-    expect(() =>
-      validateCalculatedReport(f.runs, f.operation.runId, report, "research"),
-    ).toThrow(/calculationIds/);
-    valuation.methods[0]!.calculationIds = [saved.calculationId];
-    f.runs.redo(
-      { runId: f.operation.runId, identity: "coordinator" },
-      f.operation.taskId,
-      "redo",
-    );
-    expect(() =>
-      materializeValuation(f.runs, f.operation.runId, {
-        companyProfile: valuation.companyProfile,
-        methods: [
-          {
-            methodId: "comparable_multiples",
-            suitability: "Revenue comparison",
-            calculationIds: [saved.calculationId],
-            limitations: [],
-          },
-        ],
-        targetPriceBasis: null,
-      }),
-    ).toThrow(/superseded|unsuccessful/);
-  },
-);
+    }),
+  ).toThrow(/superseded|unsuccessful/);
+});
 
 it("calculates selected methods separately and preserves their values and order in the report", async () => {
   const f = setup();
@@ -848,15 +879,10 @@ it("resolves calculation references before atomically updating a confirmed draft
     ],
     targetPriceBasis: "Synthetic forward revenue scenario",
   };
-  const session = createReportDraft(
-    "decision_draft",
-    () => "saved",
-    undefined,
-    false,
-    {},
-    [],
-    valuationDraftInput("decision_draft", f.runs, f.operation.runId),
-  );
+  const session = createReportDraft("decision_draft", () => "saved", {
+    handoff: {},
+    input: valuationDraftInput("decision_draft", f.runs, f.operation.runId),
+  });
   const [write, read, , handoff] = session.tools;
   const exec = { signal: new AbortController().signal } as ToolRunContext;
   await write!.execute(

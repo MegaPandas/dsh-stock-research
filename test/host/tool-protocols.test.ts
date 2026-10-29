@@ -124,15 +124,10 @@ it.each(protocols)(
         },
         approve: async () => false,
       }).tool,
-      ...createReportDraft(
-        "analysis",
-        () => undefined,
-        undefined,
-        false,
-        {},
-        [],
-        valuationDraftInput("analysis", h.runtime.runs, "fixture-run"),
-      ).tools,
+      ...createReportDraft("analysis", () => undefined, {
+        handoff: {},
+        input: valuationDraftInput("analysis", h.runtime.runs, "fixture-run"),
+      }).tools,
     ];
     const agent = await h.ctx.agents.create(h.agentOptions("protocol-tools"));
     const definitions = new Map(

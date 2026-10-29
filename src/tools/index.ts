@@ -17,6 +17,5 @@ export type { ReadToolServices } from "./read.js";
 export { createDataTools } from "./data.js";
 export type { DataToolServices } from "./data.js";
 export { createWriteTools } from "./write.js";
-export { draftFileTools } from "./draft-file.js";
 export type { WriteToolServices } from "./write.js";
 export type { QueryToolPolicy } from "./query-inputs.js";

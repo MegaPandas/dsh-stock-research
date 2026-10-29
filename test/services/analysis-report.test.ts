@@ -1,19 +1,18 @@
 import { afterEach, describe, expect, it } from "vitest";
 import type { GenerateDigest } from "../../src/contracts/digests.js";
 import type { TaskDefinition } from "../../src/contracts/workflow.js";
-import {
-  assembleAnalysis,
-  parseAnalysisDraft,
-  parseAnalysisReport,
-  renderAnalysisReport,
-} from "../../src/services/analysis-report.js";
+import { parseAnalysisReport } from "../../src/services/analysis-report.js";
+import { assembleAgentArtifact } from "../../src/services/business-reports.js";
 import { ArtifactInputs } from "../../src/services/artifact-inputs.js";
 import { parseArtifactInput } from "../../src/services/artifact-schema.js";
 import { checkDecisionRequirements } from "../../src/services/decision-requirements.js";
 import { DigestService } from "../../src/services/digests.js";
-import { renderArtifact } from "../../src/report/render.js";
-import { analysisReport } from "../fixtures/analysis-report.js";
+import {
+  agentAnalysisReport,
+  analysisReport,
+} from "../fixtures/analysis-report.js";
 import { decisionFixture } from "../fixtures/decision.js";
+import { US_SECURITY } from "../fixtures/market.js";
 
 const cleanups: (() => void)[] = [];
 afterEach(() => {
@@ -66,11 +65,19 @@ function stageFixture(
     frame,
     "collection:market.daily",
   );
-  const report = analysisReport();
-  report.current_state = ["最近收盘100美元/股。"];
-  report.handoff.limitations = ["缺少交付数据，不能验证销量驱动假设。"];
+  const report = agentAnalysisReport();
+  report.content.currentState = ["最近收盘100美元/股。"];
+  report.content.handoff.limitations = ["缺少交付数据，不能验证销量驱动假设。"];
   const calls = fixture.numbers.calls;
-  const content = assembleAnalysis(report, "阶段行情分析", []);
+  const content = assembleAgentArtifact("analysis", report, {
+    taskId: task.id,
+    specialty: "market",
+    title: "阶段行情分析",
+    inputRefs: [],
+    currency: fixture.scope.security.currency,
+    referencePrice: null,
+    scope: fixture.scope,
+  });
   const ref = fixture.artifacts.submitArtifact(
     operation,
     [content],
@@ -92,12 +99,23 @@ function stageFixture(
 
 describe("directional analysis reports", () => {
   it("accepts the six business sections without reference metadata and preserves ordinary business numbers", () => {
-    const report = analysisReport();
-    report.current_state = ["收盘82.40元，低于20日均线83.058元。"];
-    expect(parseAnalysisDraft(JSON.stringify(report))).toEqual(report);
-    const content = assembleAnalysis(report, "行情阶段分析", []);
+    const report = agentAnalysisReport();
+    report.content.currentState = ["收盘82.40元，低于20日均线83.058元。"];
+    const content = assembleAgentArtifact("analysis", report, {
+      taskId: "analysis.market",
+      specialty: "market",
+      title: "行情阶段分析",
+      inputRefs: [],
+      currency: "USD",
+      referencePrice: null,
+      scope: {
+        security: US_SECURITY,
+        date: "2024-01-03",
+        cutoff: "2024-01-03T22:00:00.000Z",
+      },
+    });
     expect(parseArtifactInput(content)).toEqual(content);
-    expect(content.payload).toEqual({ schemaVersion: 2, ...report });
+    expect(content.payload).toEqual({ schemaVersion: 3, report });
     expect(content.claims).toEqual([]);
     expect(content.body).toContain("82.40元");
     expect(content.body).not.toContain("{{number:");
@@ -147,39 +165,12 @@ describe("directional analysis reports", () => {
     );
   });
 
-  it("rejects bad JSON without echoing the draft in an error", () => {
-    expect(() =>
-      parseAnalysisDraft('{"assessment":"PRIVATE-DRAFT"'),
-    ).toThrowError(
-      expect.objectContaining({
-        code: "INVALID_INPUT",
-        message: expect.not.stringContaining("PRIVATE-DRAFT"),
-      }),
-    );
-  });
-
-  it("renders the analysis model, conditional outlook, risks and handoff once without an internal citation appendix", () => {
-    const report = analysisReport();
-    report.current_state = ["毛利率为5%。"];
-    const body = renderAnalysisReport(report);
-    expect(body).toContain("## 分析模型");
-    expect(body).toContain("### 基准路径");
-    expect(body).toContain("### 替代路径");
-    expect(body).toContain("## 风险与反证");
-    expect(body).toContain("## 对后续研究的含义");
-    expect(body.match(/毛利率为5%/g)).toHaveLength(1);
-    expect(body).not.toContain("%%");
-    expect(renderArtifact(assembleAnalysis(report, "研究", []))).not.toContain(
-      "<details>",
-    );
-  });
-
   it("publishes a business note without numeric-claim validation and checks provided data coverage", () => {
     const f = stageFixture();
     expect(f.numbers.calls).toBe(f.priorNumberCalls);
     expect(f.runs.readArtifact(f.ref).content.payload).toEqual({
-      schemaVersion: 2,
-      ...f.report,
+      schemaVersion: 3,
+      report: f.report,
     });
     expect(() =>
       checkDecisionRequirements([f.task], f.versions, f.inputs, f.scope.cutoff),
@@ -246,16 +237,16 @@ describe("directional analysis reports", () => {
     ) => {
       expect(context.artifacts).toHaveLength(1);
       expect(context.artifacts[0]!.content.payload).toEqual({
-        schemaVersion: 2,
-        ...f.report,
+        schemaVersion: 3,
+        report: f.report,
       });
       expect(context.numbers).toEqual([]);
       return submit({
         title: "阶段研究摘要",
         body: "综合本方向判断与条件。",
         inputRefs: context.artifacts.map((item) => item.ref),
-        facts: [{ text: f.report.assessment, inputRefs: [f.ref], numbers: [] }],
-        disagreements: f.report.handoff.open_questions,
+        facts: [{ text: f.report.summary, inputRefs: [f.ref], numbers: [] }],
+        disagreements: f.report.content.handoff.openQuestions,
         riskSummaries: [],
       });
     };
@@ -265,7 +256,7 @@ describe("directional analysis reports", () => {
       generate,
     ).makeDigest(f.operation, "stage.digest", "stage-digest");
     expect(f.runs.readArtifact(result.refs[0]!).content.payload).toMatchObject({
-      facts: [{ text: f.report.assessment }],
+      facts: [{ text: f.report.summary }],
     });
   });
 });

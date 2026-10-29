@@ -12,8 +12,8 @@ import { parseArtifactInput } from "../../src/services/artifact-schema.js";
 import { DecisionService } from "../../src/services/decisions.js";
 import { NumberService } from "../../src/services/numbers.js";
 import { RunService } from "../../src/services/runs.js";
-import { assembleAnalysis } from "../../src/services/analysis-report.js";
-import { analysisReport } from "../fixtures/analysis-report.js";
+import { assembleAgentArtifact } from "../../src/services/business-reports.js";
+import { agentAnalysisReport } from "../fixtures/analysis-report.js";
 import {
   decisionFixture,
   type DecisionFixtureOptions,
@@ -134,7 +134,17 @@ describe("decision finalization", () => {
     }
     c.artifacts.submitArtifact(
       claim,
-      [assembleAnalysis(analysisReport(), "Public events", [])],
+      [
+        assembleAgentArtifact("analysis", agentAnalysisReport(), {
+          taskId: "public",
+          specialty: "public",
+          title: "Public events",
+          inputRefs: [],
+          currency: c.scope.security.currency,
+          referencePrice: null,
+          scope: c.scope,
+        }),
+      ],
       "save-public",
     );
     const result = new DecisionService(c.runs, c.now).decide(

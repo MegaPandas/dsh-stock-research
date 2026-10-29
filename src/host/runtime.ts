@@ -11,18 +11,12 @@ import type {
   AgentSetup,
   CreateAgentOptions,
 } from "@deepseek-ai/dsh-agent";
-import type {} from "@deepseek-ai/dsh-fs";
 import type { ToolDefinition, ToolRunContext } from "@deepseek-ai/dsh-tools";
 import { SqliteCache } from "../cache/index.js";
 import { ResearchError } from "../contracts/errors.js";
 import type { MemoryState } from "../contracts/memory-service.js";
 import type { QuerySnapshot } from "../contracts/query.js";
-import type {
-  OpenRunInput,
-  RunState,
-  RunView,
-  TaskOperation,
-} from "../contracts/runs.js";
+import type { OpenRunInput, RunState, RunView } from "../contracts/runs.js";
 import { HttpClient } from "../data/http.js";
 import { MemoryStore } from "../memory/store.js";
 import { RunStore } from "../runs/store.js";
@@ -40,7 +34,7 @@ import { DataRoot } from "../storage/data-root.js";
 import { createControlTools } from "../tools/control.js";
 import { createDataTools, type DataToolServices } from "../tools/data.js";
 import type { QueryToolPolicy } from "../tools/query-inputs.js";
-import { createReadTools, createRoleReadTools } from "../tools/read.js";
+import { createReadTools } from "../tools/read.js";
 import { createWriteTools } from "../tools/write.js";
 import { SessionBindings, type ResearchBinding } from "./bindings.js";
 import {
@@ -52,7 +46,6 @@ import { generateHandoffDigest } from "../services/handoff-digest.js";
 import { DispatchBridge, type PrepareRole } from "./dispatch.js";
 import { ResearchSessions } from "./sessions.js";
 import { createSources } from "./sources.js";
-import { taskDraftFile, DraftFile } from "./draft-file.js";
 import { searchPublic, approvePublicSearch } from "./public-search.js";
 import type { DataEnvelope } from "../contracts/data.js";
 import type { ResearchData } from "../contracts/research.js";
@@ -74,13 +67,8 @@ export interface ResearchRuntime {
   readonly policy: QueryToolPolicy;
   readonly submitReport: SubmitReport;
   readonly valuations: ValuationOperations;
-  createRoleReadTools(replay: boolean): ToolDefinition[];
   bindCoordinator(agent: Agent): () => void;
   authorizeCoordinatorRun(agent: Agent, runId: string): void;
-  createDraftFile(
-    operation: Pick<TaskOperation, "runId" | "taskId">,
-  ): DraftFile;
-  createReviewDraftFile(reviewId: string): DraftFile;
   searchPublic(
     query: string,
     exec: ToolRunContext,
@@ -184,14 +172,6 @@ class Runtime implements ResearchRuntime {
     this.valuations = createValuationOperations(this.runs, components.bindings);
   }
 
-  createRoleReadTools(replay: boolean): ToolDefinition[] {
-    return createRoleReadTools(
-      { runs: this.runs, queries: this.queries, memory: this.memory },
-      this.components.bindings,
-      replay,
-    );
-  }
-
   get policy(): QueryToolPolicy {
     return structuredClone(this.capturedPolicy);
   }
@@ -229,29 +209,6 @@ class Runtime implements ResearchRuntime {
   ): Promise<boolean> {
     this.#requireOpen();
     return approvePublicSearch(this.ctx, query, exec, used, parent);
-  }
-
-  createDraftFile(
-    operation: Pick<TaskOperation, "runId" | "taskId">,
-  ): DraftFile {
-    this.#requireOpen();
-    return taskDraftFile(
-      this.ctx.fs,
-      join(this.components.root.path, "drafts"),
-      operation,
-    );
-  }
-
-  createReviewDraftFile(reviewId: string): DraftFile {
-    this.#requireOpen();
-    return new DraftFile(
-      this.ctx.fs,
-      join(
-        this.components.root.path,
-        "reviews",
-        `review-${encodeURIComponent(reviewId)}.md`,
-      ),
-    );
   }
 
   bindCoordinator(agent: Agent): () => void {
@@ -466,7 +423,7 @@ export function createResearchPlugin(prepareRole: PrepareRole) {
   return {
     name: "stock-research",
     Config,
-    inject: ["tools", "agents", "subagents", "fs"],
+    inject: ["tools", "agents", "subagents"],
     async apply(ctx: Context, config: ResearchConfig): Promise<void> {
       config = structuredClone(config);
       const spawn = ctx.subagents.getProvider("spawn");

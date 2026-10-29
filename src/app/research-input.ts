@@ -29,10 +29,7 @@ const policy = z
 const schema = z
   .object({
     schemaVersion: z.const(2).required(),
-    publicSearchLimit: z
-      .natural()
-      .max(Number.MAX_SAFE_INTEGER)
-      .default(PUBLIC_SEARCH_LIMITS.maxSearches),
+    publicSearchLimit: z.natural().max(Number.MAX_SAFE_INTEGER).required(),
     policy,
     sourceCatalogue: z.array(z.any().required()).required(),
     prompts: z

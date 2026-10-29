@@ -7,7 +7,7 @@ import type {
 import type { EvidenceData } from "../contracts/query.js";
 import type { ResearchData } from "../contracts/research.js";
 import { ResearchError } from "../contracts/errors.js";
-import { agentInput, createSubmission } from "../host/agent-execution.js";
+import { agentInput } from "../host/agent-execution.js";
 import { createReportDraft } from "../host/report-draft.js";
 import type { AgentReport } from "../contracts/agent-reports.js";
 import type { StageHandoff } from "../contracts/stage-handoff.js";
@@ -54,7 +54,6 @@ export function prepareUnifiedRole(
   profile: ReturnType<typeof readApplicationInput>,
   instruction: string,
   parent?: Agent,
-  incremental: false | "legacy" | "typed" | "handoff" = "typed",
   previous?: {
     search?: ReturnType<typeof createPublicSearchSession>;
     report?: AgentReport;
@@ -256,29 +255,23 @@ export function prepareUnifiedRole(
     submittedHandoff = stageHandoff;
     return services.submitReport([artifact], `submit:${exec.callId}`, exec);
   };
-  const submission = incremental
-    ? createReportDraft(
-        reportKind,
-        accept,
-        previous?.report as AgentReport<typeof reportKind> | undefined,
-        incremental === "legacy",
-        incremental === "handoff"
-          ? previous?.stageHandoff === undefined
-            ? {}
-            : { seed: previous.stageHandoff }
-          : undefined,
-        definition.valuation === undefined ? [] : ["valuation"],
-        valuationMethods !== undefined && incremental !== "legacy"
-          ? valuationDraftInput(reportKind, services.runs, claim.runId)
-          : undefined,
-      )
-    : createSubmission(reportKind, accept);
+  const submission = createReportDraft(reportKind, accept, {
+    ...(previous?.report === undefined
+      ? {}
+      : { seed: previous.report as AgentReport<typeof reportKind> }),
+    handoff:
+      previous?.stageHandoff === undefined
+        ? {}
+        : { seed: previous.stageHandoff },
+    requiredContentSections:
+      definition.valuation === undefined ? [] : ["valuation"],
+    ...(valuationMethods === undefined
+      ? {}
+      : { input: valuationDraftInput(reportKind, services.runs, claim.runId) }),
+  });
   return {
     systemPrompt,
-    tools: [
-      ...tools,
-      ...("tools" in submission ? submission.tools : [submission.tool]),
-    ],
+    tools: [...tools, ...submission.tools],
     followup(next, { resumeSearch }) {
       if (resumeSearch) search?.resume();
       return prepareUnifiedRole(
@@ -290,7 +283,6 @@ export function prepareUnifiedRole(
           next.claim.instructionRef!,
         ).instruction,
         parent,
-        incremental,
         {
           ...(search === undefined ? {} : { search }),
           report: submittedReport!,

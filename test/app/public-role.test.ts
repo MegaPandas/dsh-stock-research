@@ -197,26 +197,21 @@ describe("public research analyst", () => {
     await parent.dispose();
   });
 
-  it("restores the original allowance for saved application inputs without the field", async () => {
+  it("rejects an application input without its recorded search allowance", async () => {
     const h = await setup();
     const saved = h.input.inputs.find(
       ({ name }) => name === APPLICATION_INPUT_NAME,
     )!.content as Record<string, unknown>;
     delete saved.publicSearchLimit;
     const { runId } = h.runtime.runs.open("owner", h.input, "legacy-allowance");
-    expect(readApplicationInput(h.runtime.runs, runId).publicSearchLimit).toBe(
-      8,
+    expect(() => readApplicationInput(h.runtime.runs, runId)).toThrowError(
+      expect.objectContaining({ code: "STORAGE_FAILED" }),
     );
   });
 
-  it("uses the recorded allowance when preparing a legacy public analyst", async () => {
+  it("uses the recorded allowance when preparing the public analyst", async () => {
     const h = await setup(2);
-    h.input.versions.prompts.roles = "17";
-    const { runId } = h.runtime.runs.open(
-      "owner",
-      h.input,
-      "legacy-public-role",
-    );
+    const { runId } = h.runtime.runs.open("owner", h.input, "public-role");
     const context = h.runtime.runs.dispatchForCall(
       { runId, identity: "owner" },
       "analysis.public",
@@ -225,8 +220,8 @@ describe("public research analyst", () => {
     const provision = prepareResearchRole(h.runtime, context);
     const prompt = provision.prompt[0]!;
     if (prompt.type !== "text")
-      throw new Error("Expected the legacy role's fixed text input");
-    expect(JSON.parse(prompt.text).publicSearch.maxSearches).toBe(2);
+      throw new Error("Expected the role's fixed text input");
+    expect(JSON.parse(prompt.text).context.publicSearch.maxSearches).toBe(2);
     expect(
       provision.tools.find(({ name }) => name === "stock_search_public")!
         .description,

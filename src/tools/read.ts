@@ -76,13 +76,11 @@ const numberCheckOutput = objectSchema({
   passed: { type: "boolean" },
   claims: { type: "array", items: opaqueObject },
 });
-function commonReadTools(
-  services: Omit<ReadToolServices, "numbers">,
+export function createReadTools(
+  services: ReadToolServices,
   bindings: SessionBindings,
-  scope: "explicit" | "bound",
-  replay: boolean,
 ): ToolDefinition[] {
-  const { runs, queries, memory } = services;
+  const { runs, queries, memory, numbers } = services;
   const tools: ToolDefinition[] = [
     {
       name: "stock_read_run",
@@ -162,15 +160,13 @@ function commonReadTools(
       description:
         "Read configured source capabilities, gaps and call counts without fetching data.",
       parameters: objectSchema(
-        scope === "bound"
-          ? {}
-          : {
-              runId: {
-                ...stringSchema,
-                description:
-                  "Coordinators supply an authorized runId; other roles inherit their bound scope.",
-              },
-            },
+        {
+          runId: {
+            ...stringSchema,
+            description:
+              "Coordinators supply an authorized runId; other roles inherit their bound scope.",
+          },
+        },
         [],
       ),
       output: output(
@@ -198,21 +194,13 @@ function commonReadTools(
             description:
               "Positive safe integer limiting the number of results.",
           },
-          ...(replay
-            ? {
-                source: {
-                  ...objectSchema({
-                    runId: stringSchema,
-                    inputRef: objectSchema({
-                      kind: kind("input"),
-                      id: stringSchema,
-                    }),
-                  }),
-                  description:
-                    "Saved memory snapshot selected for task replay.",
-                },
-              }
-            : {}),
+          source: {
+            ...objectSchema({
+              runId: stringSchema,
+              inputRef: objectSchema({ kind: kind("input"), id: stringSchema }),
+            }),
+            description: "Saved memory snapshot selected for task replay.",
+          },
         },
         ["relatedRunId", "text", "limit"],
       ),
@@ -275,24 +263,6 @@ function commonReadTools(
         };
       },
     },
-  ];
-  return tools.map(researchTool);
-}
-
-export function createRoleReadTools(
-  services: Omit<ReadToolServices, "numbers">,
-  bindings: SessionBindings,
-  replay: boolean,
-): ToolDefinition[] {
-  return commonReadTools(services, bindings, "bound", replay);
-}
-
-export function createReadTools(
-  services: ReadToolServices,
-  bindings: SessionBindings,
-): ToolDefinition[] {
-  const { runs, numbers } = services;
-  const checks: ToolDefinition[] = [
     {
       name: "stock_check_numbers",
       description:
@@ -333,8 +303,5 @@ export function createReadTools(
       },
     },
   ];
-  return [
-    ...commonReadTools(services, bindings, "explicit", true),
-    ...checks.map(researchTool),
-  ];
+  return tools.map(researchTool);
 }

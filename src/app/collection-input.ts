@@ -14,7 +14,6 @@ import type { RunService } from "../services/runs.js";
 import { extractCandidates } from "../services/candidates.js";
 import { collectionSummary } from "../services/collection-view.js";
 import { readQuickSnapshots } from "./quick-snapshots.js";
-import { ROLE_PROMPT_VERSION } from "./research-prompts.js";
 
 export const COLLECTION_INPUT = "stock-research:collection";
 export function requireCollectionData(snapshot: CollectionSnapshot): void {
@@ -100,23 +99,10 @@ function belongsToTask(
   taskId: string,
   dataset: DataEnvelope<unknown>["dataset"],
   id: string,
-  roleVersion: string | undefined,
 ): boolean {
   const equityBenchmark =
     /^benchmark\.(shanghai|shenzhen|csi300|chinext)\./.test(id);
   if (taskId === "analysis.market" || taskId === "analysis.sentiment") {
-    if (
-      roleVersion !== "17" &&
-      roleVersion !== "18" &&
-      roleVersion !== "19" &&
-      roleVersion !== "20" &&
-      roleVersion !== "21" &&
-      roleVersion !== "22" &&
-      roleVersion !== "23" &&
-      roleVersion !== "24" &&
-      roleVersion !== ROLE_PROMPT_VERSION
-    )
-      return dataset === "market" || id === "benchmark.bondYields";
     return (
       dataset === "market" && (!id.startsWith("benchmark.") || equityBenchmark)
     );
@@ -136,7 +122,6 @@ export function registerCollectionSources(
   operation: TaskOperation,
 ) {
   const snapshot = readCollection(runs, operation.runId);
-  const roleVersion = runs.inputCatalog(operation.runId).versions.prompts.roles;
   const scope = runs.view(operation).scope;
   const replay =
     snapshot === null ? null : runs.replaySnapshot(operation.runId);
@@ -160,12 +145,7 @@ export function registerCollectionSources(
           }))
       : snapshot.packets
           .filter((packet) =>
-            belongsToTask(
-              operation.taskId,
-              packet.envelope.dataset,
-              packet.id,
-              roleVersion,
-            ),
+            belongsToTask(operation.taskId, packet.envelope.dataset, packet.id),
           )
           .map((packet) => ({
             ...packet,

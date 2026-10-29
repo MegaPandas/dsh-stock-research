@@ -101,23 +101,24 @@ function calculationRegistry(runs: RunService, runId: string) {
   return { scope, entries, current, read };
 }
 export function valuationCalculationCatalog(runs: RunService, runId: string) {
-  const { entries, current, read } = calculationRegistry(runs, runId);
-  return [...entries.values()]
+  const { entries, current } = calculationRegistry(runs, runId);
+  const refs = [...entries.values()]
     .filter(({ ref }) => current(ref.id))
-    .map(({ ref }) => {
-      const record = read(ref.id);
-      return {
-        calculationId: record.calculationId,
-        taskId: record.taskId,
-        methodId: record.request.methodId,
-        purpose: record.request.purpose,
-        valueDate: record.valueDate,
-        perShareValues: record.result.perShareValues,
-        diagnostics: record.result.diagnostics,
-        currency: record.currency,
-        engineVersion: record.engineVersion,
-      };
-    });
+    .map(({ ref }) => ref);
+  if (refs.length === 0) return [];
+  return runs.readInputs<ValuationCalculation>(runId, refs).map((record) => {
+    return {
+      calculationId: record.calculationId,
+      taskId: record.taskId,
+      methodId: record.request.methodId,
+      purpose: record.request.purpose,
+      valueDate: record.valueDate,
+      perShareValues: record.result.perShareValues,
+      diagnostics: record.result.diagnostics,
+      currency: record.currency,
+      engineVersion: record.engineVersion,
+    };
+  });
 }
 export function readValuationCalculation(
   runs: RunService,

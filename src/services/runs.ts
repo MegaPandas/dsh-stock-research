@@ -1057,6 +1057,10 @@ export class RunService {
     return this.store.readContent(runId, ref);
   }
 
+  readInputs<T>(runId: string, refs: readonly ContentRef[]): T[] {
+    return this.store.readContents(runId, refs);
+  }
+
   inputCatalog(runId: string): RunInputCatalog {
     const { versions, inputs } = this.read(runId);
     return structuredClone({ versions, inputs });
