@@ -39,6 +39,7 @@ export function createBenchmarkBondTasks(
       id: "benchmark.bondYields",
       dataset: "macro",
       provider: "eastmoney",
+      enabledBy: ["benchmarks"],
       endpoint: url.origin + url.pathname,
       async run(signal) {
         const response = parseSourceJson(

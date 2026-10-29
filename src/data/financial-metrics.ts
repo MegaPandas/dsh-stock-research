@@ -4,6 +4,7 @@ import type {
   CollectionRow,
 } from "../contracts/collection.js";
 import type { DataGap, ResearchScope } from "../contracts/data.js";
+import { FINANCIAL_METRICS_VERSION } from "./versions.js";
 
 const yearBefore = (date: string) =>
   `${Number(date.slice(0, 4)) - 1}${date.slice(4)}`;
@@ -345,68 +346,39 @@ export function deriveFinancialMetrics(
         bps,
         "Missing BPS.",
       );
-      const valuation = packets.find((p) => p.id === "valuation.history");
-      const shareRow = valuation?.envelope.data.rows
-        .filter((r) => r.asOf <= scope.cutoff)
-        .at(-1);
-      const sharesInput =
-        valuation && shareRow
-          ? { packet: valuation, row: shareRow }
-          : undefined;
-      if (shareRow) attributes.currentSharesDate = shareRow.date;
-      const shares = read(sharesInput, "TOTAL_SHARES");
-      put(
-        "CURRENT_TOTAL_SHARES",
-        "Current total shares; observation date in attributes.currentSharesDate",
-        "shares",
-        shares,
-        "Missing valuation.history TOTAL_SHARES.",
-      );
-      const equity =
-        bps !== null &&
-        shares !== null &&
-        bpsUnit === `${scope.security.currency}/share` &&
-        valuation?.envelope.data.columns.TOTAL_SHARES?.unit === "shares"
-          ? bps * shares
-          : null;
-      put(
-        "PARENT_EQUITY_COMPARISON",
-        "Derived parent equity comparison=BPS(this row's date)×current total shares; share date in attributes.currentSharesDate; not reported equity",
-        scope.security.currency,
-        equity,
-        "Missing compatible BPS/share units or current shares.",
-      );
-      const total =
-        balance &&
-        balance.packet.envelope.source.provider ===
-          indicator.packet.envelope.source.provider &&
-        balance.packet.envelope.data.columns.TOTAL_EQUITY?.unit ===
-          scope.security.currency
-          ? read(balance, "TOTAL_EQUITY")
-          : null;
-      put(
-        "MINORITY_EQUITY_ESTIMATE",
-        "Estimated minority equity=TOTAL_EQUITY-BPS×current total shares; not a reported value",
-        scope.security.currency,
-        total !== null && equity !== null ? total - equity : null,
-        "Missing same-provider TOTAL_EQUITY or parent equity comparison.",
-      );
+    }
+    if (balance) {
+      for (const field of ["TOTAL_PARENT_EQUITY", "MINORITY_EQUITY"]) {
+        const column = balance.packet.envelope.data.columns[field];
+        put(
+          field,
+          `Reported ${field}; balance-sheet date=this row's date`,
+          column?.unit ?? scope.security.currency,
+          read(balance, field),
+          `Missing reported ${field} for ${date}.`,
+        );
+      }
+    }
+    if (series.NET_INCOME) {
+      const equity = read(balance, "TOTAL_PARENT_EQUITY");
       const ni = amounts.NET_INCOME_TTM ?? null;
       put(
-        "ROE_TTM_END_EQUITY_COMPARISON",
-        "TTM parent net income/(period-end BPS×current total shares) equity comparison; not weighted ROE",
+        "ROE_TTM_END_PARENT_EQUITY",
+        "TTM parent net income/reported period-end parent equity; not average-equity or weighted ROE",
         "ratio",
         ni !== null &&
           equity !== null &&
           equity !== 0 &&
-          series.NET_INCOME?.unit === scope.security.currency &&
-          series.NET_INCOME.input.packet.envelope.source.provider ===
-            indicator.packet.envelope.source.provider
+          balance?.packet.envelope.data.columns.TOTAL_PARENT_EQUITY?.unit ===
+            series.NET_INCOME.unit &&
+          balance.packet.envelope.source.provider ===
+            series.NET_INCOME.input.packet.envelope.source.provider
           ? ni / equity
           : null,
-        "Missing TTM parent net income or nonzero equity comparison.",
+        "Missing same-provider same-unit TTM parent net income or nonzero reported period-end parent equity.",
       );
     }
+
     if (!Object.keys(values).length) continue;
     const row: CollectionRow = {
       date,
@@ -576,9 +548,9 @@ export function deriveFinancialMetrics(
       },
       source: {
         provider: "stock-research",
-        url: "urn:stock-research:financial-metrics:v1",
-        adapterVersion: "1",
-        normalizationVersion: "1",
+        url: `urn:stock-research:financial-metrics:v${FINANCIAL_METRICS_VERSION}`,
+        adapterVersion: FINANCIAL_METRICS_VERSION,
+        normalizationVersion: FINANCIAL_METRICS_VERSION,
       },
       asOf,
       availableAt: sources.some((e) => e.availableAt === null)

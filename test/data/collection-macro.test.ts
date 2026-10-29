@@ -31,11 +31,11 @@ describe("fixed China macro collection", () => {
   it("defines one source per dataset and no research or fallback requests", () => {
     const { tasks, get } = setup();
     expect(
-      tasks.map(({ id, dataset, provider, fallback }) => ({
+      tasks.map(({ id, dataset, provider, enabledBy }) => ({
         id,
         dataset,
         provider,
-        fallback,
+        enabledBy,
       })),
     ).toEqual(
       [
@@ -54,7 +54,7 @@ describe("fixed China macro collection", () => {
         id: `macro.${name}`,
         dataset: "macro",
         provider: name === "socialFinancing" ? "mofcom" : "eastmoney",
-        fallback: undefined,
+        enabledBy: ["china-macro"],
       })),
     );
     expect(get).not.toHaveBeenCalled();

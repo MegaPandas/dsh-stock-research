@@ -2,7 +2,8 @@ import fs from "node:fs";
 import { tmpdir, hostname } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { spawnSync } from "node:child_process";
+import { spawnSync, fork } from "node:child_process";
+import { DatabaseSync } from "node:sqlite";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type {
   ArtifactContentRef,
@@ -441,12 +442,6 @@ describe("single-writer run store", () => {
     const { runId } = JSON.parse(child.stdout) as { runId: string };
     expect(runId).toMatch(/^[0-9a-f-]{36}$/);
     expect(fs.existsSync(join(path, ".writer.lock"))).toBe(true);
-    expect(caught(() => new DataRoot(path))).toMatchObject({
-      code: "STORAGE_FAILED",
-      cause: { code: "EEXIST" },
-    });
-    // spawnSync confirmed the old process is dead; only this test removes its lock.
-    fs.unlinkSync(join(path, ".writer.lock"));
     const { store } = open(path);
     const recovered = store.read(runId);
     expect(recovered).toMatchObject({ revision: 2, label: "new" });
@@ -503,22 +498,63 @@ describe("single-writer run store", () => {
     expect(store.read(second.runId).revision).toBe(1);
   });
 
-  it("records diagnostic lock metadata and rejects concurrent ownership without deleting it", () => {
+  it("rejects concurrent ownership in this process and another process", () => {
     const { path } = open();
-    const before = fs.readFileSync(join(path, ".writer.lock"), "utf8");
-    expect(JSON.parse(before)).toMatchObject({
-      pid: process.pid,
-      hostname: hostname(),
-      acquiredAt: expect.any(String),
-    });
     expect(caught(() => new DataRoot(path))).toMatchObject({
       code: "STORAGE_FAILED",
-      cause: { code: "EEXIST" },
     });
-    expect(fs.readFileSync(join(path, ".writer.lock"), "utf8")).toBe(before);
+    const fixture = fileURLToPath(
+      new URL("../fixtures/writer-lock-probe.mjs", import.meta.url),
+    );
+    const child = spawnSync(process.execPath, [fixture, path], {
+      encoding: "utf8",
+      timeout: 10_000,
+    });
+    expect(child.error).toBeUndefined();
+    expect(child.status).toBe(0);
+    expect(child.stdout.trim()).toBe("blocked");
   });
 
-  it("never reclaims a residual lock based on recorded PID or age", () => {
+  it("allows exactly one simultaneous process contender to hold the data root", async () => {
+    const path = directory();
+    const fixture = fileURLToPath(
+      new URL("../fixtures/writer-lock-contender.mjs", import.meta.url),
+    );
+    const children = [
+      fork(fixture, [path], { silent: true }),
+      fork(fixture, [path], { silent: true }),
+    ];
+    const message = (child: (typeof children)[number]) =>
+      new Promise<unknown>((resolve, reject) => {
+        child.once("message", resolve);
+        child.once("error", reject);
+      });
+    try {
+      expect(await Promise.all(children.map(message))).toEqual([
+        "ready",
+        "ready",
+      ]);
+      const outcomes = children.map(message);
+      for (const child of children) child.send("start");
+      expect((await Promise.all(outcomes)).sort()).toEqual([
+        "acquired",
+        "blocked",
+      ]);
+      expect(() => new DataRoot(path)).toThrowError(
+        expect.objectContaining({ code: "STORAGE_FAILED" }),
+      );
+    } finally {
+      const exited = children.map(
+        (child) =>
+          new Promise<void>((resolve) => child.once("exit", () => resolve())),
+      );
+      for (const child of children) child.send("release");
+      await Promise.all(exited);
+    }
+    open(path).root.close();
+  }, 10_000);
+
+  it("rejects legacy JSON locks without deleting them", () => {
     const path = directory();
     const text = JSON.stringify({
       pid: 2147483647,
@@ -528,7 +564,7 @@ describe("single-writer run store", () => {
     fs.writeFileSync(join(path, ".writer.lock"), text);
     expect(caught(() => new DataRoot(path))).toMatchObject({
       code: "STORAGE_FAILED",
-      cause: { code: "EEXIST" },
+      cause: expect.any(Error),
     });
     expect(fs.readFileSync(join(path, ".writer.lock"), "utf8")).toBe(text);
   });
@@ -539,36 +575,28 @@ describe("single-writer run store", () => {
     root.close();
     const replacement = open(path);
     root.close();
-    expect(fs.existsSync(join(path, ".writer.lock"))).toBe(true);
+    expect(() => new DataRoot(path)).toThrowError(
+      expect.objectContaining({ code: "STORAGE_FAILED" }),
+    );
     expect(() =>
       store.commit(run.runId, () => ({ label: "forbidden" })),
     ).toThrowError(expect.objectContaining({ code: "STORAGE_FAILED" }));
     expect(replacement.store.read(run.runId).revision).toBe(1);
   });
 
-  it("cleans up its newly created lock and descriptor if lock initialization fails", () => {
+  it("closes its SQLite connection if lock acquisition fails", () => {
     const path = directory();
-    const write = fs.writeFileSync;
-    const failure = new Error("lock metadata failed");
-    let failedFd: number | undefined;
-    vi.spyOn(fs, "writeFileSync").mockImplementation(
-      (...args: Parameters<typeof fs.writeFileSync>) => {
-        if (typeof args[0] === "number") {
-          failedFd = args[0];
-          throw failure;
-        }
-        return write(...args);
-      },
-    );
+    const failure = new Error("lock acquisition failed");
+    const close = vi.spyOn(DatabaseSync.prototype, "close");
+    vi.spyOn(DatabaseSync.prototype, "exec").mockImplementation(() => {
+      throw failure;
+    });
     expect(caught(() => new DataRoot(path))).toMatchObject({
       code: "STORAGE_FAILED",
       cause: failure,
     });
+    expect(close).toHaveBeenCalledOnce();
     vi.restoreAllMocks();
-    expect(fs.existsSync(join(path, ".writer.lock"))).toBe(false);
-    expect(() => fs.fstatSync(failedFd!)).toThrowError(
-      expect.objectContaining({ code: "EBADF" }),
-    );
     expect(open(path).store.list()).toEqual([]);
   });
 

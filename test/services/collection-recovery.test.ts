@@ -139,7 +139,14 @@ describe("collection recovery and scheduling", () => {
     ).toHaveLength(2);
     expect(
       result.failures.filter((failure) => failure.id === "market.daily"),
-    ).toHaveLength(3);
+    ).toHaveLength(4);
+    expect(result.failures).toContainEqual(
+      expect.objectContaining({
+        id: "market.daily",
+        provider: "tencent",
+        code: "DATA_INSUFFICIENT",
+      }),
+    );
     expect(
       result.failures.find(
         (failure) =>
@@ -346,7 +353,7 @@ describe("collection recovery and scheduling", () => {
     const urls = fetch.mock.calls.map(([input]) => new URL(String(input)));
     expect(
       urls.filter((url) => url.hostname === "push2his.eastmoney.com"),
-    ).toHaveLength(2);
+    ).toHaveLength(3);
     expect(urls.some((url) => url.pathname === "/api/qt/stock/get")).toBe(true);
     expect(
       urls.some((url) => url.hostname === "datacenter-web.eastmoney.com"),

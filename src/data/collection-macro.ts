@@ -275,6 +275,7 @@ function eastmoneyTask(
     id: definition.id,
     dataset: "macro",
     provider: "eastmoney",
+    enabledBy: ["china-macro"],
     endpoint: DATA_CENTER,
     async run(signal) {
       const text = await http.getText(url, { ...(signal && { signal }) });
@@ -336,6 +337,7 @@ function socialFinancingTask(
     id: "macro.socialFinancing",
     dataset: "macro",
     provider: "mofcom",
+    enabledBy: ["china-macro"],
     endpoint: SOCIAL_URL,
     async run(signal) {
       const text = await http.postText(SOCIAL_URL, {

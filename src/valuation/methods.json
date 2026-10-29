@@ -1,5 +1,5 @@
 {
-  "version": "3",
+  "version": "4",
   "reviewedAt": "2026-10-29",
   "language": "en",
   "purpose": "Valuation method reference for research roles. Use research data for current parameters and tool schemas for execution and report submission.",
@@ -14,7 +14,7 @@
     "missingInputs": "Read the available statement details before declaring an input missing. Keep missing observations distinct from forecast assumptions. Estimate uncertain parameters with an explicit basis and sensitivities; select another applicable model when essential inputs are unavailable.",
     "terminalConstraint": "Use perpetual terminal value only for a stable business with discount rate above growth. Code derives reinvestment, payout and residual income from growth and capital returns. For finite recovery, supply actual net recovery at the final date; RI subtracts ending book equity.",
     "negativeEquity": "Negative equity residuals are saved with diagnostics, without flooring at zero. Use them for solvency analysis, not target share prices; retain economically justified assumptions.",
-    "financialMetrics": "financial.metrics precomputes TTM, quarterly, year-over-year, margin, cash-flow and equity comparisons. Read column definitions and periods; record forecasts separately from observations."
+    "financialMetrics": "financial.metrics precomputes TTM, quarterly, year-over-year, margin and cash-flow metrics, and uses reported period-end parent and minority equity. TTM income divided by period-end parent equity is not weighted or average-equity ROE. Read column definitions and periods; record forecasts separately from observations."
   },
   "methods": [
     {

@@ -399,6 +399,7 @@ function eastmoneyTask(
     id: `benchmark.${asset.id}.${window.id}`,
     dataset: "market",
     provider: "eastmoney",
+    enabledBy: ["benchmarks", "eastmoney"],
     endpoint: url.origin + url.pathname,
     async run(signal) {
       const response = parseSourceJson(
@@ -497,6 +498,7 @@ function yahooTask(
     id: `benchmark.${asset.id}.${window.id}`,
     dataset: "market",
     provider: "yahoo",
+    enabledBy: ["benchmarks", "yahoo"],
     endpoint: url.origin + url.pathname,
     async run(signal) {
       const response = parseSourceJson(
@@ -610,6 +612,7 @@ function xueqiuTask(
     id: `benchmark.${asset.id}.${window.id}`,
     dataset: "market",
     provider: "xueqiu",
+    enabledBy: ["benchmarks", "xueqiu"],
     endpoint: `https://stock.xueqiu.com${path}`,
     async run(signal) {
       const response = await client.get(
@@ -690,6 +693,7 @@ function tencentTask(
     id: `benchmark.${asset.id}.${window.id}`,
     dataset: "market",
     provider: "tencent",
+    enabledBy: ["benchmarks", "tencent"],
     endpoint: TENCENT_KLINE_ENDPOINT,
     async run(signal) {
       const period =
@@ -754,6 +758,7 @@ function sinaForexTask(
     id: `benchmark.${asset.id}.${window.id}`,
     dataset: "market",
     provider: "sina",
+    enabledBy: ["benchmarks", "sina"],
     endpoint: url.origin + url.pathname,
     async run(signal) {
       const text = await http.getText(url, {
@@ -816,25 +821,25 @@ export function createBenchmarkMarketTasks(
   xueqiu?: XueqiuClient,
 ): CollectionTask[] {
   return BENCHMARKS.flatMap((asset) =>
-    WINDOWS.map((window) => {
+    WINDOWS.flatMap((window) => {
       const task =
         asset.secid !== undefined
           ? eastmoneyTask(http.forSource("eastmoney"), scope, asset, window)
           : yahooTask(http.forSource("yahoo"), scope, asset, window);
+      task.enabledBy = ["benchmarks"];
+      const candidates = [task];
       if (asset.calendar === "china_exchange" && asset.assetType === "index")
-        task.fallback = tencentTask(
-          http.forSource("tencent"),
-          scope,
-          asset,
-          window,
+        candidates.push(
+          tencentTask(http.forSource("tencent"), scope, asset, window),
         );
       if (asset.calendar === "china_exchange") {
         const { start, end } = bounds(scope, asset, window);
         const [market, code] = asset.secid!.split(".");
-        task.fallback!.fallback = {
+        candidates.push({
           id: task.id,
           dataset: "market",
           provider: "sina",
+          enabledBy: ["benchmarks", "sina"],
           endpoint: SINA_KLINE_ENDPOINT,
           async run(signal) {
             const response = await sinaKlines(
@@ -878,31 +883,23 @@ export function createBenchmarkMarketTasks(
               asset.name,
             );
           },
-        };
+        });
       } else if (asset.secid !== undefined && asset.yahooSymbol !== undefined) {
-        task.fallback = yahooTask(
-          http.forSource("yahoo"),
-          scope,
-          asset,
-          window,
+        candidates.push(
+          yahooTask(http.forSource("yahoo"), scope, asset, window),
         );
       } else if (
         asset.sinaForexSymbol !== undefined &&
         window.interval === "1d"
       ) {
-        task.fallback = sinaForexTask(
-          http.forSource("sina"),
-          scope,
-          asset,
-          window,
+        candidates.push(
+          sinaForexTask(http.forSource("sina"), scope, asset, window),
         );
       }
       if (xueqiu !== undefined && asset.xueqiuSymbol !== undefined) {
-        const fallback = xueqiuTask(xueqiu, scope, asset, window);
-        if (task.fallback !== undefined) fallback.fallback = task.fallback;
-        task.fallback = fallback;
+        candidates.splice(1, 0, xueqiuTask(xueqiu, scope, asset, window));
       }
-      return task;
+      return candidates;
     }),
   );
 }

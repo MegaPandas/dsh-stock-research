@@ -51,8 +51,11 @@ describe("Xueqiu benchmark periods", () => {
       JSON.stringify({ error_code: 0, data: snapshots[symbol!] }),
     );
     const result = await tasks
-      .find(({ id }) => id === `benchmark.${asset}.weekly`)!
-      .fallback!.run();
+      .find(
+        ({ id, provider }) =>
+          id === `benchmark.${asset}.weekly` && provider === "xueqiu",
+      )!
+      .run();
     expect(result.data.attributes!.quoteDirection).toBe(unit);
     expect(result.data.columns.close!.unit).toBe(unit);
     expect(result.data.rows).toHaveLength(1);
@@ -69,8 +72,11 @@ describe("Xueqiu benchmark periods", () => {
       const { get, tasks } = setup();
       get.mockResolvedValue(JSON.stringify(fixture(period)));
       const result = await tasks
-        .find(({ id }) => id === `benchmark.usdcnh.${suffix}`)!
-        .fallback!.run();
+        .find(
+          ({ id, provider }) =>
+            id === `benchmark.usdcnh.${suffix}` && provider === "xueqiu",
+        )!
+        .run();
       const url = new URL(String(get.mock.lastCall![0]));
       expect(url.pathname).toBe("/v5/stock/chart/kline.json");
       expect(Object.fromEntries(url.searchParams)).toEqual({
@@ -105,13 +111,22 @@ describe("Xueqiu benchmark periods", () => {
 
   it("keeps the daily Sina fallback after Xueqiu and does not enable unverified gold symbols", () => {
     const { tasks, get } = setup();
-    const daily = tasks.find(({ id }) => id === "benchmark.usdcnh.daily")!;
-    expect(daily.provider).toBe("eastmoney");
-    expect(daily.fallback!.provider).toBe("xueqiu");
-    expect(daily.fallback!.fallback!.provider).toBe("sina");
+    const daily = tasks.filter(({ id }) => id === "benchmark.usdcnh.daily");
+    expect(daily.map((task) => task.provider)).toEqual([
+      "eastmoney",
+      "xueqiu",
+      "sina",
+    ]);
+    expect(daily.map((task) => task.enabledBy)).toEqual([
+      ["benchmarks"],
+      ["benchmarks", "xueqiu"],
+      ["benchmarks", "sina"],
+    ]);
     expect(
-      tasks.find(({ id }) => id === "benchmark.gold.weekly")!.fallback,
-    ).toBeUndefined();
+      tasks
+        .filter(({ id }) => id === "benchmark.gold.weekly")
+        .map((task) => task.provider),
+    ).toEqual(["eastmoney"]);
     expect(get).not.toHaveBeenCalled();
   });
 
@@ -131,8 +146,11 @@ describe("Xueqiu benchmark periods", () => {
       }),
     );
     const result = await tasks
-      .find(({ id }) => id === "benchmark.usdcnh.daily")!
-      .fallback!.run();
+      .find(
+        ({ id, provider }) =>
+          id === "benchmark.usdcnh.daily" && provider === "xueqiu",
+      )!
+      .run();
     expect(result.data.rows.map(({ date }) => date)).toEqual(["2026-10-28"]);
     expect(result.data.rows[0]!.values.close).toBeNull();
   });
@@ -150,8 +168,11 @@ describe("Xueqiu benchmark periods", () => {
       get.mockResolvedValue(JSON.stringify(raw));
       await expect(
         tasks
-          .find(({ id }) => id === "benchmark.usdcnh.weekly")!
-          .fallback!.run(),
+          .find(
+            ({ id, provider }) =>
+              id === "benchmark.usdcnh.weekly" && provider === "xueqiu",
+          )!
+          .run(),
       ).rejects.toMatchObject({ code: "SOURCE_UNAVAILABLE" });
     },
   );

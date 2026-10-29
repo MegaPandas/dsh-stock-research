@@ -7,6 +7,7 @@ import type {
   ResearchScope,
   SourceRef,
 } from "./data.js";
+import type { QueryCachePolicy } from "./query.js";
 
 export interface CollectionColumn {
   label: string;
@@ -43,13 +44,32 @@ export type CollectionDataset = Extract<
   "market" | "fundamentals" | "macro"
 >;
 
+/** One source's implementation of one table; never contains another source. */
 export interface CollectionTask {
   id: string;
   dataset: CollectionDataset;
   provider: string;
+  enabledBy: readonly string[];
   endpoint?: string;
   run(signal?: AbortSignal): Promise<DataEnvelope<CollectedTableData>>;
-  fallback?: CollectionTask;
+}
+
+/** Ordered, configured candidates for one logical table. */
+export interface CollectionPlan {
+  id: string;
+  dataset: CollectionDataset;
+  candidates: readonly CollectionTask[];
+  required: boolean;
+  timeoutMs: number;
+}
+
+export interface CollectionOptions {
+  enabledSources: readonly string[];
+  xueqiuCookie?: string;
+  freshness: { market: number; fundamentals: number; macro: number };
+  secCiks: Readonly<Record<string, string>>;
+  ttl: QueryCachePolicy;
+  requireDailyMarket?: boolean;
 }
 
 export interface CollectionPacket {
@@ -97,6 +117,7 @@ export interface CollectionFailure {
   attempt?: number;
   durationMs?: number;
   error?: CollectionError;
+  retryable?: boolean;
 }
 
 export interface CollectionError {

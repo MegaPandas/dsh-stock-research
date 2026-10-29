@@ -157,7 +157,7 @@ describe("fixed benchmark government-bond yields", () => {
       code: "SOURCE_UNAVAILABLE",
     });
     expect(get).toHaveBeenCalledTimes(2);
-    expect(task.fallback).toBeUndefined();
+    expect(task.enabledBy).toEqual(["benchmarks"]);
   });
 
   it("rejects empty and duplicate-dated responses", async () => {

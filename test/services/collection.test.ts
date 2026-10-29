@@ -55,7 +55,19 @@ function setup(
   });
   return { service, query, cache, http };
 }
-function response(primarySucceeds: boolean) {
+const completeScope = {
+  ...scope,
+  date: "2024-04-03",
+  cutoff: "2024-04-03T08:00:00.000Z",
+};
+function dailyDates() {
+  return Array.from({ length: 60 }, (_, i) =>
+    new Date(Date.parse("2024-04-03") - (59 - i) * 86400000)
+      .toISOString()
+      .slice(0, 10),
+  );
+}
+function response(primarySucceeds: boolean, complete = false) {
   return vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
     const url = new URL(String(input));
     if (url.hostname === "web.ifzq.gtimg.cn")
@@ -63,8 +75,15 @@ function response(primarySucceeds: boolean) {
         JSON.stringify({
           code: 0,
           data: {
-            sh600519: {
-              day: [["2024-01-03", "100", "102", "103", "99", "10"]],
+            [url.searchParams.get("param")!.split(",")[0]!]: {
+              day: (complete ? dailyDates() : ["2024-01-03"]).map((date) => [
+                date,
+                "100",
+                "102",
+                "103",
+                "99",
+                "10",
+              ]),
             },
           },
         }),
@@ -80,7 +99,9 @@ function response(primarySucceeds: boolean) {
           data: {
             code: "600519",
             market: 1,
-            klines: ["2024-01-03,100,102,103,99,10,102000,4,2,2,0.01"],
+            klines: (complete ? dailyDates() : ["2024-01-03"]).map(
+              (date) => `${date},100,102,103,99,10,102000,4,2,2,0.01`,
+            ),
           },
         }),
       );
@@ -166,7 +187,17 @@ describe("deterministic collection orchestration", () => {
         });
       const before = historyCalls().length;
       const cached = await service.collect(scope);
-      expect(historyCalls()).toHaveLength(before);
+      const extra = sources.includes("eastmoney-market")
+        ? sources.includes("tencent")
+          ? 6
+          : 3
+        : 0;
+      expect(historyCalls()).toHaveLength(before + extra);
+      expect(
+        cached.failures.filter(
+          (f) => f.provider === "sina" && f.code === "DATA_INSUFFICIENT",
+        ),
+      ).toHaveLength(3);
       expect(cached.diagnostics!.cacheHits).toBe(3);
       expect(
         cached.packets
@@ -203,6 +234,9 @@ describe("deterministic collection orchestration", () => {
       name: "AbortError",
     });
     await started.promise;
+    cleanups.unshift(async () => {
+      release.resolve();
+    });
     expect(first).toEqual([
       {
         total: 3,
@@ -248,6 +282,7 @@ describe("deterministic collection orchestration", () => {
         .filter((failure) => failure.provider === "tencent")
         .map(({ id, provider, code }) => ({ id, provider, code })),
     ).toEqual([
+      { id: "market.daily", provider: "tencent", code: "DATA_INSUFFICIENT" },
       { id: "market.weekly", provider: "tencent", code: "SOURCE_UNAVAILABLE" },
       { id: "market.monthly", provider: "tencent", code: "SOURCE_UNAVAILABLE" },
     ]);
@@ -278,6 +313,11 @@ describe("deterministic collection orchestration", () => {
           id: "market.daily",
           provider: "eastmoney",
           code: "SOURCE_UNAVAILABLE",
+        }),
+        expect.objectContaining({
+          id: "market.daily",
+          provider: "tencent",
+          code: "DATA_INSUFFICIENT",
         }),
       ],
     });
@@ -355,9 +395,9 @@ describe("deterministic collection orchestration", () => {
     expect(original.packets[0]!.envelope.cutoff).toBe(scope.cutoff);
   });
   it("keeps a single primary daily series and never calls its standby after success", async () => {
-    const fetch = response(true);
+    const fetch = response(true, true);
     const { service, query } = setup();
-    const result = await service.collect(scope);
+    const result = await service.collect(completeScope);
     const daily = result.packets.filter(
       (packet) => packet.id === "market.daily",
     );
@@ -413,9 +453,9 @@ describe("deterministic collection orchestration", () => {
   });
 
   it("reuses a cached daily standby without retrying its failed primary", async () => {
-    const fetch = response(false);
+    const fetch = response(false, true);
     const { service } = setup();
-    const first = await service.collect(scope);
+    const first = await service.collect(completeScope);
     const dailyCalls = () =>
       fetch.mock.calls
         .filter(([input]) => {
@@ -430,7 +470,7 @@ describe("deterministic collection orchestration", () => {
     const initialDailyCalls = dailyCalls();
     expect(initialDailyCalls).toHaveLength(2);
     const progress: CollectionProgress[] = [];
-    const second = await service.collect(scope, undefined, (value) =>
+    const second = await service.collect(completeScope, undefined, (value) =>
       progress.push(value),
     );
     expect(dailyCalls()).toEqual(initialDailyCalls);

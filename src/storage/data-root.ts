@@ -1,56 +1,46 @@
-import fs from "node:fs";
-import { hostname } from "node:os";
 import { join, resolve } from "node:path";
+import { DatabaseSync } from "node:sqlite";
 import { ResearchError } from "../contracts/errors.js";
-import {
-  createDirectory,
-  storageIO,
-  syncDirectory,
-  withDescriptor,
-} from "./files.js";
+import { createDirectory, storageIO } from "./files.js";
 
 export class DataRoot {
   readonly path: string;
-  readonly #lockPath: string;
+  readonly #lock: DatabaseSync;
   #closed = false;
 
   constructor(path: string) {
     this.path = resolve(path);
-    this.#lockPath = join(this.path, ".writer.lock");
-    storageIO(`Cannot acquire data-root writer lock: ${this.path}`, () => {
-      createDirectory(this.path);
-      const fd = fs.openSync(this.#lockPath, "wx", 0o600);
-      try {
-        withDescriptor(fd, () => {
-          fs.writeFileSync(
-            fd,
-            JSON.stringify({
-              pid: process.pid,
-              hostname: hostname(),
-              acquiredAt: new Date().toISOString(),
-            }),
-            "utf8",
-          );
-          fs.fsyncSync(fd);
+    this.#lock = storageIO(
+      `Cannot acquire data-root writer lock: ${this.path}`,
+      () => {
+        createDirectory(this.path);
+        const lock = new DatabaseSync(join(this.path, ".writer.lock"), {
+          timeout: 0,
         });
-        syncDirectory(this.path);
-      } catch (cause) {
-        const errors = [cause];
         try {
-          fs.unlinkSync(this.#lockPath);
-          syncDirectory(this.path);
-        } catch (cleanup) {
-          errors.push(cleanup);
-        }
-        throw errors.length === 1
-          ? cause
-          : new AggregateError(
+          // Keep the inode: unlinking it would let another writer lock a different file.
+          // SQLite's OS lock is released by close or process death, including SIGKILL.
+          // IMMEDIATE reserves the single writer without upgrading past other
+          // contenders' transient read locks, which could make both starts fail.
+          lock.exec("BEGIN IMMEDIATE");
+          return lock;
+        } catch (cause) {
+          const errors = [cause];
+          try {
+            lock.close();
+          } catch (cleanup) {
+            errors.push(cleanup);
+          }
+          if (errors.length > 1)
+            throw new AggregateError(
               errors,
-              "Writer-lock initialization and cleanup failed.",
+              "Writer-lock acquisition and cleanup failed.",
               { cause },
             );
-      }
-    });
+          throw cause;
+        }
+      },
+    );
   }
 
   assertOpen(): void {
@@ -61,9 +51,8 @@ export class DataRoot {
   close(): void {
     if (this.#closed) return;
     storageIO(`Cannot release data-root writer lock: ${this.path}`, () => {
-      fs.unlinkSync(this.#lockPath);
+      this.#lock.close();
       this.#closed = true;
-      syncDirectory(this.path);
     });
   }
 }

@@ -56,7 +56,9 @@ describe("deterministic China financial collection", () => {
     expect(get).not.toHaveBeenCalled();
     expect(
       tasks.every(
-        (task) => task.provider === "eastmoney" && task.fallback === undefined,
+        (task) =>
+          task.provider === "eastmoney" &&
+          task.enabledBy.includes("eastmoney-income"),
       ),
     ).toBe(true);
   });

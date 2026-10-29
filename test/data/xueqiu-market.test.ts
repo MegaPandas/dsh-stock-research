@@ -86,27 +86,26 @@ afterEach(() => vi.restoreAllMocks());
 describe("Xueqiu China market fallback", () => {
   it("appends to the existing period sources and only requests data when run", () => {
     const { tasks, get } = setup({});
-    for (const task of tasks.slice(0, 3)) {
-      const providers: string[] = [];
-      for (let candidate = task; candidate; candidate = candidate.fallback!)
-        providers.push(candidate.provider);
-      expect(providers).toEqual(["eastmoney", "tencent", "sina", "xueqiu"]);
+    for (const id of ["market.daily", "market.weekly", "market.monthly"]) {
+      expect(
+        tasks.filter((task) => task.id === id).map((task) => task.provider),
+      ).toEqual(["eastmoney", "tencent", "sina", "xueqiu"]);
     }
     expect(
-      tasks.find(({ id }) => id === "stock.snapshot")!.fallback!.provider,
-    ).toBe("xueqiu");
-    expect(
-      tasks.find(({ id }) => id === "market.averages")!.fallback,
-    ).toBeUndefined();
-    expect(
-      tasks.find(({ id }) => id === "valuation.history")!.fallback,
-    ).toBeUndefined();
+      tasks
+        .filter((task) => task.id === "stock.snapshot")
+        .map((task) => task.provider),
+    ).toEqual(["eastmoney", "xueqiu"]);
+    for (const id of ["market.averages", "valuation.history"])
+      expect(tasks.filter((task) => task.id === id)).toHaveLength(1);
     expect(get).not.toHaveBeenCalled();
   });
 
   it("decodes source column names, keeps shares and percentages, and records absent amplitude", async () => {
     const { tasks, get } = setup(klines());
-    const result = await tasks[0]!.fallback!.fallback!.fallback!.run();
+    const result = await tasks
+      .filter((task) => task.provider === "xueqiu")[0]!
+      .run();
     const url = new URL(String(get.mock.calls[0]![0]));
     expect(Object.fromEntries(url.searchParams)).toEqual({
       symbol: "SZ002594",
@@ -160,7 +159,10 @@ describe("Xueqiu China market fallback", () => {
         klines([completed, unfinished]),
         selectedScope,
       );
-      const result = await tasks[index]!.fallback!.fallback!.fallback!.run();
+      const result = await tasks
+        .filter((task) => task.provider === "xueqiu")
+        .at(index)!
+        .run();
       const url = new URL(String(get.mock.calls[0]![0]));
       expect(url.searchParams.get("period")).toBe(period);
       expect(url.searchParams.get("count")).toBe(count);
@@ -210,7 +212,7 @@ describe("Xueqiu China market fallback", () => {
   ])("rejects malformed external history %j", async (change) => {
     const { tasks } = setup({ ...klines(), ...change });
     await expect(
-      tasks[0]!.fallback!.fallback!.fallback!.run(),
+      tasks.filter((task) => task.provider === "xueqiu")[0]!.run(),
     ).rejects.toMatchObject({ code: "SOURCE_UNAVAILABLE" });
   });
 
@@ -218,7 +220,9 @@ describe("Xueqiu China market fallback", () => {
     const data = klines();
     data.item[0]![2] = null;
     const { tasks } = setup(data);
-    const result = await tasks[0]!.fallback!.fallback!.fallback!.run();
+    const result = await tasks
+      .filter((task) => task.provider === "xueqiu")[0]!
+      .run();
     expect(result.data.rows[0]!.values.volume).toBeNull();
     expect(result.gaps).toContainEqual(
       expect.objectContaining({
@@ -231,8 +235,10 @@ describe("Xueqiu China market fallback", () => {
   it("maps a current quote without using forecast PE as dynamic PE", async () => {
     const { tasks, get } = setup(quote());
     const result = await tasks
-      .find(({ id }) => id === "stock.snapshot")!
-      .fallback!.run();
+      .find(
+        ({ id, provider }) => id === "stock.snapshot" && provider === "xueqiu",
+      )!
+      .run();
     const url = new URL(String(get.mock.calls[0]![0]));
     expect(url.pathname).toBe("/v5/stock/quote.json");
     expect(Object.fromEntries(url.searchParams)).toEqual({
@@ -276,7 +282,12 @@ describe("Xueqiu China market fallback", () => {
       quote({ timestamp: Date.parse("2026-10-28T07:30:00.000Z") }),
     );
     await expect(
-      tasks.find(({ id }) => id === "stock.snapshot")!.fallback!.run(),
+      tasks
+        .find(
+          ({ id, provider }) =>
+            id === "stock.snapshot" && provider === "xueqiu",
+        )!
+        .run(),
     ).rejects.toMatchObject({ code: "DATA_INSUFFICIENT" });
   });
 
@@ -291,7 +302,12 @@ describe("Xueqiu China market fallback", () => {
     async (change) => {
       const { tasks } = setup(quote(change));
       await expect(
-        tasks.find(({ id }) => id === "stock.snapshot")!.fallback!.run(),
+        tasks
+          .find(
+            ({ id, provider }) =>
+              id === "stock.snapshot" && provider === "xueqiu",
+          )!
+          .run(),
       ).rejects.toMatchObject({ code: "SOURCE_UNAVAILABLE" });
     },
   );

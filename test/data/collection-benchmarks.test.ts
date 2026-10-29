@@ -52,6 +52,11 @@ function yahoo(
     },
   };
 }
+function primaryTasks(tasks: ReturnType<typeof createBenchmarkMarketTasks>) {
+  return tasks.filter(
+    (task, index) => tasks.findIndex((other) => other.id === task.id) === index,
+  );
+}
 function setup(selectedScope = scope) {
   const http = new HttpClient({
     timeoutMs: 1000,
@@ -76,7 +81,12 @@ describe("fixed benchmark market collection", () => {
     const { tasks, get } = setup();
     get.mockResolvedValue('benchmark=("\\q");');
     await expect(
-      tasks.find(({ id }) => id === "benchmark.gold.daily")!.fallback!.run(),
+      tasks
+        .find(
+          ({ id, provider }) =>
+            id === "benchmark.gold.daily" && provider === "sina",
+        )!
+        .run(),
     ).rejects.toMatchObject({
       code: "SOURCE_UNAVAILABLE",
       cause: expect.any(SyntaxError),
@@ -111,7 +121,9 @@ describe("fixed benchmark market collection", () => {
           (task) => task.id === `benchmark.${id}.${suffix}`,
         )!;
         expect(task.provider).toBe("eastmoney");
-        const result = await task.fallback!.run();
+        const result = await tasks
+          .find((other) => other.id === task.id && other.provider === "yahoo")!
+          .run();
         expect(result.source.provider).toBe("yahoo");
         expect(result.data.attributes!.assetCode).toBe(identity);
         expect(result.data.rows[0]!.values).toEqual({ close: 101 });
@@ -120,7 +132,13 @@ describe("fixed benchmark market collection", () => {
         ).toBe(interval);
         response.chart.result[0]!.meta.instrumentType = "FUTURE";
         get.mockResolvedValue(JSON.stringify(response));
-        await expect(task.fallback!.run()).rejects.toMatchObject({
+        await expect(
+          tasks
+            .find(
+              (other) => other.id === task.id && other.provider === "yahoo",
+            )!
+            .run(),
+        ).rejects.toMatchObject({
           code: "SOURCE_UNAVAILABLE",
         });
       }
@@ -138,7 +156,9 @@ describe("fixed benchmark market collection", () => {
       get.mockResolvedValue(
         '/* publisher header */\nbenchmark=("2026-10-23,100,99,102,101,|2026-10-26,100,99,102,101,|2026-10-27,100,99,102,101");',
       );
-      const result = await task.fallback!.run();
+      const result = await tasks
+        .find((other) => other.id === task.id && other.provider === "sina")!
+        .run();
       expect(
         new URL(String(get.mock.lastCall![0])).searchParams.get("symbol"),
       ).toBe(symbol);
@@ -170,17 +190,31 @@ describe("fixed benchmark market collection", () => {
         ).toBe(true);
       }
       expect(
-        tasks.find((task) => task.id === `benchmark.${id}.weekly`)!.fallback,
+        tasks.find(
+          (task) =>
+            task.id === `benchmark.${id}.weekly` && task.provider === "sina",
+        ),
       ).toBeUndefined();
       expect(
-        tasks.find((task) => task.id === `benchmark.${id}.monthly`)!.fallback,
+        tasks.find(
+          (task) =>
+            task.id === `benchmark.${id}.monthly` && task.provider === "sina",
+        ),
       ).toBeUndefined();
       get.mockResolvedValue('anotherSymbol=("2026-10-23,100,99,102,101");');
-      await expect(task.fallback!.run()).rejects.toMatchObject({
+      await expect(
+        tasks
+          .find((other) => other.id === task.id && other.provider === "sina")!
+          .run(),
+      ).rejects.toMatchObject({
         code: "SOURCE_UNAVAILABLE",
       });
       get.mockResolvedValue('benchmark=("2026-10-23,100,99,102,103");');
-      await expect(task.fallback!.run()).rejects.toMatchObject({
+      await expect(
+        tasks
+          .find((other) => other.id === task.id && other.provider === "sina")!
+          .run(),
+      ).rejects.toMatchObject({
         code: "SOURCE_UNAVAILABLE",
       });
     },
@@ -213,8 +247,12 @@ describe("fixed benchmark market collection", () => {
           ]),
         );
         const result = await tasks
-          .find((task) => task.id === `benchmark.${id}.${suffix}`)!
-          .fallback!.fallback!.run();
+          .find(
+            (task) =>
+              task.id === `benchmark.${id}.${suffix}` &&
+              task.provider === "sina",
+          )!
+          .run();
         expect(result.source.provider).toBe("sina");
         expect(result.data.rows[0]!.values).toMatchObject({
           close: 101,
@@ -245,8 +283,12 @@ describe("fixed benchmark market collection", () => {
       }),
     );
     const result = await tasks
-      .find((task) => task.id === "benchmark.shanghai.weekly")!
-      .fallback!.run();
+      .find(
+        (task) =>
+          task.id === "benchmark.shanghai.weekly" &&
+          task.provider === "tencent",
+      )!
+      .run();
     expect(result.data.rows.map((row) => row.date)).toEqual(["2026-10-19"]);
     expect(result.data.rows[0]!.values.volume).toBeNull();
     expect(result.gaps.some((gap) => gap.field.endsWith("/volume"))).toBe(true);
@@ -279,7 +321,11 @@ describe("fixed benchmark market collection", () => {
         const task = tasks.find(
           (task) => task.id === `benchmark.${id}.${suffix}`,
         )!;
-        const result = await task.fallback!.run();
+        const result = await tasks
+          .find(
+            (other) => other.id === task.id && other.provider === "tencent",
+          )!
+          .run();
         expect(
           new URL(String(get.mock.lastCall![0])).searchParams
             .get("param")!
@@ -308,7 +354,11 @@ describe("fixed benchmark market collection", () => {
           true,
         );
       }
-      expect(tasks.filter((task) => task.fallback)).toHaveLength(23);
+      expect(
+        primaryTasks(tasks).filter(
+          (task) => tasks.filter((other) => other.id === task.id).length > 1,
+        ),
+      ).toHaveLength(23);
     },
   );
 
@@ -326,17 +376,19 @@ describe("fixed benchmark market collection", () => {
       "eurusd",
       "usdjpy",
     ];
-    expect(tasks.map((task) => task.id)).toEqual(
+    expect(primaryTasks(tasks).map((task) => task.id)).toEqual(
       assets.flatMap((asset) =>
         ["daily", "weekly", "monthly"].map(
           (period) => `benchmark.${asset}.${period}`,
         ),
       ),
     );
-    expect(tasks).toHaveLength(30);
+    expect(new Set(tasks.map((task) => task.id)).size).toBe(30);
     expect(tasks.every((task) => task.dataset === "market")).toBe(true);
     expect(
-      tasks.filter((task) => task.provider === "yahoo").map((task) => task.id),
+      primaryTasks(tasks)
+        .filter((task) => task.provider === "yahoo")
+        .map((task) => task.id),
     ).toEqual([
       "benchmark.usdcny.daily",
       "benchmark.usdcny.weekly",
@@ -347,7 +399,12 @@ describe("fixed benchmark market collection", () => {
 
   it("uses bounded source dates and asks for each Chinese index period directly", async () => {
     const { tasks, get } = setup();
-    for (const task of tasks.slice(0, 3)) await task.run();
+    for (const task of tasks.filter(
+      (task) =>
+        task.id.startsWith("benchmark.shanghai.") &&
+        task.provider === "eastmoney",
+    ))
+      await task.run();
     const requests = get.mock.calls.map((call) =>
       Object.fromEntries(new URL(String(call[0])).searchParams),
     );
@@ -368,21 +425,27 @@ describe("fixed benchmark market collection", () => {
   });
 
   it.each([
-    [0, "CN:000001.SH", "index", "index", "china_exchange"],
-    [3, "CN:399001.SZ", "index", "index", "china_exchange"],
-    [6, "CN:000300.SH", "index", "index", "china_exchange"],
-    [9, "CN:399006.SZ", "index", "index", "china_exchange"],
-    [12, "XAU/USD", "gold", "USD/troy_ounce", "global_weekdays_utc"],
-    [15, "DXY", "dollarIndex", "index", "global_weekdays_utc"],
-    [18, "USD/CNY", "fx", "CNY/USD", "global_weekdays_utc"],
-    [21, "USD/CNH", "fx", "CNH/USD", "global_weekdays_utc"],
-    [24, "EUR/USD", "fx", "USD/EUR", "global_weekdays_utc"],
-    [27, "USD/JPY", "fx", "JPY/USD", "global_weekdays_utc"],
+    ["shanghai", "CN:000001.SH", "index", "index", "china_exchange"],
+    ["shenzhen", "CN:399001.SZ", "index", "index", "china_exchange"],
+    ["csi300", "CN:000300.SH", "index", "index", "china_exchange"],
+    ["chinext", "CN:399006.SZ", "index", "index", "china_exchange"],
+    ["gold", "XAU/USD", "gold", "USD/troy_ounce", "global_weekdays_utc"],
+    ["dxy", "DXY", "dollarIndex", "index", "global_weekdays_utc"],
+    ["usdcny", "USD/CNY", "fx", "CNY/USD", "global_weekdays_utc"],
+    ["usdcnh", "USD/CNH", "fx", "CNH/USD", "global_weekdays_utc"],
+    ["eurusd", "EUR/USD", "fx", "USD/EUR", "global_weekdays_utc"],
+    ["usdjpy", "USD/JPY", "fx", "JPY/USD", "global_weekdays_utc"],
   ] as const)(
     "retains the independent benchmark identity and unit for task %i",
-    async (index, assetCode, assetType, unit, calendar) => {
+    async (asset, assetCode, assetType, unit, calendar) => {
       const { tasks } = setup();
-      const result = await tasks[index]!.run();
+      const result = await tasks
+        .find(
+          (task) =>
+            task.id === `benchmark.${asset}.daily` &&
+            task.provider === (asset === "usdcny" ? "yahoo" : "eastmoney"),
+        )!
+        .run();
       expect(result.data.attributes).toMatchObject({
         assetCode,
         assetType,
@@ -408,7 +471,13 @@ describe("fixed benchmark market collection", () => {
     get.mockResolvedValue(
       JSON.stringify(eastmoney("1.000001", [line("2026-10-26")])),
     );
-    const result = await tasks[0]!.run();
+    const result = await tasks
+      .find(
+        (task) =>
+          task.id === "benchmark.shanghai.daily" &&
+          task.provider === "eastmoney",
+      )!
+      .run();
     expect(result.data.rows[0]!.values.volume).toBe(552842912);
     expect(result.data.rows[0]!.values.amount).toBe(898666874902.3);
     expect(result.data.columns.volume).toEqual({
@@ -423,7 +492,12 @@ describe("fixed benchmark market collection", () => {
     get.mockResolvedValue(
       JSON.stringify(eastmoney("122.XAU", [line("2026-10-23", "101.75", "0")])),
     );
-    const result = await tasks[12]!.run();
+    const result = await tasks
+      .find(
+        (task) =>
+          task.id === "benchmark.gold.daily" && task.provider === "eastmoney",
+      )!
+      .run();
     expect(result.data.columns).not.toHaveProperty("volume");
     expect(result.data.rows[0]!.values).not.toHaveProperty("volume");
     expect(
@@ -443,7 +517,12 @@ describe("fixed benchmark market collection", () => {
         eastmoney("122.XAU", [line("2026-10-23"), line("2026-10-26")]),
       ),
     );
-    const result = await tasks[12]!.run();
+    const result = await tasks
+      .find(
+        (task) =>
+          task.id === "benchmark.gold.daily" && task.provider === "eastmoney",
+      )!
+      .run();
     expect(new URL(String(get.mock.calls[0]![0])).searchParams.get("end")).toBe(
       "20261025",
     );
@@ -462,7 +541,12 @@ describe("fixed benchmark market collection", () => {
         eastmoney("100.UDI", [line("2026-10-16"), line("2026-10-23")]),
       ),
     );
-    const result = await tasks[16]!.run();
+    const result = await tasks
+      .find(
+        (task) =>
+          task.id === "benchmark.dxy.weekly" && task.provider === "eastmoney",
+      )!
+      .run();
     expect(new URL(String(get.mock.calls[0]![0])).searchParams.get("end")).toBe(
       "20261016",
     );
@@ -480,7 +564,12 @@ describe("fixed benchmark market collection", () => {
         eastmoney("122.XAU", [line("2026-08-31"), line("2026-09-30")]),
       ),
     );
-    const result = await tasks[14]!.run();
+    const result = await tasks
+      .find(
+        (task) =>
+          task.id === "benchmark.gold.monthly" && task.provider === "eastmoney",
+      )!
+      .run();
     expect(new URL(String(get.mock.calls[0]![0])).searchParams.get("end")).toBe(
       "20260831",
     );
@@ -502,7 +591,12 @@ describe("fixed benchmark market collection", () => {
         ]),
       ),
     );
-    const result = await tasks[18]!.run();
+    const result = await tasks
+      .find(
+        (task) =>
+          task.id === "benchmark.usdcny.daily" && task.provider === "yahoo",
+      )!
+      .run();
     expect(result.data.rows.map((row) => row.date)).toEqual(["2026-07-03"]);
     expect(result.data.rows[0]!.asOf).toBe("2026-07-03T23:59:59.999Z");
     expect(result.data.attributes!.sourceTimeZone).toBe("Europe/London");
@@ -513,8 +607,14 @@ describe("fixed benchmark market collection", () => {
 
   it("requests source weekly and monthly closing-rate charts without daily aggregation", async () => {
     const { tasks, get } = setup();
-    for (const index of [19, 20]) {
-      const result = await tasks[index]!.run();
+    for (const period of ["weekly", "monthly"]) {
+      const result = await tasks
+        .find(
+          (task) =>
+            task.id === `benchmark.usdcny.${period}` &&
+            task.provider === "yahoo",
+        )!
+        .run();
       expect(Object.keys(result.data.columns)).toEqual(["close"]);
       expect(result.data.rows[0]!.values).toEqual({ close: 6.68 });
       expect(result.data.basis).toBe("source_reported_close");
@@ -537,7 +637,12 @@ describe("fixed benchmark market collection", () => {
     });
     response.chart.result[0]!.meta.symbol = "USDCNY=X";
     get.mockResolvedValue(JSON.stringify(response));
-    const result = await tasks[18]!.run();
+    const result = await tasks
+      .find(
+        (task) =>
+          task.id === "benchmark.usdcny.daily" && task.provider === "yahoo",
+      )!
+      .run();
     expect(result.data.attributes).toMatchObject({
       assetCode: "USD/CNY",
       sourceName: "USD/CNY",
@@ -549,7 +654,14 @@ describe("fixed benchmark market collection", () => {
     });
     response.chart.result[0]!.meta.symbol = "USDCNH=X";
     get.mockResolvedValue(JSON.stringify(response));
-    await expect(tasks[18]!.run()).rejects.toMatchObject({
+    await expect(
+      tasks
+        .find(
+          (task) =>
+            task.id === "benchmark.usdcny.daily" && task.provider === "yahoo",
+        )!
+        .run(),
+    ).rejects.toMatchObject({
       code: "SOURCE_UNAVAILABLE",
     });
   });
@@ -565,7 +677,12 @@ describe("fixed benchmark market collection", () => {
     });
     response.chart.result[0]!.meta.symbol = "USDCNY=X";
     get.mockResolvedValue(JSON.stringify(response));
-    const result = await tasks[18]!.run();
+    const result = await tasks
+      .find(
+        (task) =>
+          task.id === "benchmark.usdcny.daily" && task.provider === "yahoo",
+      )!
+      .run();
     expect(result.data.columns).toEqual({
       close: { label: "收盘汇率", unit: "CNY/USD" },
     });
@@ -588,7 +705,14 @@ describe("fixed benchmark market collection", () => {
     get.mockResolvedValue(
       JSON.stringify(yahoo("1d", [1792623600, 1792710000], { close: [6.68] })),
     );
-    await expect(tasks[18]!.run()).rejects.toMatchObject({
+    await expect(
+      tasks
+        .find(
+          (task) =>
+            task.id === "benchmark.usdcny.daily" && task.provider === "yahoo",
+        )!
+        .run(),
+    ).rejects.toMatchObject({
       code: "SOURCE_UNAVAILABLE",
     });
   });
@@ -598,7 +722,12 @@ describe("fixed benchmark market collection", () => {
     get.mockResolvedValue(
       JSON.stringify(yahoo("1d", [1792710000], { close: [null] })),
     );
-    const result = await tasks[18]!.run();
+    const result = await tasks
+      .find(
+        (task) =>
+          task.id === "benchmark.usdcny.daily" && task.provider === "yahoo",
+      )!
+      .run();
     expect(result.data.rows[0]!.values).toEqual({ close: null });
     expect(
       result.gaps.some((gap) => gap.field === "/data/rows/0/values/close"),
@@ -606,7 +735,14 @@ describe("fixed benchmark market collection", () => {
     get.mockResolvedValue(
       JSON.stringify(yahoo("1d", [1792710000], { close: [0] })),
     );
-    await expect(tasks[18]!.run()).rejects.toMatchObject({
+    await expect(
+      tasks
+        .find(
+          (task) =>
+            task.id === "benchmark.usdcny.daily" && task.provider === "yahoo",
+        )!
+        .run(),
+    ).rejects.toMatchObject({
       code: "SOURCE_UNAVAILABLE",
     });
   });
@@ -616,7 +752,14 @@ describe("fixed benchmark market collection", () => {
     get.mockResolvedValue(
       JSON.stringify(eastmoney("100.UDI", [line("2026-10-23", "120")])),
     );
-    await expect(tasks[15]!.run()).rejects.toMatchObject({
+    await expect(
+      tasks
+        .find(
+          (task) =>
+            task.id === "benchmark.dxy.daily" && task.provider === "eastmoney",
+        )!
+        .run(),
+    ).rejects.toMatchObject({
       code: "SOURCE_UNAVAILABLE",
     });
   });
@@ -626,7 +769,12 @@ describe("fixed benchmark market collection", () => {
     get.mockResolvedValue(
       JSON.stringify(eastmoney("100.UDI", [line("2026-10-23", "-")])),
     );
-    const result = await tasks[15]!.run();
+    const result = await tasks
+      .find(
+        (task) =>
+          task.id === "benchmark.dxy.daily" && task.provider === "eastmoney",
+      )!
+      .run();
     expect(result.data.rows[0]!.values.close).toBeNull();
     expect(
       result.gaps.some((gap) => gap.field === "/data/rows/0/values/close"),
@@ -636,13 +784,28 @@ describe("fixed benchmark market collection", () => {
   it("rejects source identity and quote-direction mismatches", async () => {
     const { tasks, get } = setup();
     get.mockResolvedValue(JSON.stringify(eastmoney("120.USDCNYC")));
-    await expect(tasks[21]!.run()).rejects.toMatchObject({
+    await expect(
+      tasks
+        .find(
+          (task) =>
+            task.id === "benchmark.usdcnh.daily" &&
+            task.provider === "eastmoney",
+        )!
+        .run(),
+    ).rejects.toMatchObject({
       code: "SOURCE_UNAVAILABLE",
     });
     const wrong = yahoo();
     wrong.chart.result[0]!.meta.currency = "USD";
     get.mockResolvedValue(JSON.stringify(wrong));
-    await expect(tasks[18]!.run()).rejects.toMatchObject({
+    await expect(
+      tasks
+        .find(
+          (task) =>
+            task.id === "benchmark.usdcny.daily" && task.provider === "yahoo",
+        )!
+        .run(),
+    ).rejects.toMatchObject({
       code: "SOURCE_UNAVAILABLE",
     });
   });
@@ -655,12 +818,26 @@ describe("fixed benchmark market collection", () => {
         .slice(0, 10),
     ).map((date) => line(date));
     get.mockResolvedValue(JSON.stringify(eastmoney("1.000001", lines)));
-    const result = await tasks[0]!.run();
+    const result = await tasks
+      .find(
+        (task) =>
+          task.id === "benchmark.shanghai.daily" &&
+          task.provider === "eastmoney",
+      )!
+      .run();
     expect(result.data.rows).toHaveLength(60);
     expect(result.data.rows.at(-1)!.date).toBe("2026-10-26");
     const failure = new Error("source transport unavailable");
     get.mockRejectedValue(failure);
-    await expect(tasks[0]!.run()).rejects.toBe(failure);
+    await expect(
+      tasks
+        .find(
+          (task) =>
+            task.id === "benchmark.shanghai.daily" &&
+            task.provider === "eastmoney",
+        )!
+        .run(),
+    ).rejects.toBe(failure);
     expect(get).toHaveBeenCalledTimes(2);
   });
 });

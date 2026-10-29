@@ -1,5 +1,3 @@
-import fs from "node:fs";
-import { join } from "node:path";
 import { setImmediate } from "node:timers/promises";
 import {
   HarnessError,
@@ -515,7 +513,9 @@ describe("stock-ask through real commands, runtime and AgentLoop", () => {
         });
         await setImmediate();
         expect(closed).toBe(false);
-        expect(fs.existsSync(join(h.directory, ".writer.lock"))).toBe(true);
+        expect(() => new DataRoot(h.directory)).toThrowError(
+          expect.objectContaining({ code: "STORAGE_FAILED" }),
+        );
         source.released.resolve();
         await closing;
         expect(h.ctx.get("stockResearch")).toBeUndefined();

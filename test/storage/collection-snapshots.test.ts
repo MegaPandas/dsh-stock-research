@@ -132,6 +132,7 @@ describe("collection snapshot store", () => {
       expect(JSON.parse(fs.readFileSync(path, "utf8"))).toEqual(value);
       expect(fs.readdirSync(directory).sort()).toEqual([
         ".writer.lock",
+        ".writer.lock-journal",
         "collections",
       ]);
       expect(fs.readdirSync(dirname(path))).toEqual([basename(path)]);
@@ -156,7 +157,7 @@ describe("collection snapshot store", () => {
     expect(() => store.save(record("cancelled"))).toThrowError(
       expect.objectContaining({ code: "STORAGE_FAILED" }),
     );
-    expect(fs.readdirSync(directory)).toEqual([]);
+    expect(fs.readdirSync(directory)).toEqual([".writer.lock"]);
   });
 
   it("preserves publication failure causes without publishing incomplete JSON", () => {

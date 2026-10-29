@@ -38,7 +38,7 @@ function setup(enabledSources: string[]) {
     {
       enabledSources,
       xueqiuCookie: cookie,
-      freshness: { market: 86400000, fundamentals: 86400000, macro: 0 },
+      freshness: { market: 86400000, fundamentals: 200 * 86400000, macro: 0 },
       secCiks: {},
       ttl: { market: 60000, fundamentals: 60000, macro: 0, research: 0 },
     },
@@ -116,7 +116,19 @@ function mockSources(primarySucceeds: boolean) {
         data: {
           code: "600519",
           market: 1,
-          klines: [`${date},100,102,103,99,12,122400,4,2,2,0.01`],
+          klines: Array.from(
+            { length: interval === "101" ? 60 : interval === "102" ? 52 : 36 },
+            (_, i) => {
+              const point = new Date(`${date}T00:00:00Z`);
+              if (interval === "103")
+                point.setUTCMonth(point.getUTCMonth() - i);
+              else
+                point.setUTCDate(
+                  point.getUTCDate() - i * (interval === "102" ? 7 : 1),
+                );
+              return `${point.toISOString().slice(0, 10)},100,102,103,99,12,122400,4,2,2,0.01`;
+            },
+          ),
         },
       });
     }
@@ -136,16 +148,33 @@ function mockSources(primarySucceeds: boolean) {
       success: true,
       code: 0,
       result: {
-        data: [
-          {
+        data: Array.from(
+          { length: url.hostname === "datacenter-web.eastmoney.com" ? 60 : 12 },
+          (_, i) => ({
             SECUCODE: "600519.SH",
-            REPORT_DATE: "2023-09-30 00:00:00",
+            REPORT_DATE:
+              new Date(Date.UTC(2023, 9 - i * 3, 0))
+                .toISOString()
+                .slice(0, 10) + " 00:00:00",
             NOTICE_DATE: "2023-10-30 00:00:00",
             SECURITY_CODE: "600519",
-            TRADE_DATE: "2024-01-03 00:00:00",
+            TRADE_DATE:
+              new Date(Date.parse("2024-01-03") - i * 86400000)
+                .toISOString()
+                .slice(0, 10) + " 00:00:00",
             EPSJB: 1,
-          },
-        ],
+            TOTALOPERATEREVE: 100,
+            PARENTNETPROFIT: 20,
+            BPS: 5,
+            TOTAL_OPERATE_INCOME: 100,
+            PARENT_NETPROFIT: 20,
+            TOTAL_ASSETS: 500,
+            TOTAL_LIABILITIES: 200,
+            TOTAL_PARENT_EQUITY: 250,
+            NETCASH_OPERATE: 30,
+            CONSTRUCT_LONG_ASSET: 10,
+          }),
+        ),
       },
     });
   });

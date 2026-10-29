@@ -51,15 +51,18 @@ afterEach(() => vi.restoreAllMocks());
 describe("Xueqiu financial collection fallback", () => {
   it("adds four lazy fallbacks while leaving the single-quarter table and default tasks unchanged", () => {
     const { tasks, withoutXueqiu, get } = setup();
-    expect(tasks.map((task) => [task.id, task.fallback?.provider])).toEqual([
-      ["financial.indicators", "xueqiu"],
-      ["financial.quarter", undefined],
-      ["financial.income", "xueqiu"],
-      ["financial.balance", "xueqiu"],
-      ["financial.cashflow", "xueqiu"],
+    expect(
+      tasks.filter((task) => task.provider === "xueqiu").map((task) => task.id),
+    ).toEqual([
+      "financial.indicators",
+      "financial.income",
+      "financial.balance",
+      "financial.cashflow",
     ]);
-    expect(tasks.every((task) => task.provider === "eastmoney")).toBe(true);
-    expect(withoutXueqiu.every((task) => task.fallback === undefined)).toBe(
+    expect(
+      tasks.filter((task) => task.id === "financial.quarter"),
+    ).toHaveLength(1);
+    expect(withoutXueqiu.every((task) => task.provider === "eastmoney")).toBe(
       true,
     );
     expect(get).not.toHaveBeenCalled();
@@ -81,7 +84,19 @@ describe("Xueqiu financial collection fallback", () => {
       }),
     ]);
     const signal = new AbortController().signal;
-    const result = await tasks[0]!.fallback!.run(signal);
+    const result = await tasks
+      .find(
+        (task) =>
+          task.id ===
+            [
+              "financial.indicators",
+              "financial.quarter",
+              "financial.income",
+              "financial.balance",
+              "financial.cashflow",
+            ][0] && task.provider === "xueqiu",
+      )!
+      .run(signal);
     expect(get).toHaveBeenCalledWith(
       "/v5/stock/finance/cn/indicator.json",
       {
@@ -139,7 +154,19 @@ describe("Xueqiu financial collection fallback", () => {
         net_profit_after_nrgal_atsolc: [55, 0.08],
       }),
     ]);
-    const result = await tasks[2]!.fallback!.run();
+    const result = await tasks
+      .find(
+        (task) =>
+          task.id ===
+            [
+              "financial.indicators",
+              "financial.quarter",
+              "financial.income",
+              "financial.balance",
+              "financial.cashflow",
+            ][2] && task.provider === "xueqiu",
+      )!
+      .run();
     expect(result.data.rows[0]!.values).toMatchObject({
       TOTAL_OPERATE_INCOME: 500,
       OPERATE_INCOME: 450,
@@ -163,7 +190,19 @@ describe("Xueqiu financial collection fallback", () => {
         net_increase_in_cce: [80, 0.4],
       }),
     ]);
-    const balance = await tasks[3]!.fallback!.run();
+    const balance = await tasks
+      .find(
+        (task) =>
+          task.id ===
+            [
+              "financial.indicators",
+              "financial.quarter",
+              "financial.income",
+              "financial.balance",
+              "financial.cashflow",
+            ][3] && task.provider === "xueqiu",
+      )!
+      .run();
     expect(balance.data.basis).toBe("point_in_time");
     expect(balance.data.rows[0]).toMatchObject({
       periodStart: "2026-06-30",
@@ -173,7 +212,19 @@ describe("Xueqiu financial collection fallback", () => {
         DEBT_ASSET_RATIO: 70,
       },
     });
-    const cashflow = await tasks[4]!.fallback!.run();
+    const cashflow = await tasks
+      .find(
+        (task) =>
+          task.id ===
+            [
+              "financial.indicators",
+              "financial.quarter",
+              "financial.income",
+              "financial.balance",
+              "financial.cashflow",
+            ][4] && task.provider === "xueqiu",
+      )!
+      .run();
     expect(cashflow.data.basis).toBe("year_to_date");
     expect(cashflow.data.rows[0]).toMatchObject({
       periodStart: "2026-01-01",
@@ -240,7 +291,19 @@ describe("Xueqiu financial collection fallback", () => {
         ),
       );
       const { tasks } = setup(fixture.data.list);
-      const result = await tasks[index]!.fallback!.run();
+      const result = await tasks
+        .find(
+          (task) =>
+            task.id ===
+              [
+                "financial.indicators",
+                "financial.quarter",
+                "financial.income",
+                "financial.balance",
+                "financial.cashflow",
+              ][index] && task.provider === "xueqiu",
+        )!
+        .run();
       expect(result.data.rows).toHaveLength(name === "balance" ? 3 : 2);
       expect(result.data.rows.at(-1)!.values).toMatchObject(expected);
       if (name === "balance") {
@@ -272,7 +335,19 @@ describe("Xueqiu financial collection fallback", () => {
     const { tasks } = setup([
       row({ basic_eps: [null, 5], avg_roe: [0, 8], current_ratio: null }),
     ]);
-    const result = await tasks[0]!.fallback!.run();
+    const result = await tasks
+      .find(
+        (task) =>
+          task.id ===
+            [
+              "financial.indicators",
+              "financial.quarter",
+              "financial.income",
+              "financial.balance",
+              "financial.cashflow",
+            ][0] && task.provider === "xueqiu",
+      )!
+      .run();
     expect(result.data.rows[0]!.values).toMatchObject({
       EPSJB: null,
       ROEJQ: 0,
@@ -289,7 +364,19 @@ describe("Xueqiu financial collection fallback", () => {
       }),
       row({ basic_eps: [1.35, 1], ctime: Date.parse("2030-01-01T00:00:00Z") }),
     ]);
-    const result = await tasks[0]!.fallback!.run();
+    const result = await tasks
+      .find(
+        (task) =>
+          task.id ===
+            [
+              "financial.indicators",
+              "financial.quarter",
+              "financial.income",
+              "financial.balance",
+              "financial.cashflow",
+            ][0] && task.provider === "xueqiu",
+      )!
+      .run();
     expect(result.data.rows).toHaveLength(1);
     expect(result.data.rows[0]).toMatchObject({
       date: "2026-06-30",
@@ -309,7 +396,19 @@ describe("Xueqiu financial collection fallback", () => {
       });
     });
     const { tasks } = setup(rows.reverse());
-    const result = await tasks[0]!.fallback!.run();
+    const result = await tasks
+      .find(
+        (task) =>
+          task.id ===
+            [
+              "financial.indicators",
+              "financial.quarter",
+              "financial.income",
+              "financial.balance",
+              "financial.cashflow",
+            ][0] && task.provider === "xueqiu",
+      )!
+      .run();
     expect(result.data.rows).toHaveLength(12);
     expect(result.data.rows[0]!.date).toBe("2023-09-30");
     expect(result.data.rows.at(-1)!.date).toBe("2026-06-30");
@@ -324,18 +423,60 @@ describe("Xueqiu financial collection fallback", () => {
     { basic_eps: ["unknown", 0] },
   ])("rejects invalid source fields: %j", async (extra) => {
     const { tasks } = setup([row(extra)]);
-    await expect(tasks[0]!.fallback!.run()).rejects.toMatchObject({
+    await expect(
+      tasks
+        .find(
+          (task) =>
+            task.id ===
+              [
+                "financial.indicators",
+                "financial.quarter",
+                "financial.income",
+                "financial.balance",
+                "financial.cashflow",
+              ][0] && task.provider === "xueqiu",
+        )!
+        .run(),
+    ).rejects.toMatchObject({
       code: "SOURCE_UNAVAILABLE",
     });
   });
 
   it("rejects a non-CNY response and duplicate reporting periods", async () => {
     const { tasks } = setup([row()], scope, "USD");
-    await expect(tasks[0]!.fallback!.run()).rejects.toMatchObject({
+    await expect(
+      tasks
+        .find(
+          (task) =>
+            task.id ===
+              [
+                "financial.indicators",
+                "financial.quarter",
+                "financial.income",
+                "financial.balance",
+                "financial.cashflow",
+              ][0] && task.provider === "xueqiu",
+        )!
+        .run(),
+    ).rejects.toMatchObject({
       code: "SOURCE_UNAVAILABLE",
     });
     const duplicate = setup([row(), row()]);
-    await expect(duplicate.tasks[2]!.fallback!.run()).rejects.toMatchObject({
+    await expect(
+      duplicate.tasks
+        .find(
+          (task) =>
+            task.id ===
+              [
+                "financial.indicators",
+                "financial.quarter",
+                "financial.income",
+                "financial.balance",
+                "financial.cashflow",
+              ][2] && task.provider === "xueqiu",
+        )!
+        .run(),
+    ).rejects.toMatchObject({
       code: "SOURCE_UNAVAILABLE",
     });
   });

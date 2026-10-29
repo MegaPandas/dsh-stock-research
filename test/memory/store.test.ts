@@ -403,8 +403,6 @@ describe("memory version store", () => {
     expect(child.signal).toBe("SIGKILL");
     const previous = JSON.parse(child.stdout) as MemoryRef;
     expect(fs.existsSync(join(path, ".writer.lock"))).toBe(true);
-    // The child is confirmed dead; this test alone removes its residual lock.
-    fs.unlinkSync(join(path, ".writer.lock"));
     const { store } = open(path);
     const next = { entryId: previous.entryId, revision: 2 };
     expect(store.readIndex()).toMatchObject({

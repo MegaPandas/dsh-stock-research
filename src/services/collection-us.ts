@@ -4,7 +4,7 @@ import type {
 } from "../contracts/collection.js";
 import type { DataEnvelope, ResearchScope } from "../contracts/data.js";
 import type { QueryRequest } from "../contracts/query.js";
-import type { CollectionOptions } from "./collection.js";
+import type { CollectionOptions } from "../contracts/collection.js";
 import type { QueryService } from "./query.js";
 import { COLLECTION_VERSION } from "../data/versions.js";
 import { SESSION_DATES } from "../data/market-session.js";
@@ -71,6 +71,7 @@ export function createUsCollectionTasks(
     id,
     dataset: request.dataset as CollectionTask["dataset"],
     provider: request.provider,
+    enabledBy: [request.provider],
     async run(signal) {
       const envelope = await queries.query(scope, request, signal);
       const source = envelope.data;

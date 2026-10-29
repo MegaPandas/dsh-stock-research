@@ -58,7 +58,7 @@ describe("deterministic China market collection", () => {
           volume: "4159916",
         })),
       );
-      const task = tasks[index]!.fallback!.fallback!;
+      const task = tasks.filter((task) => task.provider === "sina")[index]!;
       expect(task.provider).toBe("sina");
       const result = await task.run();
       expect(
@@ -111,7 +111,10 @@ describe("deterministic China market collection", () => {
           },
         },
       });
-      const result = await tasks[index]!.fallback!.run();
+      const result = await tasks
+        .filter((task) => task.provider === "tencent")
+        .at(index)!
+        .run();
       expect(
         new URL(String(get.mock.calls[0]![0])).searchParams
           .get("param")!
@@ -134,15 +137,22 @@ describe("deterministic China market collection", () => {
       expect(result.gaps.some((gap) => gap.field.endsWith("/amount"))).toBe(
         true,
       );
-      expect(tasks[index]!.fallback!.endpoint).toBe(
-        "https://web.ifzq.gtimg.cn/appstock/app/fqkline/get",
-      );
+      expect(
+        tasks.filter((task) => task.provider === "tencent")[index]!.endpoint,
+      ).toBe("https://web.ifzq.gtimg.cn/appstock/app/fqkline/get");
     },
   );
 
   it("has one fixed task per dataset and all price periods declare Tencent fallbacks", () => {
     const { tasks, get } = setup({});
-    expect(tasks.map((task) => task.id)).toEqual([
+    expect(
+      tasks
+        .filter(
+          (task) =>
+            task.provider === "eastmoney" || task.id === "market.averages",
+        )
+        .map((task) => task.id),
+    ).toEqual([
       "market.daily",
       "market.weekly",
       "market.monthly",
@@ -152,8 +162,8 @@ describe("deterministic China market collection", () => {
     ]);
     expect(
       tasks
-        .filter((task) => task.fallback !== undefined)
-        .map((task) => [task.id, task.fallback!.provider]),
+        .filter((task) => task.provider === "tencent")
+        .map((task) => [task.id, task.provider]),
     ).toEqual([
       ["market.daily", "tencent"],
       ["market.weekly", "tencent"],
@@ -166,7 +176,12 @@ describe("deterministic China market collection", () => {
     const { tasks, get } = setup(
       response(dates(70).map((date) => kline(date))),
     );
-    const envelope = await tasks[0]!.run();
+    const envelope = await tasks
+      .filter(
+        (task) =>
+          task.provider === "eastmoney" || task.id === "market.averages",
+      )[0]!
+      .run();
     expect(get).toHaveBeenCalledTimes(1);
     const url = new URL(String(get.mock.calls[0]![0]));
     expect(Object.fromEntries(url.searchParams)).toMatchObject({
@@ -219,7 +234,9 @@ describe("deterministic China market collection", () => {
       },
       selectedScope,
     );
-    const envelope = await tasks[0]!.fallback!.run();
+    const envelope = await tasks
+      .filter((task) => task.provider === "tencent")[0]!
+      .run();
     expect(get).toHaveBeenCalledTimes(1);
     expect(
       new URL(String(get.mock.calls[0]![0])).searchParams.get("param"),
@@ -242,7 +259,12 @@ describe("deterministic China market collection", () => {
     const { tasks, get } = setup(
       response([kline("2026-10-16"), kline("2026-10-23"), kline("2026-10-26")]),
     );
-    const envelope = await tasks[1]!.run();
+    const envelope = await tasks
+      .filter(
+        (task) =>
+          task.provider === "eastmoney" || task.id === "market.averages",
+      )[1]!
+      .run();
     const url = new URL(String(get.mock.calls[0]![0]));
     expect(url.searchParams.get("klt")).toBe("102");
     expect(url.searchParams.get("lmt")).toBe("52");
@@ -262,7 +284,12 @@ describe("deterministic China market collection", () => {
     const { tasks, get } = setup(
       response([kline("2026-08-31"), kline("2026-09-30"), kline("2026-10-26")]),
     );
-    const envelope = await tasks[2]!.run();
+    const envelope = await tasks
+      .filter(
+        (task) =>
+          task.provider === "eastmoney" || task.id === "market.averages",
+      )[2]!
+      .run();
     const url = new URL(String(get.mock.calls[0]![0]));
     expect(Object.fromEntries(url.searchParams)).toMatchObject({
       klt: "103",
@@ -283,7 +310,12 @@ describe("deterministic China market collection", () => {
       response([kline("2026-10-26"), kline("2026-10-27")]),
       selectedScope,
     );
-    const envelope = await tasks[0]!.run();
+    const envelope = await tasks
+      .filter(
+        (task) =>
+          task.provider === "eastmoney" || task.id === "market.averages",
+      )[0]!
+      .run();
     expect(new URL(String(get.mock.calls[0]![0])).searchParams.get("end")).toBe(
       "20261026",
     );
@@ -304,7 +336,12 @@ describe("deterministic China market collection", () => {
         ma_volume30: 25043350,
       },
     ]);
-    const envelope = await tasks[3]!.run();
+    const envelope = await tasks
+      .filter(
+        (task) =>
+          task.provider === "eastmoney" || task.id === "market.averages",
+      )[3]!
+      .run();
     const url = new URL(String(get.mock.calls[0]![0]));
     expect(Object.fromEntries(url.searchParams)).toMatchObject({
       symbol: "sz002594",
@@ -331,7 +368,14 @@ describe("deterministic China market collection", () => {
       date: "2024-01-03",
       cutoff: "2024-01-03T15:59:59.999Z",
     });
-    await expect(tasks[3]!.run()).rejects.toMatchObject({
+    await expect(
+      tasks
+        .filter(
+          (task) =>
+            task.provider === "eastmoney" || task.id === "market.averages",
+        )[3]!
+        .run(),
+    ).rejects.toMatchObject({
       code: "DATA_INSUFFICIENT",
       message: expect.stringContaining("current rolling window"),
     });
@@ -357,7 +401,12 @@ describe("deterministic China market collection", () => {
         ],
       },
     });
-    const envelope = await tasks[4]!.run();
+    const envelope = await tasks
+      .filter(
+        (task) =>
+          task.provider === "eastmoney" || task.id === "market.averages",
+      )[4]!
+      .run();
     expect(
       new URL(String(get.mock.calls[0]![0])).searchParams.get("reportName"),
     ).toBe("RPT_VALUEANALYSIS_DET");
@@ -389,7 +438,12 @@ describe("deterministic China market collection", () => {
         f168: 78,
       },
     });
-    const envelope = await tasks[5]!.run();
+    const envelope = await tasks
+      .filter(
+        (task) =>
+          task.provider === "eastmoney" || task.id === "market.averages",
+      )[5]!
+      .run();
     expect(envelope.data.basis).toBe("current_quote");
     expect(envelope.data.attributes).toEqual({
       name: "比亚迪",
@@ -419,7 +473,14 @@ describe("deterministic China market collection", () => {
         f86: Date.parse("2026-10-28T07:34:15Z") / 1000,
       },
     });
-    await expect(tasks[5]!.run()).rejects.toMatchObject({
+    await expect(
+      tasks
+        .filter(
+          (task) =>
+            task.provider === "eastmoney" || task.id === "market.averages",
+        )[5]!
+        .run(),
+    ).rejects.toMatchObject({
       code: "DATA_INSUFFICIENT",
     });
   });
@@ -428,7 +489,14 @@ describe("deterministic China market collection", () => {
     const { tasks, get } = setup(
       response(["2026-10-26,80,90,85,79,100,1000,2,1,1,1"]),
     );
-    await expect(tasks[0]!.run()).rejects.toMatchObject({
+    await expect(
+      tasks
+        .filter(
+          (task) =>
+            task.provider === "eastmoney" || task.id === "market.averages",
+        )[0]!
+        .run(),
+    ).rejects.toMatchObject({
       code: "SOURCE_UNAVAILABLE",
     });
     get.mockResolvedValue(
@@ -437,7 +505,14 @@ describe("deterministic China market collection", () => {
         data: { code: "600519", market: 1, klines: [] },
       }),
     );
-    await expect(tasks[0]!.run()).rejects.toMatchObject({
+    await expect(
+      tasks
+        .filter(
+          (task) =>
+            task.provider === "eastmoney" || task.id === "market.averages",
+        )[0]!
+        .run(),
+    ).rejects.toMatchObject({
       code: "SOURCE_UNAVAILABLE",
     });
   });
@@ -446,7 +521,14 @@ describe("deterministic China market collection", () => {
     const { tasks, get } = setup({});
     const failure = new Error("network unavailable");
     get.mockRejectedValue(failure);
-    await expect(tasks[0]!.run()).rejects.toBe(failure);
+    await expect(
+      tasks
+        .filter(
+          (task) =>
+            task.provider === "eastmoney" || task.id === "market.averages",
+        )[0]!
+        .run(),
+    ).rejects.toBe(failure);
     expect(get).toHaveBeenCalledTimes(1);
   });
 });

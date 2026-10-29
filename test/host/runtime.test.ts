@@ -44,8 +44,10 @@ function observe<T>(work: Promise<T>) {
     (reason: unknown) => ({ kind: "rejected" as const, reason }),
   );
 }
-function lockExists(directory: string) {
-  return fs.existsSync(join(directory, ".writer.lock"));
+function assertLocked(directory: string) {
+  expect(() => new DataRoot(directory)).toThrowError(
+    expect.objectContaining({ code: "STORAGE_FAILED" }),
+  );
 }
 function reacquire(directory: string) {
   const root = new DataRoot(directory);
@@ -344,7 +346,7 @@ describe("research runtime plugin with the real DSH host", () => {
     await setImmediate();
     expect(closed).toBe(false);
     expect(setupFinished).toBe(false);
-    expect(lockExists(h.directory)).toBe(true);
+    assertLocked(h.directory);
     release.resolve();
     expect(await creation).toMatchObject({
       kind: "rejected",
@@ -423,11 +425,11 @@ describe("research runtime plugin with the real DSH host", () => {
     });
     await Promise.all([model.aborted.promise, search.aborted.promise]);
     expect(unloaded).toBe(false);
-    expect(lockExists(h.directory)).toBe(true);
+    assertLocked(h.directory);
     model.released.resolve();
     await setImmediate();
     expect(unloaded).toBe(false);
-    expect(lockExists(h.directory)).toBe(true);
+    assertLocked(h.directory);
     search.released.resolve();
     await unloading;
     expect(await query).toMatchObject({

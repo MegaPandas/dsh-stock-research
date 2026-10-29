@@ -145,14 +145,14 @@ function validatePrices(values: CollectionRow["values"], date: string): void {
     sourceError(date, "OHLC values contradict the declared range");
 }
 
-function klineTask(
+function klineTasks(
   http: HttpClient,
   scope: ResearchScope,
   window: (typeof MARKET_WINDOWS)[number],
   tencent: HttpClient,
   sina: HttpClient,
   xueqiu?: XueqiuClient,
-): CollectionTask {
+): CollectionTask[] {
   const end = completedEnd(scope, window.interval);
   const start =
     window.interval === "1d"
@@ -184,6 +184,7 @@ function klineTask(
     id: `market.${window.id}`,
     dataset: "market",
     provider: "eastmoney",
+    enabledBy: ["eastmoney-market"],
     endpoint: new URL(url).origin + new URL(url).pathname,
     async run(signal) {
       const response = parseSourceJson(
@@ -264,6 +265,7 @@ function klineTask(
       id: task.id,
       dataset: "market",
       provider,
+      enabledBy: [provider],
       endpoint:
         provider === "tencent" ? TENCENT_KLINE_ENDPOINT : SINA_KLINE_ENDPOINT,
       async run(signal) {
@@ -347,14 +349,14 @@ function klineTask(
       },
     };
   }
-  task.fallback = backup("tencent");
-  task.fallback.fallback = backup("sina");
+  const candidates = [task, backup("tencent"), backup("sina")];
   if (xueqiu !== undefined) {
     const client = xueqiu;
-    task.fallback.fallback.fallback = {
+    candidates.push({
       id: task.id,
       dataset: "market",
       provider: "xueqiu",
+      enabledBy: ["xueqiu"],
       endpoint: "https://stock.xueqiu.com/v5/stock/chart/kline.json",
       async run(signal) {
         const symbol = scope.security.exchange + code;
@@ -458,9 +460,9 @@ function klineTask(
           });
         return envelope;
       },
-    };
+    });
   }
-  return task;
+  return candidates;
 }
 
 function averagesTask(http: HttpClient, scope: ResearchScope): CollectionTask {
@@ -484,6 +486,7 @@ function averagesTask(http: HttpClient, scope: ResearchScope): CollectionTask {
     id: "market.averages",
     dataset: "market",
     provider: "sina",
+    enabledBy: ["sina"],
     endpoint: new URL(url).origin + new URL(url).pathname,
     async run(signal) {
       const text = await http.getText(url, { ...(signal && { signal }) });
@@ -583,6 +586,7 @@ function valuationTask(http: HttpClient, scope: ResearchScope): CollectionTask {
     id: "valuation.history",
     dataset: "fundamentals",
     provider: "eastmoney",
+    enabledBy: ["eastmoney-market"],
     endpoint: new URL(url).origin + new URL(url).pathname,
     async run(signal) {
       const response = parseSourceJson(
@@ -640,11 +644,11 @@ function valuationTask(http: HttpClient, scope: ResearchScope): CollectionTask {
   };
 }
 
-function snapshotTask(
+function snapshotTasks(
   http: HttpClient,
   scope: ResearchScope,
   xueqiu?: XueqiuClient,
-): CollectionTask {
+): CollectionTask[] {
   const code = scope.security.symbol.slice(0, 6);
   const url = urlWith("https://push2.eastmoney.com/api/qt/stock/get", {
     secid: `${scope.security.exchange === "SH" ? 1 : 0}.${code}`,
@@ -675,6 +679,7 @@ function snapshotTask(
     id: "stock.snapshot",
     dataset: "market",
     provider: "eastmoney",
+    enabledBy: ["eastmoney-market"],
     endpoint: new URL(url).origin + new URL(url).pathname,
     async run(signal) {
       const response = parseSourceJson(
@@ -751,12 +756,14 @@ function snapshotTask(
       );
     },
   };
+  const candidates = [task];
   if (xueqiu !== undefined) {
     const client = xueqiu;
-    task.fallback = {
+    candidates.push({
       id: task.id,
       dataset: "market",
       provider: "xueqiu",
+      enabledBy: ["xueqiu"],
       endpoint: "https://stock.xueqiu.com/v5/stock/quote.json",
       async run(signal) {
         const symbol = scope.security.exchange + code;
@@ -827,9 +834,9 @@ function snapshotTask(
           response.retrievedAt,
         );
       },
-    };
+    });
   }
-  return task;
+  return candidates;
 }
 
 export function createChinaMarketTasks(
@@ -850,11 +857,11 @@ export function createChinaMarketTasks(
   const tencent = http.forSource("tencent");
   const sina = http.forSource("sina");
   return [
-    ...MARKET_WINDOWS.map((window) =>
-      klineTask(eastmoney, scope, window, tencent, sina, xueqiu),
+    ...MARKET_WINDOWS.flatMap((window) =>
+      klineTasks(eastmoney, scope, window, tencent, sina, xueqiu),
     ),
     averagesTask(sina, scope),
     valuationTask(eastmoney, scope),
-    snapshotTask(eastmoney, scope, xueqiu),
+    ...snapshotTasks(eastmoney, scope, xueqiu),
   ];
 }

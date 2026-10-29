@@ -159,7 +159,7 @@ describe("snapshot financial metrics", () => {
       ]),
     ).toBeUndefined();
   });
-  it("labels equity comparisons and computes working capital from matching balance dates", () => {
+  it("uses reported equity independently of current shares and computes working capital", () => {
     const indicators = packet("financial.indicators", [
       ["2026-06-30", { BPS: 5, TOTALOPERATEREVE: 100, PARENTNETPROFIT: 20 }],
     ]);
@@ -177,6 +177,8 @@ describe("snapshot financial metrics", () => {
           INVENTORY: 20,
           ACCOUNTS_PAYABLE: 5,
           TOTAL_EQUITY: 80,
+          TOTAL_PARENT_EQUITY: 60,
+          MINORITY_EQUITY: 20,
         },
       ],
       [
@@ -186,6 +188,8 @@ describe("snapshot financial metrics", () => {
           INVENTORY: 25,
           ACCOUNTS_PAYABLE: 10,
           TOTAL_EQUITY: 90,
+          TOTAL_PARENT_EQUITY: 70,
+          MINORITY_EQUITY: 20,
         },
       ],
     ]);
@@ -198,15 +202,69 @@ describe("snapshot financial metrics", () => {
     const equity = result.data.rows.find(
       (r) => r.date === "2026-06-30" && r.periodStart === "2026-01-01",
     )!;
-    expect(equity.values.PARENT_EQUITY_COMPARISON).toBe(50);
-    expect(equity.values.MINORITY_EQUITY_ESTIMATE).toBe(40);
-    expect(result.data.attributes!.currentSharesDate).toBe("2026-09-30");
+    expect(equity.values.TOTAL_PARENT_EQUITY).toBe(70);
+    expect(equity.values.MINORITY_EQUITY).toBe(20);
+    shares.envelope.data.rows[0]!.values.TOTAL_SHARES = 1000;
+    const changed = deriveFinancialMetrics(scope, [
+      indicators,
+      balance,
+      shares,
+    ])!.envelope;
+    expect(
+      changed.data.rows.find(
+        (r) => r.date === equity.date && r.periodStart === equity.periodStart,
+      )!.values.TOTAL_PARENT_EQUITY,
+    ).toBe(70);
     const working = result.data.rows.find(
       (r) => r.periodStart === "2026-06-30",
     )!;
     expect(working.values.SIMPLIFIED_WORKING_CAPITAL).toBe(30);
     expect(working.values.SIMPLIFIED_WORKING_CAPITAL_CHANGE).toBe(5);
   });
+  it("uses period-end reported equity for TTM ROE and leaves missing equity empty", () => {
+    const income = packet("financial.income", [
+      ["2025-12-31", { PARENT_NETPROFIT: 20 }],
+    ]);
+    const balance = packet("financial.balance", [
+      ["2025-12-31", { TOTAL_PARENT_EQUITY: 80, MINORITY_EQUITY: null }],
+    ]);
+    balance.envelope.data.rows[0]!.periodStart = "2025-12-31";
+    const values = () =>
+      deriveFinancialMetrics(scope, [income, balance])!.envelope.data.rows.find(
+        (r) => r.periodStart === "2025-01-01",
+      )!.values;
+    expect(values().ROE_TTM_END_PARENT_EQUITY).toBe(0.25);
+    balance.envelope.data.rows[0]!.values.TOTAL_PARENT_EQUITY = null;
+    expect(values().ROE_TTM_END_PARENT_EQUITY).toBeNull();
+    expect(values().TOTAL_PARENT_EQUITY).toBeNull();
+    expect(values().MINORITY_EQUITY).toBeNull();
+  });
+  it.each(["source", "unit", "zero", "period"])(
+    "leaves period-end ROE empty for incompatible %s",
+    (problem) => {
+      const income = packet("financial.income", [
+        ["2025-12-31", { PARENT_NETPROFIT: 20 }],
+      ]);
+      const balance = packet("financial.balance", [
+        ["2025-12-31", { TOTAL_PARENT_EQUITY: 80 }],
+      ]);
+      balance.envelope.data.rows[0]!.periodStart = "2025-12-31";
+      if (problem === "source")
+        balance.envelope.source.provider = "another-source";
+      if (problem === "unit")
+        balance.envelope.data.columns.TOTAL_PARENT_EQUITY!.unit = "USD";
+      if (problem === "zero")
+        balance.envelope.data.rows[0]!.values.TOTAL_PARENT_EQUITY = 0;
+      if (problem === "period")
+        balance.envelope.data.rows[0]!.date = "2025-09-30";
+      const result = deriveFinancialMetrics(scope, [income, balance])!;
+      expect(
+        result.envelope.data.rows.find(
+          (row) => row.periodStart === "2025-01-01",
+        )!.values.ROE_TTM_END_PARENT_EQUITY,
+      ).toBeNull();
+    },
+  );
   it("sums four contiguous SEC quarters and compares with prior four quarters", () => {
     const source = packet(
       "financial.revenue",

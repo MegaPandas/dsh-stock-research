@@ -213,6 +213,7 @@ function xueqiuReportTask(
     id: report.id,
     dataset: "fundamentals",
     provider: "xueqiu",
+    enabledBy: ["xueqiu"],
     endpoint: `https://stock.xueqiu.com${path}`,
     async run(signal) {
       const response = await client.get(
@@ -365,6 +366,7 @@ function reportTask(
     id: report.id,
     dataset: "fundamentals",
     provider: "eastmoney",
+    enabledBy: ["eastmoney-income"],
     endpoint: url.origin + url.pathname,
     async run(signal) {
       const response = parseSourceJson(
@@ -479,11 +481,11 @@ export function createChinaFinancialTasks(
       "VERSION_UNAVAILABLE",
       "Deterministic China financial collection supports SH/SZ A shares in CNY.",
     );
-  return REPORTS.map((report) => {
+  return REPORTS.flatMap((report) => {
     const task = reportTask(http, scope, report);
     const source = XUEQIU_REPORTS[report.id];
-    if (xueqiu !== undefined && source !== undefined)
-      task.fallback = xueqiuReportTask(xueqiu, scope, report, source);
-    return task;
+    return xueqiu !== undefined && source !== undefined
+      ? [task, xueqiuReportTask(xueqiu, scope, report, source)]
+      : [task];
   });
 }

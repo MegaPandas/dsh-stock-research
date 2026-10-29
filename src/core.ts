@@ -239,8 +239,9 @@ export type {
 export type { QueryHealth, SourceHealth } from "./services/query.js";
 export { QueryService } from "./services/query.js";
 export { CollectionService } from "./services/collection.js";
-export type { CollectionOptions } from "./services/collection.js";
 export type {
+  CollectionOptions,
+  CollectionPlan,
   CollectedTableData,
   CollectionColumn,
   CollectionRow,

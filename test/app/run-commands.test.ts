@@ -753,6 +753,9 @@ describe("run commands during real producers", () => {
       );
       fetch.mockResolvedValueOnce(new Response("unavailable", { status: 503 }));
       fetch.mockResolvedValueOnce(new Response("unavailable", { status: 503 }));
+      // Optional weekly/monthly sources each retry their transient 503 once.
+      fetch.mockResolvedValueOnce(new Response("unavailable", { status: 503 }));
+      fetch.mockResolvedValueOnce(new Response("unavailable", { status: 503 }));
       const initial = observe(h.executeAndWait());
       await Promise.all([market.started.promise, fundamentals.started.promise]);
       const priorFundamentals = h.runtime.runs
@@ -868,7 +871,7 @@ describe("run commands during real producers", () => {
         h.runtime.runs.readArtifact(priorFundamentals[0]!).content.kind,
       ).toBe("analysis");
       expect(h.ctx.agents.list()).toEqual([h.outside.agent]);
-      expect(fetch).toHaveBeenCalledTimes(3);
+      expect(fetch).toHaveBeenCalledTimes(5);
     },
   );
 });
