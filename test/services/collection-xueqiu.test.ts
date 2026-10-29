@@ -62,11 +62,16 @@ function mockSources(primarySucceeds: boolean) {
     if (url.hostname === "stock.xueqiu.com") {
       if (url.pathname.includes("kline")) {
         const period = url.searchParams.get("period");
-        const date = period === "day" ? "2024-01-03" : "2023-12-29";
+        const date =
+          period === "day"
+            ? url.searchParams.get("symbol")!.endsWith(".FX")
+              ? "2024-01-02"
+              : "2024-01-03"
+            : "2023-12-29";
         return json({
           error_code: 0,
           data: {
-            symbol: "SH600519",
+            symbol: url.searchParams.get("symbol"),
             column: ["timestamp", "open", "close", "high", "low", "volume"],
             item: [[Date.parse(`${date}T00:00:00Z`), 100, 102, 103, 99, 1200]],
           },
@@ -221,5 +226,26 @@ describe("Xueqiu collection fallback integration", () => {
     expect(xueqiuCalls(fetch)).toHaveLength(calls.length);
     expect(cached.diagnostics!.cacheHits).toBe(8);
     expect(JSON.stringify(cached)).not.toContain(cookie);
+  });
+
+  it("routes enabled USD/CNH benchmarks to Xueqiu when Eastmoney fails", async () => {
+    const fetch = mockSources(false);
+    const snapshot = await setup(["benchmarks", "xueqiu"]).collect(scope);
+    const packets = snapshot.packets.filter(({ id }) =>
+      id.startsWith("benchmark.usdcnh."),
+    );
+    expect(packets.map(({ id }) => id)).toEqual([
+      "benchmark.usdcnh.daily",
+      "benchmark.usdcnh.weekly",
+      "benchmark.usdcnh.monthly",
+    ]);
+    expect(
+      packets.every(({ envelope }) => envelope.source.provider === "xueqiu"),
+    ).toBe(true);
+    const forexCalls = xueqiuCalls(fetch).filter(([url]) =>
+      new URL(String(url)).searchParams.get("symbol")!.endsWith(".FX"),
+    );
+    expect(forexCalls).toHaveLength(12);
+    expect(JSON.stringify(snapshot)).not.toContain(cookie);
   });
 });

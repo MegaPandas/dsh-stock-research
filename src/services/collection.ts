@@ -270,7 +270,7 @@ export class CollectionService {
           xueqiu,
         ),
         ...createChinaMacroTasks(this.http, scope),
-        ...createBenchmarkMarketTasks(this.http, scope),
+        ...createBenchmarkMarketTasks(this.http, scope, xueqiu),
         ...createBenchmarkBondTasks(this.http.forSource("eastmoney"), scope),
       ].flatMap((task) => {
         const configured = task.id.startsWith("benchmark.")

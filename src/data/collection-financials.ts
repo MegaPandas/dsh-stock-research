@@ -1,3 +1,7 @@
+import {
+  STATEMENT_FIELDS,
+  statementColumns,
+} from "./financial-statement-fields.js";
 import type {
   CollectionColumn,
   CollectionRow,
@@ -80,46 +84,6 @@ const QUARTER: Record<string, CollectionColumn> = {
   GROSS_PROFIT_RATIO: percent("单季度毛利率"),
   NET_PROFIT_RATIO: percent("单季度净利率"),
 };
-const INCOME: Record<string, CollectionColumn> = {
-  TOTAL_OPERATE_INCOME: amount("营业总收入"),
-  OPERATE_INCOME: amount("营业收入"),
-  TOTAL_OPERATE_COST: amount("营业总成本"),
-  OPERATE_COST: amount("营业成本"),
-  SALE_EXPENSE: amount("销售费用"),
-  MANAGE_EXPENSE: amount("管理费用"),
-  FINANCE_EXPENSE: amount("财务费用"),
-  OPERATE_PROFIT: amount("营业利润"),
-  TOTAL_PROFIT: amount("利润总额"),
-  INCOME_TAX: amount("所得税费用"),
-  PARENT_NETPROFIT: amount("归母净利润"),
-  DEDUCT_PARENT_NETPROFIT: amount("扣非归母净利润"),
-};
-const BALANCE: Record<string, CollectionColumn> = {
-  TOTAL_ASSETS: amount("总资产"),
-  TOTAL_LIABILITIES: amount("总负债"),
-  TOTAL_EQUITY: amount("所有者权益合计"),
-  MONETARYFUNDS: amount("货币资金"),
-  ACCOUNTS_RECE: amount("应收账款"),
-  INVENTORY: amount("存货"),
-  FIXED_ASSET: amount("固定资产"),
-  ACCOUNTS_PAYABLE: amount("应付账款"),
-  ADVANCE_RECEIVABLES: amount("预收款项"),
-  SHORT_LOAN: amount("短期借款"),
-  DEBT_ASSET_RATIO: percent("资产负债率"),
-};
-const CASHFLOW: Record<string, CollectionColumn> = {
-  NETCASH_OPERATE: amount("经营活动现金流量净额"),
-  NETCASH_INVEST: amount("投资活动现金流量净额"),
-  NETCASH_FINANCE: amount("筹资活动现金流量净额"),
-  SALES_SERVICES: amount("销售商品提供劳务收到现金"),
-  PAY_STAFF_CASH: amount("支付职工现金"),
-  RECEIVE_INVEST_INCOME: amount("取得投资收益收到现金"),
-  CONSTRUCT_LONG_ASSET: amount("购建长期资产支付现金"),
-  INVEST_PAY_CASH: amount("投资支付现金"),
-  CCE_ADD: amount("现金及现金等价物净增加额"),
-  BEGIN_CCE: amount("期初现金及现金等价物余额"),
-  END_CCE: amount("期末现金及现金等价物余额"),
-};
 
 interface Report {
   id: string;
@@ -150,25 +114,25 @@ const REPORTS: Report[] = [
   },
   {
     id: "financial.income",
-    title: "利润表摘要",
-    report: "RPT_DMSK_FN_INCOME",
-    columns: INCOME,
+    title: "利润表明细",
+    report: "RPT_F10_FINANCE_GINCOME",
+    columns: statementColumns("financial.income"),
     basis: "year_to_date",
     notice: true,
   },
   {
     id: "financial.balance",
-    title: "资产负债表摘要",
-    report: "RPT_DMSK_FN_BALANCE",
-    columns: BALANCE,
+    title: "资产负债表明细",
+    report: "RPT_F10_FINANCE_GBALANCE",
+    columns: statementColumns("financial.balance"),
     basis: "point_in_time",
     notice: true,
   },
   {
     id: "financial.cashflow",
-    title: "现金流量表摘要",
-    report: "RPT_DMSK_FN_CASHFLOW",
-    columns: CASHFLOW,
+    title: "现金流量表明细",
+    report: "RPT_F10_FINANCE_GCASHFLOW",
+    columns: statementColumns("financial.cashflow"),
     basis: "year_to_date",
     notice: true,
   },
@@ -204,55 +168,19 @@ const XUEQIU_REPORTS: Record<
       YSZKZZL: "account_receivable_turnover",
     },
   },
-  "financial.income": {
-    endpoint: "income",
-    fields: {
-      TOTAL_OPERATE_INCOME: "total_revenue",
-      OPERATE_INCOME: "revenue",
-      TOTAL_OPERATE_COST: "operating_costs",
-      OPERATE_COST: "operating_cost",
-      SALE_EXPENSE: "sales_fee",
-      MANAGE_EXPENSE: "manage_fee",
-      FINANCE_EXPENSE: "financing_expenses",
-      OPERATE_PROFIT: "op",
-      TOTAL_PROFIT: "profit_total_amt",
-      INCOME_TAX: "income_tax_expenses",
-      PARENT_NETPROFIT: "net_profit_atsopc",
-      DEDUCT_PARENT_NETPROFIT: "net_profit_after_nrgal_atsolc",
-    },
-  },
-  "financial.balance": {
-    endpoint: "balance",
-    fields: {
-      TOTAL_ASSETS: "total_assets",
-      TOTAL_LIABILITIES: "total_liab",
-      TOTAL_EQUITY: "total_holders_equity",
-      MONETARYFUNDS: "currency_funds",
-      ACCOUNTS_RECE: "account_receivable",
-      INVENTORY: "inventory",
-      FIXED_ASSET: "fixed_asset",
-      ACCOUNTS_PAYABLE: "accounts_payable",
-      ADVANCE_RECEIVABLES: "pre_receivable",
-      SHORT_LOAN: "st_loan",
-      DEBT_ASSET_RATIO: "asset_liab_ratio",
-    },
-  },
-  "financial.cashflow": {
-    endpoint: "cash_flow",
-    fields: {
-      NETCASH_OPERATE: "ncf_from_oa",
-      NETCASH_INVEST: "ncf_from_ia",
-      NETCASH_FINANCE: "ncf_from_fa",
-      SALES_SERVICES: "cash_received_of_sales_service",
-      PAY_STAFF_CASH: "cash_paid_to_employee_etc",
-      RECEIVE_INVEST_INCOME: "invest_income_cash_received",
-      CONSTRUCT_LONG_ASSET: "cash_paid_for_assets",
-      INVEST_PAY_CASH: "invest_paid_cash",
-      CCE_ADD: "net_increase_in_cce",
-      BEGIN_CCE: "initial_balance_of_cce",
-      END_CCE: "final_balance_of_cce",
-    },
-  },
+  ...Object.fromEntries(
+    Object.entries(STATEMENT_FIELDS).map(([id, fields]) => [
+      id,
+      {
+        endpoint: id === "financial.cashflow" ? "cash_flow" : id.split(".")[1]!,
+        fields: Object.fromEntries(
+          Object.entries(fields).flatMap(([key, field]) =>
+            field.xueqiu === undefined ? [] : [[key, field.xueqiu]],
+          ),
+        ),
+      },
+    ]),
+  ),
 };
 
 function xueqiuValue(value: unknown, field: string): number | null {
@@ -261,6 +189,15 @@ function xueqiuValue(value: unknown, field: string): number | null {
   if (pair.length !== 2)
     sourceError(field, "expected a source value and comparison pair");
   return collectedNumber(pair[0], field);
+}
+
+function scaledXueqiuValue(
+  value: unknown,
+  field: string,
+  scale: number,
+): number | null {
+  const number = xueqiuValue(value, field);
+  return number === null ? null : number * scale;
 }
 
 function xueqiuReportTask(
@@ -311,7 +248,13 @@ function xueqiuReportTask(
               const field = source.fields[key];
               return [
                 key,
-                field === undefined ? null : xueqiuValue(raw[field], field),
+                field === undefined
+                  ? null
+                  : scaledXueqiuValue(
+                      raw[field],
+                      field,
+                      STATEMENT_FIELDS[report.id]?.[key]?.xueqiuScale ?? 1,
+                    ),
               ];
             }),
           ),
@@ -338,6 +281,15 @@ function xueqiuReportTask(
           code: "missing",
           field: "/data/rows",
           detail: `The source supplies ${envelope.data.rows.length} eligible reporting periods; the fixed window requests ${REPORT_WINDOW}.`,
+        });
+      const absentFields = Object.entries(STATEMENT_FIELDS[report.id] ?? {})
+        .filter(([, field]) => field.xueqiu === undefined)
+        .map(([key]) => key);
+      if (absentFields.length > 0)
+        envelope.gaps.push({
+          code: "missing",
+          field: "/data/columns",
+          detail: `Xueqiu detail does not supply these declared fields: ${absentFields.join(", ")}. Values remain null.`,
         });
       envelope.gaps.push({
         code: "unverified_time",
@@ -374,9 +326,7 @@ function reportTask(
   const url = new URL(
     report.main
       ? "https://datacenter.eastmoney.com/securities/api/data/get"
-      : report.id === "financial.quarter"
-        ? "https://datacenter.eastmoney.com/securities/api/data/v1/get"
-        : "https://datacenter-web.eastmoney.com/api/data/v1/get",
+      : "https://datacenter.eastmoney.com/securities/api/data/v1/get",
   );
   url.search = new URLSearchParams(
     report.main
@@ -398,16 +348,17 @@ function reportTask(
             "SECUCODE",
             "REPORT_DATE",
             ...(report.notice ? ["NOTICE_DATE"] : []),
-            ...Object.keys(report.columns),
+            ...Object.keys(report.columns).filter(
+              (key) => STATEMENT_FIELDS[report.id]?.[key]?.eastmoney !== false,
+            ),
           ].join(","),
           filter,
           pageNumber: "1",
           pageSize: String(REPORT_WINDOW),
           sortColumns: "REPORT_DATE",
           sortTypes: "-1",
-          ...(report.id === "financial.quarter"
-            ? { source: "HSF10", client: "PC" }
-            : {}),
+          source: "HSF10",
+          client: "PC",
         },
   ).toString();
   return {
@@ -459,7 +410,9 @@ function reportTask(
         const values = Object.fromEntries(
           Object.keys(report.columns).map((key) => [
             key,
-            collectedNumber(raw[key], key),
+            STATEMENT_FIELDS[report.id]?.[key]?.eastmoney === false
+              ? null
+              : collectedNumber(raw[key], key),
           ]),
         );
         const row = {

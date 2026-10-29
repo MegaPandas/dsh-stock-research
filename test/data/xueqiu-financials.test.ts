@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ResearchScope } from "../../src/contracts/data.js";
 import { createChinaFinancialTasks } from "../../src/data/collection-financials.js";
@@ -155,7 +156,7 @@ describe("Xueqiu financial collection fallback", () => {
       row({
         total_assets: [1000, 0.2],
         total_liab: [700, 0.1],
-        asset_liab_ratio: [70, 0.05],
+        asset_liab_ratio: [0.7, 0.05],
         ncf_from_oa: [150, 0.15],
         ncf_from_ia: [-50, 0.1],
         ncf_from_fa: [-20, 0.3],
@@ -185,6 +186,87 @@ describe("Xueqiu financial collection fallback", () => {
     });
     expect(cashflow.data.columns.NETCASH_OPERATE!.unit).toBe("CNY");
   });
+
+  it.each([
+    [
+      "income",
+      2,
+      {
+        RESEARCH_EXPENSE: 27894594.88,
+        ASSET_IMPAIRMENT_INCOME: -66450084.58,
+        CREDIT_IMPAIRMENT_INCOME: -8059186.37,
+        NETPROFIT: 226821000.45,
+        MINORITY_INTEREST: -26339017.52,
+      },
+    ],
+    [
+      "balance",
+      3,
+      {
+        TOTAL_PARENT_EQUITY: 2168152451.98,
+        MINORITY_EQUITY: -244752710,
+        SHORT_LOAN: 3461625400.17,
+        LONG_LOAN: 698800000,
+        LONG_PAYABLE_TOTAL: 0,
+        LONG_PAYABLE: null,
+        LEASE_LIAB: null,
+        USERIGHT_ASSET: null,
+        DEBT_ASSET_RATIO: 93.03916570125526,
+      },
+    ],
+    [
+      "cashflow",
+      4,
+      {
+        RECEIVE_LOAN_CASH: 3499510166.67,
+        PAY_DEBT_CASH: 3764910166.67,
+        TOTAL_OPERATE_INFLOW: 26181223396.59,
+        FA_IR_DEPR: null,
+        IA_AMORTIZE: null,
+        USERIGHT_ASSET_AMORTIZE: null,
+        OPERATE_PAYABLE_ADD: null,
+      },
+    ],
+  ] as const)(
+    "maps verified Xueqiu %s detail while preserving source omissions",
+    async (name, index, expected) => {
+      const fixture = JSON.parse(
+        readFileSync(
+          new URL(
+            `../fixtures/sources/financial-detail-xueqiu-${name}.json`,
+            import.meta.url,
+          ),
+          "utf8",
+        ),
+      );
+      const { tasks } = setup(fixture.data.list);
+      const result = await tasks[index]!.fallback!.run();
+      expect(result.data.rows).toHaveLength(name === "balance" ? 3 : 2);
+      expect(result.data.rows.at(-1)!.values).toMatchObject(expected);
+      if (name === "balance") {
+        expect(
+          result.data.rows.find(({ date }) => date === "2026-03-31")!.values,
+        ).toMatchObject({
+          FIXED_ASSET: 3618963676.66,
+          FIXED_ASSET_DETAIL: null,
+          CIP: 39949481.72,
+          CIP_DETAIL: null,
+        });
+        expect(
+          result.data.rows.find(({ date }) => date === "2023-12-31")!.values,
+        ).toMatchObject({
+          OTHER_RECE: 563030272.81,
+          TOTAL_OTHER_RECE: null,
+        });
+        expect(result.gaps).toContainEqual(
+          expect.objectContaining({
+            field: "/data/columns",
+            detail: expect.stringContaining("LEASE_LIAB"),
+          }),
+        );
+      }
+    },
+  );
 
   it("preserves missing and zero values independently of the comparison value", async () => {
     const { tasks } = setup([

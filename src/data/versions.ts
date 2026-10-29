@@ -14,7 +14,7 @@ export const SOURCE_VERSIONS = {
   "macro/fred": { adapterVersion: "1", normalizationVersion: "1" },
   "research/dsh-web": { adapterVersion: "1", normalizationVersion: "1" },
 } as const;
-export const COLLECTION_VERSION = "1";
+export const COLLECTION_VERSION = "2";
 export const COLLECTION_SOURCE_VERSIONS = Object.fromEntries(
   [
     "market/eastmoney",

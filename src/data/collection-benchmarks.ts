@@ -8,6 +8,7 @@ import type { ResearchScope } from "../contracts/data.js";
 import { ResearchError } from "../contracts/errors.js";
 import { collectedEnvelope, collectedNumber } from "./collection-utils.js";
 import type { HttpClient } from "./http.js";
+import { type XueqiuClient, xueqiuDate } from "./xueqiu.js";
 import { SINA_KLINE_ENDPOINT, sinaKlines } from "./sina-kline.js";
 import {
   TENCENT_KLINE_ENDPOINT,
@@ -61,6 +62,7 @@ interface Benchmark {
   yahooSymbol?: string;
   yahooAlias?: string;
   sinaForexSymbol?: string;
+  xueqiuSymbol?: string;
   currency?: string;
 }
 
@@ -132,6 +134,7 @@ const BENCHMARKS: readonly Benchmark[] = [
     unit: "CNY/USD",
     calendar: "global_weekdays_utc",
     yahooSymbol: "CNY=X",
+    xueqiuSymbol: "USDCNY.FX",
     currency: "CNY",
   },
   {
@@ -143,6 +146,7 @@ const BENCHMARKS: readonly Benchmark[] = [
     calendar: "global_weekdays_utc",
     secid: "133.USDCNH",
     sinaForexSymbol: "fx_susdcnh",
+    xueqiuSymbol: "USDCNH.FX",
     currency: "CNH",
   },
   {
@@ -154,6 +158,7 @@ const BENCHMARKS: readonly Benchmark[] = [
     calendar: "global_weekdays_utc",
     secid: "119.EURUSD",
     yahooSymbol: "EURUSD=X",
+    xueqiuSymbol: "EURUSD.FX",
     currency: "USD",
   },
   {
@@ -166,6 +171,7 @@ const BENCHMARKS: readonly Benchmark[] = [
     secid: "119.USDJPY",
     yahooSymbol: "JPY=X",
     yahooAlias: "USDJPY=X",
+    xueqiuSymbol: "USDJPY.FX",
     currency: "JPY",
   },
 ];
@@ -592,6 +598,86 @@ function yahooTask(
   };
 }
 
+function xueqiuTask(
+  client: XueqiuClient,
+  scope: ResearchScope,
+  asset: Benchmark,
+  window: Window,
+): CollectionTask {
+  const path = "/v5/stock/chart/kline.json";
+  const { end } = bounds(scope, asset, window);
+  return {
+    id: `benchmark.${asset.id}.${window.id}`,
+    dataset: "market",
+    provider: "xueqiu",
+    endpoint: `https://stock.xueqiu.com${path}`,
+    async run(signal) {
+      const response = await client.get(
+        path,
+        {
+          symbol: asset.xueqiuSymbol!,
+          period:
+            window.interval === "1d"
+              ? "day"
+              : window.interval === "1wk"
+                ? "week"
+                : "month",
+          type: "normal",
+          begin: String(Date.parse(`${end}T23:59:59.999Z`)),
+          count: String(-window.count),
+        },
+        signal,
+      );
+      if (response.data.symbol !== asset.xueqiuSymbol)
+        sourceError(
+          "symbol",
+          "benchmark identity does not match the requested Xueqiu symbol",
+        );
+      const fields = sourceArray(response.data.column, "column");
+      const indices = new Map(fields.map((field, index) => [field, index]));
+      for (const field of ["timestamp", "open", "high", "low", "close"])
+        if (!indices.has(field)) sourceError("column", `missing ${field}`);
+      const rows = sourceArray(response.data.item, "item").map((item) => {
+        const row = sourceArray(item, "item[]");
+        if (row.length !== fields.length)
+          sourceError("item[]", "row length does not match the column count");
+        const number = (field: string) => {
+          const index = indices.get(field);
+          return index === undefined
+            ? null
+            : collectedNumber(row[index], field);
+        };
+        return makeRow(
+          xueqiuDate(row[indices.get("timestamp")!], "timestamp"),
+          {
+            open: number("open"),
+            high: number("high"),
+            low: number("low"),
+            close: number("close"),
+            change: number("chg"),
+            changePercent: number("percent"),
+            amplitude: null,
+          },
+          asset,
+          window,
+        );
+      });
+      const result = finish(
+        rows,
+        scope,
+        asset,
+        window,
+        "xueqiu",
+        response.url,
+        response.retrievedAt,
+        asset.name,
+      );
+      result.data.attributes!.sourceTimeZone = "Asia/Shanghai";
+      return result;
+    },
+  };
+}
+
 function tencentTask(
   http: HttpClient,
   scope: ResearchScope,
@@ -727,6 +813,7 @@ function sinaForexTask(
 export function createBenchmarkMarketTasks(
   http: HttpClient,
   scope: ResearchScope,
+  xueqiu?: XueqiuClient,
 ): CollectionTask[] {
   return BENCHMARKS.flatMap((asset) =>
     WINDOWS.map((window) => {
@@ -809,6 +896,11 @@ export function createBenchmarkMarketTasks(
           asset,
           window,
         );
+      }
+      if (xueqiu !== undefined && asset.xueqiuSymbol !== undefined) {
+        const fallback = xueqiuTask(xueqiu, scope, asset, window);
+        if (task.fallback !== undefined) fallback.fallback = task.fallback;
+        task.fallback = fallback;
       }
       return task;
     }),

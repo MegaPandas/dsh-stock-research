@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ResearchScope } from "../../src/contracts/data.js";
 import { createChinaFinancialTasks } from "../../src/data/collection-financials.js";
@@ -146,7 +147,7 @@ describe("deterministic China financial collection", () => {
     ).toBe(true);
   });
 
-  it("requests only declared financial fields in the three statement summaries", async () => {
+  it("requests only declared financial fields in the three detailed statements", async () => {
     const { tasks, get } = setup(
       response([
         row({
@@ -161,7 +162,7 @@ describe("deterministic China financial collection", () => {
     const balance = await tasks[3]!.run();
     const balanceUrl = new URL(String(get.mock.calls[0]![0]));
     expect(balanceUrl.searchParams.get("reportName")).toBe(
-      "RPT_DMSK_FN_BALANCE",
+      "RPT_F10_FINANCE_GBALANCE",
     );
     expect(balanceUrl.searchParams.get("columns")).toContain("TOTAL_ASSETS");
     expect(balanceUrl.searchParams.get("columns")).not.toBe("ALL");
@@ -176,7 +177,7 @@ describe("deterministic China financial collection", () => {
       values: {
         TOTAL_ASSETS: 1000,
         TOTAL_LIABILITIES: 200,
-        DEBT_ASSET_RATIO: 70.95,
+        DEBT_ASSET_RATIO: null,
       },
     });
     const cashflow = await tasks[4]!.run();
@@ -184,6 +185,94 @@ describe("deterministic China financial collection", () => {
     expect(cashflow.data.columns.NETCASH_OPERATE!.unit).toBe("CNY");
     expect(cashflow.data.basis).toBe("year_to_date");
   });
+
+  it.each([
+    [
+      "income",
+      2,
+      {
+        RESEARCH_EXPENSE: 27894594.88,
+        FE_INTEREST_EXPENSE: 272611826.37,
+        ASSET_IMPAIRMENT_INCOME: -66450084.58,
+        CREDIT_IMPAIRMENT_INCOME: -8059186.37,
+        MINORITY_INTEREST: -26339017.52,
+      },
+    ],
+    [
+      "balance",
+      3,
+      {
+        TOTAL_PARENT_EQUITY: 2168152451.98,
+        MINORITY_EQUITY: -244752710,
+        SHORT_LOAN: 3461625400.17,
+        LONG_LOAN: 698800000,
+        LEASE_LIAB: 8570353616.09,
+        USERIGHT_ASSET: 6913694820.58,
+        TRADE_FINASSET_NOTFVTPL: 1090318098.97,
+        LONG_PAYABLE: null,
+        LONG_PAYABLE_TOTAL: null,
+      },
+    ],
+    [
+      "cashflow",
+      4,
+      {
+        RECEIVE_LOAN_CASH: 3499510166.67,
+        PAY_DEBT_CASH: 3764910166.67,
+        TOTAL_OPERATE_INFLOW: 26181223396.59,
+        FA_IR_DEPR: 171319373.3,
+        OILGAS_BIOLOGY_DEPR: 166267463.53,
+        IR_DEPR: 5051909.77,
+        IA_AMORTIZE: 33681230.18,
+        LPE_AMORTIZE: 212474358.32,
+        USERIGHT_ASSET_AMORTIZE: 378491595.03,
+        OPERATE_PAYABLE_ADD: -1995409971.6,
+      },
+    ],
+  ] as const)(
+    "maps verified F10 %s detail and requests only supported columns",
+    async (name, index, expected) => {
+      const fixture = JSON.parse(
+        readFileSync(
+          new URL(
+            `../fixtures/sources/financial-detail-eastmoney-${name}.json`,
+            import.meta.url,
+          ),
+          "utf8",
+        ),
+      );
+      const selectedScope = {
+        ...scope,
+        security: {
+          ...scope.security,
+          id: "CN:601933.SH",
+          symbol: "601933.SH",
+          exchange: "SH" as const,
+        },
+      };
+      const { tasks, get } = setup(fixture, selectedScope);
+      const result = await tasks[index]!.run();
+      expect(result.data.rows).toHaveLength(name === "balance" ? 3 : 2);
+      expect(result.data.rows.at(-1)!.values).toMatchObject(expected);
+      if (name === "balance")
+        expect(
+          result.data.rows.find(({ date }) => date === "2023-12-31")!.values
+            .TOTAL_OTHER_RECE,
+        ).toBe(563971664.48);
+      const url = new URL(String(get.mock.calls[0]![0]));
+      expect(url.origin + url.pathname).toBe(
+        "https://datacenter.eastmoney.com/securities/api/data/v1/get",
+      );
+      expect(url.searchParams.get("reportName")).toBe(
+        `RPT_F10_FINANCE_G${name.toUpperCase()}`,
+      );
+      expect(url.searchParams.get("source")).toBe("HSF10");
+      expect(url.searchParams.get("client")).toBe("PC");
+      expect(url.searchParams.get("columns")).not.toMatch(
+        /(?:^|,)(?:DEBT_ASSET_RATIO|FIXED_ASSET_DETAIL|CIP_DETAIL|LONG_PAYABLE_TOTAL|ALL)(?:,|$)|YOY/,
+      );
+    },
+  );
 
   it("excludes periods and announcements beyond cutoff before passing data to analysis", async () => {
     const { tasks } = setup(
