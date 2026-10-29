@@ -16,6 +16,7 @@ import {
   parseAnalysisDraft,
 } from "../services/analysis-report.js";
 import type { RoleProvision } from "../host/dispatch.js";
+import type { SubmitReport } from "../host/report-submission.js";
 import type { RunService } from "../services/runs.js";
 import type { QueryToolPolicy } from "../tools/query-inputs.js";
 import { readApplicationInput } from "./research-input.js";
@@ -49,6 +50,7 @@ import {
   stringSchema,
   text,
   resultOutput,
+  artifactRefSchema,
 } from "../tools/parameters.js";
 
 const ROLE_TOOLS = new Set([
@@ -57,12 +59,12 @@ const ROLE_TOOLS = new Set([
   "stock_read_evidence",
   "stock_data_health",
   "stock_recall",
-  "stock_save_report",
 ]);
 const SCOPED_QUERIES = new Set(["stock_data_health", "stock_recall"]);
 
 export interface RoleServices {
   runs: RunService;
+  submitReport: SubmitReport;
   searchPublic(
     query: string,
     exec: ToolRunContext,
@@ -167,8 +169,6 @@ export function prepareResearchRole(
     },
   );
   if (definition.executor.role === "analyst" && roleVersion !== "11") {
-    const taskTools = services.createTools(profile.policy);
-    const submit = taskTools.find((tool) => tool.name === "stock_save_report")!;
     const publicRole = claim.taskId === PUBLIC_RESEARCH_TASK;
     let systemPrompt = profile.prompts.analyst;
     let dataTools = collectionDataTools(tables);
@@ -232,7 +232,7 @@ export function prepareResearchRole(
         ...dataTools,
         ...businessDraftTools(file),
         researchTool({
-          ...submit,
+          name: "stock_save_report",
           description:
             "Validate the business structure and submission eligibility of this task's fixed JSON draft, then publish it. Accepts no body or reference arguments. Success ends the task.",
           parameters: objectSchema({ requestId: stringSchema }),
@@ -269,11 +269,9 @@ export function prepareResearchRole(
               if (times.length > 0)
                 content.body = `公开检索截至：${times.at(-1)}\n\n${content.body}`;
             }
-            await submit.execute(
-              {
-                requestId: text(item.requestId, "requestId"),
-                contents: [content],
-              },
+            services.submitReport(
+              [content],
+              text(item.requestId, "requestId"),
               exec,
             );
             exec.concludeTurn();
@@ -320,23 +318,6 @@ export function prepareResearchRole(
     .createTools(profile.policy)
     .filter((tool) => ROLE_TOOLS.has(tool.name))
     .map((tool) => {
-      if (tool.name === "stock_save_report")
-        return researchTool({
-          ...tool,
-          description:
-            "Read, validate and publish this task's fixed Markdown draft. Errors identify fields and reasons; edit the retained draft and resubmit. Accepts no body or path arguments.",
-          parameters: objectSchema({ requestId: stringSchema }),
-          async execute(value, exec) {
-            const item = object(value, ["requestId"]);
-            const requestId = text(item.requestId, "requestId");
-            const result = await tool.execute(
-              { requestId, contents: [await file.value(exec.signal)] },
-              exec,
-            );
-            exec.concludeTurn();
-            return result;
-          },
-        });
       if (!SCOPED_QUERIES.has(tool.name)) return tool;
       return {
         ...tool,
@@ -345,7 +326,35 @@ export function prepareResearchRole(
     });
   return {
     systemPrompt: profile.prompts[definition.executor.role],
-    tools: [...tools, ...collectionReadTools(tables), ...draftFileTools(file)],
+    tools: [
+      ...tools,
+      researchTool({
+        name: "stock_save_report",
+        description:
+          "Read, validate and publish this task's fixed Markdown draft. Errors identify fields and reasons; edit the retained draft and resubmit. Accepts no body or path arguments.",
+        parameters: objectSchema({ requestId: stringSchema }),
+        output: resultOutput(
+          objectSchema({
+            runId: stringSchema,
+            taskId: stringSchema,
+            attempt: { type: "integer" },
+            refs: { type: "array", items: artifactRefSchema },
+          }),
+        ),
+        async execute(value, exec) {
+          const item = object(value, ["requestId"]);
+          const result = services.submitReport(
+            [await file.value(exec.signal)],
+            text(item.requestId, "requestId"),
+            exec,
+          );
+          exec.concludeTurn();
+          return result;
+        },
+      }),
+      ...collectionReadTools(tables),
+      ...draftFileTools(file),
+    ],
     prompt: [
       {
         type: "text",

@@ -1,10 +1,7 @@
 import type { ToolDefinition } from "@deepseek-ai/dsh-tools";
 import { ResearchError } from "../contracts/errors.js";
-import {
-  authorizeRun,
-  taskOperation,
-  type SessionBindings,
-} from "../host/bindings.js";
+import { authorizeRun, type SessionBindings } from "../host/bindings.js";
+import { createReportSubmission } from "../host/report-submission.js";
 import type { ArtifactService } from "../services/artifacts.js";
 import type { DecisionService } from "../services/decisions.js";
 import type { DigestService } from "../services/digests.js";
@@ -51,6 +48,7 @@ export function createWriteTools(
   policy: QueryToolPolicy,
 ): ToolDefinition[] {
   const captured = captureQueryPolicy(policy);
+  const submitReport = createReportSubmission(services.artifacts, bindings);
   const serviceTools: ToolDefinition[] = (
     ["stock_make_digest", "stock_decide"] as const
   ).map((name): ToolDefinition => ({
@@ -89,23 +87,9 @@ export function createWriteTools(
       output: commitOutput,
       async execute(value, exec) {
         exec.signal.throwIfAborted();
-        const operation = taskOperation(bindings.require(exec.agent));
         const item = object(value, ["requestId", "contents"]);
         const requestId = text(item.requestId, "requestId");
-        if (Array.isArray(item.contents))
-          for (const content of item.contents) {
-            const kind = (content as { kind?: unknown } | null)?.kind;
-            if (kind === "digest" || kind === "decision" || kind === "report")
-              throw new ResearchError(
-                "ACCESS_DENIED",
-                "Service artifacts cannot be written through stock_save_report.",
-              );
-          }
-        return services.artifacts.submitArtifact(
-          operation,
-          item.contents,
-          requestId,
-        );
+        return submitReport(item.contents, requestId, exec);
       },
     },
     {

@@ -24,6 +24,7 @@ import { DigestService } from "../../src/services/digests.js";
 import { MemoryService } from "../../src/services/memory.js";
 import { rememberInputSchema } from "../../src/tools/write-inputs.js";
 import { createWriteTools } from "../../src/tools/write.js";
+import { createReportSubmission } from "../../src/host/report-submission.js";
 import { decisionFixture } from "../fixtures/decision.js";
 import { oneDigest } from "../fixtures/digest-conversation.js";
 
@@ -186,6 +187,60 @@ afterEach(async () => {
 });
 
 describe("write tools", () => {
+  it("shares trusted task identity and receipts with direct report submission", async () => {
+    const f = setup();
+    const submit = createReportSubmission(f.artifacts, f.bindings);
+    const saved = submit([analysis()], "shared-save", {
+      agent: f.task,
+      signal: new AbortController().signal,
+    });
+    expect(saved).toMatchObject({
+      runId: f.operation.runId,
+      taskId: "writer",
+      attempt: 1,
+    });
+    expect(f.runs.readArtifact(saved.refs[0]!).content).toEqual(analysis());
+    expect(
+      await f.call("stock_save_report", {
+        requestId: "shared-save",
+        contents: [analysis()],
+      }),
+    ).toEqual(saved);
+  });
+
+  it("enforces authorization and cancellation on direct report submission", () => {
+    const f = setup();
+    const submit = createReportSubmission(f.artifacts, f.bindings);
+    const signal = new AbortController().signal;
+    for (const agent of [
+      undefined,
+      f.agent(undefined, f.task.id),
+      f.coordinator,
+      f.review,
+      f.ask,
+    ])
+      expect(() =>
+        submit([analysis()], "denied", { agent, signal }),
+      ).toThrowError(expect.objectContaining({ code: "ACCESS_DENIED" }));
+    for (const kind of ["digest", "decision", "report"])
+      expect(() =>
+        submit([{ ...analysis(), kind }], kind, { agent: f.task, signal }),
+      ).toThrowError(expect.objectContaining({ code: "ACCESS_DENIED" }));
+    const aborted = new AbortController();
+    const reason = new Error("caller cancelled");
+    aborted.abort(reason);
+    expect(() =>
+      submit([analysis()], "cancelled", {
+        agent: f.task,
+        signal: aborted.signal,
+      }),
+    ).toThrow(reason);
+    expect(
+      f.runs.view(f.operation).tasks.find((t) => t.taskId === "writer")!
+        .outputRefs,
+    ).toEqual([]);
+  });
+
   it("omits replay source from memory returns request schema", () => {
     const input = {
       ...note(),

@@ -39,6 +39,10 @@ import type { QueryToolPolicy } from "../tools/query-inputs.js";
 import { createReadTools } from "../tools/read.js";
 import { createWriteTools } from "../tools/write.js";
 import { SessionBindings, type ResearchBinding } from "./bindings.js";
+import {
+  createReportSubmission,
+  type SubmitReport,
+} from "./report-submission.js";
 import { Config, type ResearchConfig } from "./config.js";
 import { generateHandoffDigest } from "../services/handoff-digest.js";
 import { DispatchBridge, type PrepareRole } from "./dispatch.js";
@@ -64,6 +68,7 @@ export interface ResearchRuntime {
   readonly dispatch: DispatchBridge;
   readonly tools: readonly ToolDefinition[];
   readonly policy: QueryToolPolicy;
+  readonly submitReport: SubmitReport;
   bindCoordinator(agent: Agent): () => void;
   authorizeCoordinatorRun(agent: Agent, runId: string): void;
   createDraftFile(
@@ -147,6 +152,7 @@ class Runtime implements ResearchRuntime {
   readonly memory: MemoryService;
   readonly dispatch: DispatchBridge;
   readonly tools: readonly ToolDefinition[];
+  readonly submitReport: SubmitReport;
   readonly #pending = new Set<PendingAgent>();
   readonly #agents = new Map<Agent, AgentHandle>();
   #closing: Promise<void> | undefined;
@@ -163,6 +169,10 @@ class Runtime implements ResearchRuntime {
     this.collection = components.collection;
     this.memory = components.memory;
     this.dispatch = components.dispatch;
+    this.submitReport = createReportSubmission(
+      components.artifacts,
+      components.bindings,
+    );
     this.tools = this.createTools(capturedPolicy);
   }
 

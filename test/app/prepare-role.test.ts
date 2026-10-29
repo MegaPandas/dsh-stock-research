@@ -1055,6 +1055,62 @@ describe("persisted research role preparation", () => {
     },
   );
 
+  it.each(["16", "17"])(
+    "submits a saved version %s business role through its fixed draft",
+    async (version) => {
+      const issue = {
+        description: "Demand uncertainty",
+        impact: "Lower cash generation",
+        trigger: "Orders decline",
+        constraint: "Limit exposure",
+        recommendation: "Reassess when results arrive",
+      };
+      const h = await host(async function* () {
+        yield* draftSubmission(
+          "stock_save_report",
+          { issues: [issue] },
+          "risk-save",
+          "risk-save",
+          "json",
+        );
+      });
+      h.input.versions.prompts.roles = version;
+      h.input.definition.tasks = h.input.definition.tasks.filter(
+        ({ id }) => id === "risk.main",
+      );
+      h.input.definition.tasks[0]!.dependsOn = [];
+      h.input.definition.tasks[0]!.inputTasks = [];
+      h.input.instructions = h.input.instructions!.filter(
+        ({ taskId }) => taskId === "risk.main",
+      );
+      const { runId } = h.runtime.runs.open("owner", h.input, "open-risk");
+      const parent = await h.runtime.createAgent(
+        h.agentOptions("risk-coordinator"),
+        { kind: "coordinator", runIds: [runId] },
+        [],
+      );
+      const result = await h.runtime.dispatch.dispatch(
+        parent.agent,
+        runId,
+        "risk.main",
+        "dispatch-risk",
+        new AbortController().signal,
+      );
+      expect(result).toMatchObject({ status: "succeeded", failure: null });
+      expect(
+        h.runtime.runs.readArtifact(result.refs[0]!).content,
+      ).toMatchObject({
+        kind: "risk",
+        payload: {
+          issues: [
+            { ...issue, issueId: "risk.main.1", evidence: [], numbers: [] },
+          ],
+        },
+      });
+      await parent.dispose();
+    },
+  );
+
   it("uses the saved version 11 draft and tool protocol for historical roles", async () => {
     const h = await host(async function* () {
       yield* draftSubmission(

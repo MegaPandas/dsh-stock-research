@@ -56,9 +56,6 @@ export function prepareBusinessRole(
       ? { artifact: priceReport.ref, claim: priceClaim }
       : null;
   const file = services.createDraftFile(claim);
-  const submit = services
-    .createTools(profile.policy)
-    .find((tool) => tool.name === "stock_save_report")!;
   const labels = {
     debate: definition.executor.specialty === "bull" ? "多方讨论" : "空方讨论",
     risk: "风控分析",
@@ -71,7 +68,7 @@ export function prepareBusinessRole(
       reader.tool,
       ...businessDraftTools(file),
       researchTool({
-        ...submit,
+        name: "stock_save_report",
         description:
           "Read the fixed business JSON draft, validate it and submit this stage's result.",
         parameters: objectSchema({ requestId: stringSchema }),
@@ -92,11 +89,9 @@ export function prepareBusinessRole(
               referencePrice,
             },
           );
-          await submit.execute(
-            {
-              requestId: text(item.requestId, "requestId"),
-              contents: [content],
-            },
+          services.submitReport(
+            [content],
+            text(item.requestId, "requestId"),
             exec,
           );
           exec.concludeTurn();

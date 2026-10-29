@@ -203,9 +203,6 @@ export function prepareUnifiedRole(
     plan: "研究计划",
     decision_draft: "经理决策",
   };
-  const save = services
-    .createTools(profile.policy)
-    .find(({ name }) => name === "stock_save_report")!;
   let submittedReport: AgentReport | undefined;
   let submittedHandoff: StageHandoff | undefined;
   const accept = async (
@@ -266,10 +263,7 @@ export function prepareUnifiedRole(
     }
     submittedReport = report;
     submittedHandoff = stageHandoff;
-    return save.execute(
-      { requestId: `submit:${exec.callId}`, contents: [artifact] },
-      exec,
-    );
+    return services.submitReport([artifact], `submit:${exec.callId}`, exec);
   };
   const submission = incremental
     ? createReportDraft(
