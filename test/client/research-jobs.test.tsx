@@ -11,7 +11,7 @@ import {
   screen,
   waitFor,
 } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type {
   IJobs,
   JobsSnapshot,
@@ -38,8 +38,20 @@ import {
 } from "../../src/client/research-jobs.js";
 import type { ResearchActivity } from "../../src/app/research-job.js";
 
+beforeEach(() => {
+  // jsdom does not implement layout or ResizeObserver.
+  vi.stubGlobal(
+    "ResizeObserver",
+    class {
+      observe() {}
+      disconnect() {}
+    },
+  );
+});
+
 afterEach(() => {
   cleanup();
+  vi.unstubAllGlobals();
   vi.useRealTimers();
   cancelRun.mockReset();
 });
@@ -419,6 +431,45 @@ describe("research task chat node", () => {
 });
 
 describe("research task card", () => {
+  it("acknowledges cancellation immediately and lets a terminal event supersede its pending receipt", async () => {
+    let finishCancellation!: () => void;
+    const pending = new Promise<void>((resolve) => {
+      finishCancellation = resolve;
+    });
+    cancelRun.mockReturnValueOnce(pending);
+    const h = jobsFixture();
+    const mounted = render(
+      <ResearchJobCard
+        data={project([activity()]).data}
+        sessionId={sessionId}
+        jobs={h.jobs}
+        cancelRun={cancelRun}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "取消调研" }));
+    expect(screen.getByRole("status").textContent).toBe("正在取消");
+    expect(
+      (screen.getByRole("button", { name: "正在取消…" }) as HTMLButtonElement)
+        .disabled,
+    ).toBe(true);
+
+    mounted.rerender(
+      <ResearchJobCard
+        data={
+          project([activity(2, { status: "completed", finishedAt: 12000 })])
+            .data
+        }
+        sessionId={sessionId}
+        jobs={h.jobs}
+        cancelRun={cancelRun}
+      />,
+    );
+    expect(screen.getByRole("status").textContent).toBe("已完成");
+    expect(screen.queryByRole("button", { name: /取消/ })).toBeNull();
+    await act(async () => finishCancellation());
+    expect(screen.getByRole("status").textContent).toBe("已完成");
+  });
+
   it("shows real collection counts while keeping technical identifiers in collapsed details", () => {
     const technical =
       "采集数据 38/53 · 成功 37，缺失 1 · eastmoney · benchmark.dxy.weekly";
@@ -580,8 +631,12 @@ describe("research task card", () => {
     );
     expect(h.jobs.observe).toHaveBeenCalledWith(sessionId, firstId);
     expect(h.jobs.observe).toHaveBeenCalledWith(sessionId, secondId);
-    expect(screen.getByText("行情分析 · 读取行情快照")).toBeTruthy();
-    expect(screen.getByText("财务分析 · 核对现金流")).toBeTruthy();
+    expect(screen.getByText("行情分析").closest("li")?.textContent).toBe(
+      "行情分析进行中读取行情快照",
+    );
+    expect(screen.getByText("财务分析").closest("li")?.textContent).toBe(
+      "财务分析进行中核对现金流",
+    );
     mounted.rerender(
       <ResearchJobCard
         data={project([activity(2, { operationIds: [] })]).data}
