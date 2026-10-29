@@ -51,13 +51,8 @@ function readRequest(
       `offset must be a nonnegative integer and limit an integer from 1 to ${MAX_PAGE_SIZE}.`,
     );
   const dateFrom =
-    item.dateFrom === undefined
-      ? undefined
-      : parseLocalDate(text(item.dateFrom, "dateFrom"));
-  const dateTo =
-    item.dateTo === undefined
-      ? undefined
-      : parseLocalDate(text(item.dateTo, "dateTo"));
+    item.dateFrom === null ? undefined : parseLocalDate(item.dateFrom);
+  const dateTo = item.dateTo === null ? undefined : parseLocalDate(item.dateTo);
   if (dateFrom !== undefined && dateTo !== undefined && dateFrom > dateTo)
     invalid("dateFrom must not be after dateTo.");
   return {
@@ -111,35 +106,34 @@ function createCollectionTools(
       description: dataOnly
         ? "Read a fixed snapshot without network access. Select columns with fields, filter by dateFrom/dateTo, then paginate from offset. Rows include dates, reporting periods and original row indices; missing values are null. Read field definitions with stock_describe_collection."
         : "Read a fixed snapshot without network access. Select columns with fields, filter by dateFrom/dateTo, then paginate from offset. Return original row indices, relevant gaps and fixed numeric references. Read field definitions with stock_describe_collection.",
-      parameters: objectSchema(
-        {
-          table: stringSchema,
-          fields: {
-            type: "array",
-            items: stringSchema,
-            description: dataOnly
-              ? "Nonempty, unique field names from columns or rowFields. Date metadata is returned automatically and may also be listed explicitly."
-              : "Nonempty, unique field names present in the table schema.",
-          },
-          offset: {
-            type: "integer",
-            description: "Zero-based row offset after date filtering.",
-          },
-          limit: {
-            type: "integer",
-            description: `Rows per page, from 1 to ${MAX_PAGE_SIZE}.`,
-          },
-          dateFrom: {
-            type: "string",
-            description: "Optional inclusive start date, YYYY-MM-DD.",
-          },
-          dateTo: {
-            type: "string",
-            description: "Optional inclusive end date, YYYY-MM-DD.",
-          },
+      parameters: objectSchema({
+        table: stringSchema,
+        fields: {
+          type: "array",
+          items: stringSchema,
+          description: dataOnly
+            ? "Nonempty, unique field names from columns or rowFields. Date metadata is returned automatically and may also be listed explicitly."
+            : "Nonempty, unique field names present in the table schema.",
         },
-        ["table", "fields", "offset", "limit"],
-      ),
+        offset: {
+          type: "integer",
+          description: "Zero-based row offset after date filtering.",
+        },
+        limit: {
+          type: "integer",
+          description: `Rows per page, from 1 to ${MAX_PAGE_SIZE}.`,
+        },
+        dateFrom: {
+          oneOf: [stringSchema, { type: "null" }],
+          description:
+            "Inclusive start date (YYYY-MM-DD), or null for no lower bound.",
+        },
+        dateTo: {
+          oneOf: [stringSchema, { type: "null" }],
+          description:
+            "Inclusive end date (YYYY-MM-DD), or null for no upper bound.",
+        },
+      }),
       output: resultOutput(opaqueObjectSchema),
       async execute(value, exec) {
         exec.signal.throwIfAborted();

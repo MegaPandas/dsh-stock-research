@@ -12,6 +12,7 @@ import type {} from "@deepseek-ai/dsh-system-prompt";
 import type { RunDefinition } from "../contracts/workflow.js";
 import type { RunView } from "../contracts/runs.js";
 import type { AgentReport } from "../contracts/agent-reports.js";
+import type { ArtifactVersion } from "../contracts/artifacts.js";
 import { ResearchError } from "../contracts/errors.js";
 import { serializeJson } from "../cache/json.js";
 import { researchTool } from "../tools/errors.js";
@@ -137,7 +138,26 @@ class ResearchApplication {
       releases.push(agent.ctx.tools.register(this.reviewTool()));
       for (const tool of this.ctx.stockResearch.tools) {
         if (tool.name === "stock_read_artifact") {
-          releases.push(agent.ctx.tools.register(tool));
+          releases.push(
+            agent.ctx.tools.register({
+              ...tool,
+              description:
+                "Read a fixed artifact for review. Final reports return the rendered body; source details remain in the saved artifact.",
+              execute: async (value, exec) => {
+                const result = (await tool.execute(value, exec)) as {
+                  kind: "artifact";
+                  artifact: ArtifactVersion;
+                };
+                const { artifact } = result;
+                if (artifact.content.kind !== "report") return result;
+                const { kind, title, body } = artifact.content;
+                return {
+                  ...result,
+                  artifact: { ...artifact, content: { kind, title, body } },
+                };
+              },
+            }),
+          );
           continue;
         }
         if (tool.name === "stock_read_run") {

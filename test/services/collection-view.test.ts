@@ -115,6 +115,8 @@ const rowRequest = {
   fields: ["close"],
   offset: 0,
   limit: 1,
+  dateFrom: null,
+  dateTo: null,
 };
 beforeEach(() => {
   fetch.mockReset().mockRejectedValue(new Error("Unexpected network request"));
@@ -143,7 +145,7 @@ describe("collected table views", () => {
       });
       expect(read!.parameters).toMatchObject({
         type: "object",
-        required: ["table", "fields", "offset", "limit"],
+        required: ["table", "fields", "offset", "limit", "dateFrom", "dateTo"],
       });
       expect(read!.parameters).not.toHaveProperty("oneOf");
       expect(read!.parameters.properties).not.toHaveProperty("kind");
@@ -166,6 +168,43 @@ describe("collected table views", () => {
         ).rejects.toMatchObject({ code: "INVALID_INPUT" });
       }
       expect(fetch).not.toHaveBeenCalled();
+    },
+  );
+
+  describe.each([collectionReadTools, collectionDataTools])(
+    "%s date bounds",
+    (createTools) => {
+      it.each([
+        {
+          dateFrom: null,
+          dateTo: null,
+          dates: ["2024-01-01", "2024-01-02", "2024-01-03"],
+        },
+        {
+          dateFrom: "2024-01-02",
+          dateTo: null,
+          dates: ["2024-01-02", "2024-01-03"],
+        },
+        {
+          dateFrom: null,
+          dateTo: "2024-01-02",
+          dates: ["2024-01-01", "2024-01-02"],
+        },
+      ])(
+        "reads unbounded dates without a retry: $dateFrom to $dateTo",
+        async ({ dates, ...bounds }) => {
+          const [, tool] = createTools([
+            { id: "market.daily", envelope: envelope() },
+          ]);
+          const args = { ...rowRequest, ...bounds, limit: 100 };
+          expect(validateJsonSchemaValue(tool!.parameters, args)).toEqual([]);
+          const result = (await tool!.execute(args, {
+            signal: new AbortController().signal,
+          } as ToolRunContext)) as { data: { rows: { date: string }[] } };
+          expect(result.data.rows.map(({ date }) => date)).toEqual(dates);
+          expect(fetch).not.toHaveBeenCalled();
+        },
+      );
     },
   );
 
@@ -291,6 +330,10 @@ describe("collected table views", () => {
     { ...rowRequest, offset: 0.5 },
     { ...rowRequest, limit: 0 },
     { ...rowRequest, limit: 101 },
+    { ...rowRequest, dateFrom: "" },
+    { ...rowRequest, dateTo: "" },
+    { ...rowRequest, dateFrom: undefined },
+    { ...rowRequest, dateTo: undefined },
     { ...rowRequest, dateFrom: "2024-02-30" },
     { ...rowRequest, dateFrom: "2024-01-03", dateTo: "2024-01-02" },
     { ...rowRequest, cutoff: scope.cutoff },

@@ -194,7 +194,7 @@ export function calculatedReportSections<
             methodId: text("Built-in method ID; the first method is primary."),
             suitability: text("Method applicability and selection rationale."),
             calculationIds: texts(
-              "Research-date calculation IDs. Use [] when required inputs are missing and explain the gaps in limitations.",
+              "Research-date calculation IDs. Fundamentals must include a calculated method; explain uncomputed alternatives in limitations.",
             ),
             limitations: texts(
               "Missing inputs and limitations of the results.",
@@ -209,13 +209,11 @@ export function calculatedReportSections<
       }),
     );
   if (properties.targetPrice !== undefined)
-    properties.targetPrice = nullable(
-      object({
-        calculationId: text(
-          "ID of a purpose=target_price calculation with a single per-share result.",
-        ),
-      }),
-    );
+    properties.targetPrice = object({
+      calculationId: text(
+        "Required: ID of a purpose=target_price calculation with one nonnegative per-share result for the six-month target date.",
+      ),
+    });
   return properties;
 }
 

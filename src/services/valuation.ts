@@ -52,7 +52,7 @@ export function validateRoleValuation(
   if (!("valuation" in report.content) || report.content.valuation == null) {
     if (ownsValuation)
       invalid(
-        "Write the valuation section, retaining missing inputs and null value ranges when quantification is unsupported.",
+        "Write the valuation section with calculated results, assumptions and method limitations.",
       );
     return;
   }
@@ -85,16 +85,15 @@ export function validateRoleValuation(
   if (taskId === "manager.decision") {
     const targetPrice = (report as AgentReport<"decision_draft">).content
       .targetPrice;
-    if (targetPrice !== null) {
-      if (record.targetPriceBasis === null)
-        invalid(
-          "Explain the target-price scenario and the relationship between valuation-date value and target-date price in targetPriceBasis.",
-        );
-      if (!record.methods.some(({ valueRange }) => valueRange !== null))
-        invalid(
-          "A numeric target price requires at least one supported value range; otherwise retain targetPrice=null.",
-        );
-    } else if (record.targetPriceBasis !== null)
-      invalid("Keep targetPriceBasis=null when targetPrice is null.");
+    if (targetPrice === null)
+      invalid(
+        "A decision requires a six-month target price. Select an applicable model, justify forecast assumptions, call stock_calculate_valuation with purpose=target_price, and submit its calculationId.",
+      );
+    if (record.targetPriceBasis === null)
+      invalid(
+        "Explain the target-price scenario and the relationship between valuation-date value and target-date price in targetPriceBasis.",
+      );
+    if (!record.methods.some(({ valueRange }) => valueRange !== null))
+      invalid("Include at least one calculated research-date value range.");
   }
 }

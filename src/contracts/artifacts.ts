@@ -51,7 +51,7 @@ export interface ArtifactInput {
 }
 
 export interface DecisionDraftValidation {
-  version: 1;
+  version: 2;
   computedReturn: number | null;
   warnings: string[];
 }

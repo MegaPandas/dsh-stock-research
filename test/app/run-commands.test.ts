@@ -3,7 +3,7 @@ import {
   agentAnalysisReport,
   reportSubmission,
 } from "../fixtures/analysis-report.js";
-import { valuationRecord } from "../fixtures/valuation.js";
+import { calculationRequest, valuationRecord } from "../fixtures/valuation.js";
 import {
   ToolCallId,
   type GenerateOptions,
@@ -201,6 +201,7 @@ describe("explicit run control commands", () => {
     async (version) => {
       const roles: RoleInput[] = [];
       let coordinatorCalls = 0;
+      let calculationId: string | undefined;
       const h = await host(async function* (request) {
         if (isMainResearchRequest(request)) {
           const input = mainResearchRequest(request);
@@ -214,16 +215,26 @@ describe("explicit run control commands", () => {
             yield* textResponse(
               "Fundamentals submitted; remaining mandatory research is incomplete.",
             );
-        } else if (request.messages.some((message) => message.role === "tool"))
-          yield* textResponse("Submitted canonical analysis.");
-        else {
+        } else {
           const input = initialInput<RoleInput>(request);
-          roles.push(input);
+          if (!request.messages.some((message) => message.role === "tool")) {
+            roles.push(input);
+            yield* toolCall("stock_calculate_valuation", calculationRequest());
+            return;
+          }
+          if (calculationId !== undefined) {
+            yield* textResponse("Submitted canonical analysis.");
+            return;
+          }
+          calculationId = lastToolResult<{ calculationId: string }>(
+            request,
+          ).calculationId;
           const report = agentAnalysisReport();
           report.content.valuation = valuationRecord(
             input.scope.date,
             input.scope.security.currency,
           );
+          report.content.valuation.methods[0]!.calculationIds = [calculationId];
           yield* reportSubmission(report, "save-fundamentals");
         }
       });
@@ -596,6 +607,7 @@ describe("run commands during real producers", () => {
       let marketReleased = false;
       let fundamentalsReleased = false;
       let fundamentalsAborted = false;
+      let fundamentalsCalculation: string | undefined;
       const attempts: (RoleInput & { task: { attempt: number } })[] = [];
       const coordinatorIds: string[] = [];
       const handledControls = new Set<string>();
@@ -678,18 +690,32 @@ describe("run commands during real producers", () => {
               fundamentalsReleased = true;
             }
           });
+          attempts.push(recordedInput);
+          yield* toolCall("stock_calculate_valuation", calculationRequest());
+          return;
         }
-        if (saved) {
+        if (
+          saved &&
+          (role.task.id !== "analysis.fundamentals" ||
+            fundamentalsCalculation !== undefined)
+        ) {
           yield* textResponse("New attempt submitted.");
           return;
         }
-        attempts.push(recordedInput);
+        if (!saved) attempts.push(recordedInput);
         const report = agentAnalysisReport();
-        if (role.task.id === "analysis.fundamentals")
+        if (role.task.id === "analysis.fundamentals") {
+          fundamentalsCalculation = lastToolResult<{ calculationId: string }>(
+            request,
+          ).calculationId;
           report.content.valuation = valuationRecord(
             role.scope.date,
             role.scope.security.currency,
           );
+          report.content.valuation.methods[0]!.calculationIds = [
+            fundamentalsCalculation,
+          ];
+        }
         yield* reportSubmission(report, "save");
       });
       const startActivation = h.ctx.subagents.startActivation.bind(

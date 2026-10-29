@@ -64,6 +64,8 @@ async function* collectionCall(
     fields: ["close"],
     offset: 1,
     limit: 1,
+    dateFrom: null,
+    dateTo: null,
   },
 ): AsyncIterable<StreamChunk> {
   const id = ToolCallId("saved-source-page");
@@ -179,7 +181,7 @@ describe("stock-ask through real commands, runtime and AgentLoop", () => {
     )!;
     expect(reader.parameters).toMatchObject({
       type: "object",
-      required: ["table", "fields", "offset", "limit"],
+      required: ["table", "fields", "offset", "limit", "dateFrom", "dateTo"],
       properties: {
         table: { type: "string" },
         fields: { type: "array" },
@@ -336,6 +338,8 @@ describe("stock-ask through real commands, runtime and AgentLoop", () => {
             yield* collectionCall(0, {
               table: "market.daily",
               fields: ["close"],
+              dateFrom: null,
+              dateTo: null,
               ...page,
             });
             return;

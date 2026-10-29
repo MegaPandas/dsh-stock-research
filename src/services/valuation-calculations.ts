@@ -311,7 +311,7 @@ export function materializeTargetPrice(
     record.result.perShareValues[0]! < 0
   )
     invalid(
-      "A target price requires one nonnegative target-date calculated per-share value. Negative equity residuals remain available for analysis; retain targetPrice=null.",
+      "A target price requires one nonnegative target-date calculated per-share value. A negative equity residual supports solvency analysis; calculate an applicable common-share pricing scenario for the target price.",
     );
   return {
     calculationId,
@@ -361,6 +361,13 @@ export function validateCalculatedReport(
             `Stored ${method.methodId}.${key} must equal the referenced calculation results.`,
           );
     }
+    if (
+      operation.taskId === "analysis.fundamentals" &&
+      !record.methods.some(({ calculationIds }) => calculationIds!.length > 0)
+    )
+      invalid(
+        "Fundamentals requires at least one saved research-date valuation calculation. Read the financial statement details, select an applicable model, justify forecast assumptions and call stock_calculate_valuation before submitting.",
+      );
   }
   if ("targetPrice" in report.content && report.content.targetPrice !== null) {
     const target = report.content.targetPrice;

@@ -99,6 +99,8 @@ const request = {
   fields: ["profit"],
   offset: 0,
   limit: 1,
+  dateFrom: null,
+  dateTo: null,
 };
 
 beforeEach(() => {

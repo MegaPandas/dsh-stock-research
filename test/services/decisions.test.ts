@@ -243,6 +243,29 @@ describe("decision finalization", () => {
     ).toEqual([]);
   });
 
+  it("requires a draft accepted under the previous nullable-target contract to be resubmitted", () => {
+    const c = setup({ deferDraft: true });
+    c.draft.payload.targetPrice = null;
+    c.runs.commitArtifact(
+      c.managerOp,
+      [c.draft],
+      "old-draft",
+      JSON.parse('{"version":1,"computedReturn":null,"warnings":[]}'),
+    );
+    expect(() =>
+      new DecisionService(c.runs, c.now).decide(
+        c.operation,
+        "final",
+        "old-validation",
+      ),
+    ).toThrow(/resubmit the manager draft/);
+    expect(c.runs.view(c.operation).status).not.toBe("completed");
+    expect(
+      c.runs.view(c.operation).tasks.find(({ taskId }) => taskId === "final")!
+        .outputRefs,
+    ).toEqual([]);
+  });
+
   it.each([
     ["strong_buy", "强烈买入"],
     ["buy", "买入"],
@@ -254,7 +277,7 @@ describe("decision finalization", () => {
     (rating, label) => {
       const c = setup({ rating });
       expect(c.runs.readArtifact(c.draftRef).decisionValidation?.version).toBe(
-        1,
+        2,
       );
       const checked = vi.spyOn(NumberService.prototype, "checkNumbers");
       const before = c.store.read(c.operation.runId);
@@ -303,27 +326,15 @@ describe("decision finalization", () => {
     },
   );
 
-  it("keeps an absent target and return null instead of reading one from prose", () => {
-    const c = setup({
-      draft: (draft) => {
-        draft.payload.targetPrice = null;
-        draft.body =
-          "The body mentions target 999; it is not a structured target.";
-      },
-    });
-    const values = output(
-      c,
-      new DecisionService(c.runs, c.now).decide(c.operation, "final", "decide")
-        .refs,
-    );
-    expect(values.decision.targetPrice).toBeNull();
-    expect(values.decision.computedReturn).toBeNull();
-    const report = c.runs
-      .view(c.operation)
-      .tasks.find((task) => task.taskId === "final")!.outputRefs[1]!;
-    expect(c.runs.readArtifact(report).content.body).not.toContain(
-      "预期收益：",
-    );
+  it("rejects an absent structured target even when prose mentions a price", () => {
+    expect(() =>
+      setup({
+        draft: (draft) => {
+          draft.payload.targetPrice = null;
+          draft.body = "The body mentions target 999.";
+        },
+      }),
+    ).toThrow(/requires a target price/);
   });
 
   it("accepts a zero target and preserves an explicitly unresolved risk as a warning", () => {

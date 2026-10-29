@@ -54,7 +54,7 @@ it("retains structured assumptions and explicit missing ranges without changing 
       scope,
       methodIds,
     ),
-  ).not.toThrow();
+  ).toThrow(/requires a six-month target price/);
   expect(() =>
     validateRoleValuation(old, "analysis.fundamentals", scope, methodIds),
   ).toThrow(/valuation section/);

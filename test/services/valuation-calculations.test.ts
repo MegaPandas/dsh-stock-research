@@ -344,7 +344,7 @@ it("saves negative equity residuals and their diagnostics without treating them 
   );
   expect(() =>
     materializeTargetPrice(f.runs, f.operation.runId, target.calculationId),
-  ).toThrow(/Negative equity residuals/);
+  ).toThrow(/negative equity residual/);
 });
 
 it("rejects mismatched multiple denominators and equity-value debt bridges", () => {
@@ -435,6 +435,40 @@ it("formats report values while preserving exact calculations and range endpoint
   expect(() =>
     validateCalculatedReport(f.runs, f.operation, report),
   ).not.toThrow();
+});
+
+it("rejects a fundamentals report that only lists uncomputed valuation methods", () => {
+  const f = setup();
+  const report = agentAnalysisReport();
+  report.content.valuation = materializeValuation(f.runs, f.operation.runId, {
+    companyProfile: "Synthetic loss-making company",
+    methods: [
+      {
+        methodId: "fcff_dcf",
+        suitability: "Cash-flow model requires an operating forecast.",
+        calculationIds: [],
+        limitations: ["Forecast inputs have not been estimated."],
+      },
+    ],
+    targetPriceBasis: null,
+  });
+  const artifact = assembleAgentArtifact("analysis", report, {
+    taskId: f.operation.taskId,
+    specialty: "fundamentals",
+    title: "Uncomputed valuation",
+    inputRefs: [],
+    currency: "USD",
+    referencePrice: null,
+    scope: f.runs.view(f.operation).scope,
+  });
+  const artifacts = new ArtifactService(f.runs, new NumberService(f.runs));
+  expect(() =>
+    artifacts.submitArtifact(f.operation, [artifact], "uncomputed"),
+  ).toThrow(/at least one saved research-date valuation calculation/);
+  expect(f.runs.view(f.operation).tasks[0]).toMatchObject({
+    status: "running",
+    outputRefs: [],
+  });
 });
 
 it("materializes reports from calculation references and rejects forged or unreferenced results under the current protocol", () => {

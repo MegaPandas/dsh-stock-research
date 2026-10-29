@@ -50,7 +50,7 @@ export class DecisionService {
       const roots = call.context.tasks.flatMap((task) => task.outputRefs);
       const versions = inputs.closure(roots);
       const validated = selected.draft.decisionValidation;
-      if (validated?.version !== 1)
+      if (validated?.version !== 2)
         throw new ResearchError(
           "INVALID_ARTIFACT",
           "The decision draft has no current submission validation; resubmit the manager draft.",

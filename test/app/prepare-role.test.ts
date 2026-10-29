@@ -21,7 +21,7 @@ import {
   VALUATION_METHODS_INPUT,
   type ValuationMethods,
 } from "../../src/app/valuation-methods.js";
-import { valuationRecord } from "../fixtures/valuation.js";
+import { calculationRequest, valuationRecord } from "../fixtures/valuation.js";
 import { createResearchPlugin } from "../../src/runtime.js";
 import { ArtifactService } from "../../src/services/artifacts.js";
 import { NumberService } from "../../src/services/numbers.js";
@@ -29,7 +29,11 @@ import { analysis } from "../fixtures/dispatch-host.js";
 import { MARKET_FIXTURE } from "../fixtures/market.js";
 import { runtimeHost, textResponse } from "../fixtures/runtime-host.js";
 import { draftSubmission } from "../fixtures/draft-stream.js";
-import { initialInput, toolCall } from "../fixtures/quick-host.js";
+import {
+  initialInput,
+  lastToolResult,
+  toolCall,
+} from "../fixtures/quick-host.js";
 import {
   analysisReport,
   agentAnalysisReport,
@@ -219,13 +223,21 @@ describe("persisted research role preparation", () => {
   it("returns a missing valuation section to the original fundamental role for correction", async () => {
     let calls = 0;
     const h = await host(async function* (request) {
+      if (++calls === 2) {
+        yield* toolCall("stock_calculate_valuation", calculationRequest());
+        return;
+      }
       const report = agentAnalysisReport();
       const input = initialInput<{ scope: ResearchScope }>(request);
-      if (++calls > 1)
+      if (calls > 1) {
         report.content.valuation = valuationRecord(
           input.scope.date,
           input.scope.security.currency,
         );
+        report.content.valuation.methods[0]!.calculationIds = [
+          lastToolResult<{ calculationId: string }>(request).calculationId,
+        ];
+      }
       yield* reportSubmission(report, `valuation-${calls}`);
     });
     const { runId } = h.runtime.runs.open("owner", h.input, "open-valuation");
@@ -242,14 +254,20 @@ describe("persisted research role preparation", () => {
       new AbortController().signal,
     );
     expect(result).toMatchObject({ status: "succeeded", failure: null });
-    expect(calls).toBe(2);
+    expect(calls).toBe(3);
     expect(
       h.runtime.runs.readArtifact(result.refs[0]!).content.payload,
     ).toMatchObject({
       report: {
         content: {
           valuation: {
-            methods: [{ methodId: "comparable_multiples", valueRange: null }],
+            methods: [
+              {
+                methodId: "comparable_multiples",
+                calculationIds: [expect.any(String)],
+                valueRange: { low: 192, high: 240, unit: "USD/share" },
+              },
+            ],
           },
         },
       },
@@ -568,6 +586,8 @@ describe("persisted research role preparation", () => {
         fields: ["close"],
         offset: 0,
         limit: 1,
+        dateFrom: null,
+        dateTo: null,
       },
       exec,
     );

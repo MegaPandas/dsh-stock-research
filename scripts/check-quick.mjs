@@ -690,6 +690,29 @@ try {
     assert.equal(view.status, "completed");
     assert.equal(view.tasks.length, 12);
     assert.ok(view.tasks.every((task) => task.status === "succeeded"));
+    const manager = runtime.runs.readArtifact(
+      view.tasks.find(({ taskId }) => taskId === "manager.decision")
+        .outputRefs[0],
+    );
+    const target = manager.content.payload.report.content.targetPrice;
+    assert.ok(target, "Completed research must include a manager target price");
+    assert.ok(Number.isFinite(target.value) && target.value >= 0);
+    const calculationEntry = runtime.runs
+      .inputCatalog(runId)
+      .inputs.find(({ ref }) => ref.id === target.calculationId);
+    assert.ok(
+      calculationEntry,
+      "The target price must reference a saved calculation",
+    );
+    const calculation = runtime.runs.readInput(runId, calculationEntry.ref);
+    assert.equal(calculation.request.purpose, "target_price");
+    assert.deepEqual(calculation.result.perShareValues, [target.value]);
+    assert.equal(calculation.valueDate, manager.content.payload.horizonEndDate);
+    record.targetPrice = {
+      ...target,
+      date: calculation.valueDate,
+      currency: calculation.currency,
+    };
     if (resumeRunId === undefined)
       assert.equal(
         view.stages?.length,

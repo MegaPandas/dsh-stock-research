@@ -179,7 +179,7 @@ export class ArtifactService {
     return {
       contents: captured,
       decisionValidation: {
-        version: 1,
+        version: 2,
         computedReturn: basics.computedReturn,
         warnings: [...new Set(warnings)],
       },

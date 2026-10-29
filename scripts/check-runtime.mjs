@@ -136,7 +136,7 @@ try {
     "@megapandas/dsh-stock-research/package.json",
   );
   assert.equal(input.versions.plugin, manifest.version);
-  assert.equal(input.versions.prompts.roles, "29");
+  assert.equal(input.versions.prompts.roles, "31");
   assert.equal(input.versions.prompts.digest, "12");
   assert.equal(input.definition.tasks.length, 12);
   assert.equal(input.instructions.length, 12);

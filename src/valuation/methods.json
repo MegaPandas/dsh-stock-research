@@ -1,5 +1,5 @@
 {
-  "version": "2",
+  "version": "3",
   "reviewedAt": "2026-10-29",
   "language": "en",
   "purpose": "Valuation method reference for research roles. Use research data for current parameters and tool schemas for execution and report submission.",
@@ -11,7 +11,7 @@
     "discounting": "Execution uses ACT/365F: t=actual days from value date to cash-flow period-end/365; DF_t(r)=(1+r)^t. Supply a justified discount rate or CAPM/WACC components for code to combine.",
     "commonEquityBridge": "E_common=V_op+separately stated excess cash+other nonoperating assets-financing debt-preferred equity-applicable minority interests-other claims. Exclude excess cash from other assets; equity multiples require no further bridge.",
     "perShare": "P_common=E_common/N_common. Keep share count, share classes, employee options and financing treatment consistent; accounting diluted weighted-average shares may require adjustment.",
-    "missingInputs": "Missing values are not zero. Record each assumption's basis and effect. Stop numerical valuation when essential inputs lack supportable assumptions.",
+    "missingInputs": "Read the available statement details before declaring an input missing. Keep missing observations distinct from forecast assumptions. Estimate uncertain parameters with an explicit basis and sensitivities; select another applicable model when essential inputs are unavailable.",
     "terminalConstraint": "Use perpetual terminal value only for a stable business with discount rate above growth. Code derives reinvestment, payout and residual income from growth and capital returns. For finite recovery, supply actual net recovery at the final date; RI subtracts ending book equity.",
     "negativeEquity": "Negative equity residuals are saved with diagnostics, without flooring at zero. Use them for solvency analysis, not target share prices; retain economically justified assumptions.",
     "financialMetrics": "financial.metrics precomputes TTM, quarterly, year-over-year, margin, cash-flow and equity comparisons. Read column definitions and periods; record forecasts separately from observations."

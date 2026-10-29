@@ -60,38 +60,37 @@ export function assessDecisionBasics(
 ): DecisionBasics {
   const { draft, digests } = selected;
   const proposal = draft.content.payload;
+  if (proposal.targetPrice === null)
+    invalid(
+      "A decision requires a target price; complete the manager valuation before submitting.",
+    );
   if (proposal.horizonEndDate <= scope.date)
     invalid("The decision horizon must be after the research date.");
   const base =
     proposal.basePrice === null
       ? null
       : inputs.number(proposal.basePrice, draft.ref).claim;
-  const target =
-    proposal.targetPrice === null
-      ? null
-      : inputs.number(proposal.targetPrice, draft.ref).claim;
+  const target = inputs.number(proposal.targetPrice, draft.ref).claim;
   const unit = `${scope.security.currency}/share`;
   if (base !== null && (base.value <= 0 || base.unit !== unit))
     invalid(`The base price must be positive and use ${unit}.`);
-  if (target !== null && (target.value < 0 || target.unit !== unit))
+  if (target.value < 0 || target.unit !== unit)
     invalid(`The target price must be nonnegative and use ${unit}.`);
   const profile = (claim: NumericClaim) => ({
     estimated: claim.kind === "estimated",
     ...(claim.kind === "observed" ? { source: claim.source } : {}),
   });
   try {
-    if (base !== null || target !== null)
-      verifyPriceBasis(
-        profile(base ?? target!),
-        profile(target ?? base!),
-        (ref) => inputs.source(ref).envelope,
-      );
+    verifyPriceBasis(
+      profile(base ?? target),
+      profile(target),
+      (ref) => inputs.source(ref).envelope,
+    );
   } catch (cause) {
     if (!(cause instanceof PriceBasisError)) throw cause;
     throw new ResearchError("INVALID_ARTIFACT", cause.message, { cause });
   }
-  const computedReturn =
-    target === null || base === null ? null : target.value / base.value - 1;
+  const computedReturn = base === null ? null : target.value / base.value - 1;
   if (computedReturn !== null && !Number.isFinite(computedReturn))
     invalid("The expected return is outside the finite numeric range.");
   if (proposal.ratingPolicy === PRICE_RATING_POLICY) {
@@ -99,10 +98,7 @@ export function assessDecisionBasics(
       invalid(
         "The price rating horizon must be six calendar months after the research date.",
       );
-    if (
-      proposal.rating !==
-      priceRating(base?.value ?? null, target?.value ?? null)
-    )
+    if (proposal.rating !== priceRating(base?.value ?? null, target.value))
       invalid(
         "The price rating must match the fixed absolute-price intervals.",
       );
@@ -132,7 +128,7 @@ export function assessDecisionBasics(
     );
   const numericFacts = [
     ...(proposal.basePrice === null ? [] : [proposal.basePrice]),
-    ...(proposal.targetPrice === null ? [] : [proposal.targetPrice]),
+    proposal.targetPrice,
     ...proposal.thesis.flatMap((thesis) => thesis.numbers),
   ];
   for (const input of numericFacts) {

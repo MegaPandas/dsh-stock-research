@@ -262,6 +262,14 @@ describe("stock-quick real command boundary", () => {
     expect(report.body).toContain("## 估值依据");
     expect(report.body).toContain("研究日价值区间：192 CNY/股 至 240 CNY/股");
     expect(report.body).toContain("六个月目标价依据");
+    const delivered = lastToolResult<{
+      artifact: { content: unknown };
+    }>(h.adapter.requests.filter(isMainResearchRequest).at(-1)!);
+    expect(delivered.artifact.content).toEqual({
+      kind: report.kind,
+      title: report.title,
+      body: report.body,
+    });
     expect(report).toMatchObject({
       payload: {
         gaps: expect.arrayContaining([
@@ -323,6 +331,116 @@ describe("stock-quick real command boundary", () => {
     ).toMatchObject({ status: "succeeded", attempt: 1 });
     expect(view.tasks.every((task) => task.status === "succeeded")).toBe(true);
     expect(fetch).toHaveBeenCalledTimes(3);
+  });
+
+  it.each(["omitted", "null"] as const)(
+    "requires the manager to repair a %s target in the same session before completing",
+    async (kind) => {
+      const model = workflowModel({
+        missingManagerTarget: { kind, repair: true },
+      });
+      const h = await host(model.respond);
+      const result = await h.executeAndWait();
+      expect(result?.result.kind, result?.result.text).toBe("success");
+      expect(model.state.managerFeedback).toContain("INVALID_INPUT");
+      expect(model.state.managerFeedback).toContain("targetPrice");
+      const view = h.runtime.runs.view({ runId: model.state.runId! });
+      expect(view.status).toBe("completed");
+      expect(
+        view.tasks.find(({ taskId }) => taskId === "manager.decision"),
+      ).toMatchObject({ status: "succeeded", attempt: 1 });
+      const managerRequests = h.adapter.requests.filter(
+        (request) =>
+          request.tools?.some(({ name }) => name === "stock_submit") &&
+          initialInput<{ task: { id: string } }>(request).task.id ===
+            "manager.decision",
+      );
+      expect(
+        new Set(managerRequests.map(({ sessionId }) => sessionId)).size,
+      ).toBe(1);
+      if (kind === "null")
+        expect(
+          managerRequests
+            .at(-1)!
+            .messages.filter(({ role }) => role === "tool")
+            .flatMap(({ content }) => content)
+            .filter((block) => block.type === "text")
+            .map((block) => block.text)
+            .join("\n"),
+        ).toContain("reportDraft.targetPrice");
+      const finalized = view.tasks
+        .find(({ taskId }) => taskId === "finalize")!
+        .outputRefs.map((ref) => h.runtime.runs.readArtifact(ref).content);
+      const decision = finalized.find(
+        (content) => content.kind === "decision",
+      )!;
+      expect(decision.payload.targetPrice).toEqual({
+        kind: "local",
+        claimId: "decision.target",
+      });
+      const managerRef = view.tasks.find(
+        ({ taskId }) => taskId === "manager.decision",
+      )!.outputRefs[0]!;
+      expect(decision.payload.draftRef).toEqual(managerRef);
+      const manager = h.runtime.runs.readArtifact(managerRef).content;
+      expect(manager.kind).toBe("decision_draft");
+      const report = manager.payload.report;
+      expect(report).toMatchObject({
+        content: {
+          targetPrice: { value: 230.4, calculationId: expect.any(String) },
+        },
+      });
+      const calculationId = (
+        report as { content: { targetPrice: { calculationId: string } } }
+      ).content.targetPrice.calculationId;
+      expect(manager.claims).toContainEqual(
+        expect.objectContaining({
+          id: "decision.target",
+          kind: "estimated",
+          calculationId,
+          value: 230.4,
+          unit: "CNY/share",
+        }),
+      );
+      const calculation = h.runtime.runs
+        .inputCatalog(view.runId)
+        .inputs.find(({ ref }) => ref.id === calculationId)!;
+      expect(
+        h.runtime.runs.readInput(view.runId, calculation.ref),
+      ).toMatchObject({
+        request: { purpose: "target_price" },
+        valueDate: "2024-07-03",
+        result: { perShareValues: [230.4] },
+      });
+    },
+  );
+
+  it("keeps the run incomplete when the manager ends without repairing its target", async () => {
+    const model = workflowModel({
+      missingManagerTarget: { kind: "omitted", repair: false },
+    });
+    const h = await host(model.respond);
+    const result = await h.executeAndWait();
+    expect(result?.result.kind).toBe("error");
+    expect(model.state.managerFeedback).toContain("INVALID_INPUT");
+    expect(model.state.managerFeedback).toContain("targetPrice");
+    const view = h.runtime.runs.view({ runId: model.state.runId! });
+    expect(view.status).not.toBe("completed");
+    expect(
+      view.tasks.find(({ taskId }) => taskId === "manager.decision"),
+    ).toMatchObject({ status: "failed", attempt: 1, outputRefs: [] });
+    expect(
+      view.tasks.find(({ taskId }) => taskId === "finalize"),
+    ).toMatchObject({ status: "pending", outputRefs: [] });
+    expect(
+      view.tasks
+        .flatMap(({ outputRefs }) =>
+          outputRefs.map(
+            (ref) => h.runtime.runs.readArtifact(ref).content.kind,
+          ),
+        )
+        .filter((kind) => kind === "decision" || kind === "report"),
+    ).toEqual([]);
   });
 
   it.each(["4", "5", "6"])(

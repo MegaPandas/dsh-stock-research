@@ -82,6 +82,7 @@ export function workflowModel(
   options: {
     pauseFundamentals?: ReturnType<typeof gate<GenerateOptions>>;
     repairManager?: boolean;
+    missingManagerTarget?: { kind: "omitted" | "null"; repair: boolean };
     rejectStage?: string;
   } = {},
 ) {
@@ -340,6 +341,10 @@ export function workflowModel(
     }
     const repairManager =
       options.repairManager && role.task.id === "manager.decision";
+    const missingManagerTarget =
+      role.task.id === "manager.decision"
+        ? options.missingManagerTarget
+        : undefined;
     const calculates =
       request.tools?.some(({ name }) => name === "stock_calculate_valuation") &&
       ["analysis.fundamentals", "manager.decision"].includes(role.task.id);
@@ -360,9 +365,15 @@ export function workflowModel(
       );
     }
     const reportCall = call - (calculates ? 1 : 0);
-    if (repairManager && reportCall === 2)
+    if (
+      (repairManager || missingManagerTarget !== undefined) &&
+      reportCall === 2
+    )
       state.managerFeedback = lastToolText(request);
-    if (reportCall > 1 && !(repairManager && reportCall === 2)) {
+    if (
+      reportCall > 1 &&
+      !((repairManager || missingManagerTarget?.repair) && reportCall === 2)
+    ) {
       yield* textResponse("产物已提交。");
       return;
     }
@@ -484,6 +495,16 @@ export function workflowModel(
         targetPrice: { calculationId: calculations.get(session), value: -1 },
       });
       return;
+    }
+    if (missingManagerTarget !== undefined && reportCall === 1) {
+      const content = report.content as {
+        targetPrice?: unknown;
+        valuation: { targetPriceBasis: string | null };
+      };
+      if (missingManagerTarget.kind === "null") {
+        content.targetPrice = null;
+        content.valuation.targetPriceBasis = null;
+      } else delete content.targetPrice;
     }
     if (request.tools?.some(({ name }) => name === "stock_write_report"))
       yield* reportSubmission(
