@@ -6,10 +6,8 @@ import { collectionDataTools } from "../../src/app/collection-tools.js";
 import { createPublicSearchSession } from "../../src/app/public-search.js";
 import { createReportReader } from "../../src/app/report-reader.js";
 import { createReportDraft } from "../../src/host/report-draft.js";
-import {
-  computedValuationDraftTools,
-  scopedCalculationReader,
-} from "../../src/app/valuation-tools.js";
+import { valuationDraftInput } from "../../src/app/valuation-draft.js";
+import { createValuationCalculationReader } from "../../src/tools/valuation.js";
 import {
   createValuationMethodTool,
   VALUATION_METHODS,
@@ -111,12 +109,7 @@ it.each(protocols)(
     });
     const roleTools = [
       createValuationMethodTool(VALUATION_METHODS),
-      scopedCalculationReader(
-        h.runtime.tools.find(
-          ({ name }) => name === "stock_read_valuation_calculation",
-        )!,
-        "fixture-run",
-      ),
+      createValuationCalculationReader(h.runtime.valuations, "fixture-run"),
       ...collectionDataTools(
         askCollection({
           security: US_SECURITY,
@@ -131,12 +124,15 @@ it.each(protocols)(
         },
         approve: async () => false,
       }).tool,
-      ...computedValuationDraftTools(
-        createReportDraft("analysis", () => undefined, undefined, false, {})
-          .tools,
-        h.runtime.runs,
-        "fixture-run",
-      ),
+      ...createReportDraft(
+        "analysis",
+        () => undefined,
+        undefined,
+        false,
+        {},
+        [],
+        valuationDraftInput("analysis", h.runtime.runs, "fixture-run"),
+      ).tools,
     ];
     const agent = await h.ctx.agents.create(h.agentOptions("protocol-tools"));
     const definitions = new Map(

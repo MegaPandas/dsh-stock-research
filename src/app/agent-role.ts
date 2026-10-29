@@ -42,10 +42,11 @@ import {
 } from "./valuation-methods.js";
 import { validateRoleValuation } from "../services/valuation.js";
 import { valuationCalculationCatalog } from "../services/valuation-calculations.js";
+import { valuationDraftInput } from "./valuation-draft.js";
 import {
-  computedValuationDraftTools,
-  scopedCalculationReader,
-} from "./valuation-tools.js";
+  createValuationCalculationTool,
+  createValuationCalculationReader,
+} from "../tools/valuation.js";
 
 export function prepareUnifiedRole(
   services: RoleServices,
@@ -113,19 +114,9 @@ export function prepareUnifiedRole(
     const collection = readCollection(services.runs, claim.runId);
     if (collection !== null)
       details.financialMetrics = financialMetricContext(collection.packets);
-    const calculationTools = services.createTools(profile.policy);
+    tools.push(createValuationCalculationTool(services.valuations));
     tools.push(
-      calculationTools.find(
-        ({ name }) => name === "stock_calculate_valuation",
-      )!,
-    );
-    tools.push(
-      scopedCalculationReader(
-        calculationTools.find(
-          ({ name }) => name === "stock_read_valuation_calculation",
-        )!,
-        claim.runId,
-      ),
+      createValuationCalculationReader(services.valuations, claim.runId),
     );
     details.valuationCalculations = valuationCalculationCatalog(
       services.runs,
@@ -277,21 +268,16 @@ export function prepareUnifiedRole(
             : { seed: previous.stageHandoff }
           : undefined,
         definition.valuation === undefined ? [] : ["valuation"],
+        valuationMethods !== undefined && incremental !== "legacy"
+          ? valuationDraftInput(reportKind, services.runs, claim.runId)
+          : undefined,
       )
     : createSubmission(reportKind, accept);
   return {
     systemPrompt,
     tools: [
       ...tools,
-      ...("tools" in submission
-        ? valuationMethods !== undefined
-          ? computedValuationDraftTools(
-              submission.tools,
-              services.runs,
-              claim.runId,
-            )
-          : submission.tools
-        : [submission.tool]),
+      ...("tools" in submission ? submission.tools : [submission.tool]),
     ],
     followup(next, { resumeSearch }) {
       if (resumeSearch) search?.resume();

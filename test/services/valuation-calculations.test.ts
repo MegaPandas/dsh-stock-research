@@ -36,7 +36,13 @@ import {
   valuationCalculationCatalog,
 } from "../../src/services/valuation-calculations.js";
 import { DataRoot } from "../../src/storage/data-root.js";
-import { createValuationTools } from "../../src/tools/valuation.js";
+import {
+  createValuationTools,
+  createValuationCalculationReader,
+} from "../../src/tools/valuation.js";
+import { createValuationOperations } from "../../src/host/valuation-operations.js";
+import { createReportDraft } from "../../src/host/report-draft.js";
+import { valuationDraftInput } from "../../src/app/valuation-draft.js";
 import { agentAnalysisReport } from "../fixtures/analysis-report.js";
 import { US_SECURITY } from "../fixtures/market.js";
 import { renderValuation } from "../../src/report/valuation.js";
@@ -756,6 +762,155 @@ it("binds calculation tools to trusted tasks and authorizes all run reads", asyn
       task,
     ),
   ).rejects.toThrow(/ACCESS_DENIED/);
+});
+
+it("shares calculation receipts with direct operations and restricts scoped reads", async () => {
+  const f = setup();
+  const bindings = new SessionBindings();
+  const task = { id: "worker" } as Agent;
+  bindings.bind(task, {
+    kind: "task",
+    runId: f.operation.runId,
+    taskId: f.operation.taskId,
+    attempt: f.operation.attempt,
+  });
+  const operations = createValuationOperations(f.runs, bindings);
+  const exec = {
+    agent: task,
+    callId: "shared",
+    signal: new AbortController().signal,
+  } as ToolRunContext;
+  const saved = operations.calculate(request(), "shared", exec);
+  const tools = createValuationTools(f.runs, bindings);
+  expect(await tools[0]!.execute(request(), exec)).toEqual(saved);
+  const read = createValuationCalculationReader(operations, f.operation.runId);
+  expect(
+    await read.execute({ calculationId: saved.calculationId }, exec),
+  ).toEqual(saved);
+  await expect(
+    read.execute(
+      { calculationId: saved.calculationId, runId: "foreign" },
+      exec,
+    ),
+  ).rejects.toMatchObject({ code: "INVALID_INPUT" });
+  expect(() =>
+    operations.read("foreign", saved.calculationId, exec),
+  ).toThrowError(expect.objectContaining({ code: "ACCESS_DENIED" }));
+  const unbound = { ...exec, agent: { id: task.id } as Agent };
+  expect(() =>
+    operations.calculate(request(), "unbound", unbound),
+  ).toThrowError(expect.objectContaining({ code: "ACCESS_DENIED" }));
+  expect(() =>
+    operations.read(f.operation.runId, saved.calculationId, unbound),
+  ).toThrowError(expect.objectContaining({ code: "ACCESS_DENIED" }));
+  const aborted = new AbortController();
+  const reason = new Error("valuation cancelled");
+  aborted.abort(reason);
+  const cancelled = { ...exec, signal: aborted.signal };
+  expect(() => operations.calculate(request(), "cancelled", cancelled)).toThrow(
+    reason,
+  );
+  expect(() =>
+    operations.read(f.operation.runId, saved.calculationId, cancelled),
+  ).toThrow(reason);
+  await expect(tools[0]!.execute(request(), cancelled)).rejects.toThrow(reason);
+  await expect(
+    read.execute({ calculationId: saved.calculationId }, cancelled),
+  ).rejects.toThrow(reason);
+  expect(
+    valuationCalculationCatalog(f.runs, f.operation.runId).map(
+      ({ calculationId }) => calculationId,
+    ),
+  ).toEqual([saved.calculationId]);
+});
+
+it("resolves calculation references before atomically updating a confirmed draft", async () => {
+  const f = setup();
+  const saved = calculateValuation(f.runs, f.operation, request(), "valuation");
+  const targetRequest = request();
+  targetRequest.purpose = "target_price";
+  targetRequest.inputs.multiples = [0.4];
+  const target = calculateValuation(
+    f.runs,
+    f.operation,
+    targetRequest,
+    "target",
+  );
+  const selection = {
+    companyProfile: "Synthetic company",
+    methods: [
+      {
+        methodId: "comparable_multiples",
+        suitability: "Revenue comparison",
+        calculationIds: [saved.calculationId],
+        limitations: [],
+      },
+    ],
+    targetPriceBasis: "Synthetic forward revenue scenario",
+  };
+  const session = createReportDraft(
+    "decision_draft",
+    () => "saved",
+    undefined,
+    false,
+    {},
+    [],
+    valuationDraftInput("decision_draft", f.runs, f.operation.runId),
+  );
+  const [write, read, , handoff] = session.tools;
+  const exec = { signal: new AbortController().signal } as ToolRunContext;
+  await write!.execute(
+    {
+      summary: "Original",
+      valuation: selection,
+      targetPrice: { calculationId: target.calculationId },
+    },
+    exec,
+  );
+  await handoff!.execute(
+    {
+      keyPoints: ["Saved calculation"],
+      disagreements: [],
+      risks: [],
+      openQuestions: [],
+    },
+    exec,
+  );
+  const before = await read!.execute({}, exec);
+  expect(session.draft().content.targetPrice).toMatchObject({
+    value: 18,
+    calculationId: target.calculationId,
+  });
+  expect(session.draft().content.valuation?.methods[0]?.valueRange).toEqual({
+    low: 13.5,
+    high: 22.5,
+    unit: "USD/share",
+  });
+  for (const patch of [
+    {
+      summary: "Must not persist",
+      valuation: selection,
+      targetPrice: { calculationId: "missing" },
+    },
+    {
+      summary: "Must not persist",
+      targetPrice: { calculationId: target.calculationId },
+      valuation: {
+        ...selection,
+        methods: [{ ...selection.methods[0], calculationIds: ["missing"] }],
+      },
+    },
+  ]) {
+    await expect(write!.execute(patch, exec)).rejects.toMatchObject({
+      code: "INVALID_INPUT",
+    });
+    expect(await read!.execute({}, exec)).toEqual(before);
+  }
+  await write!.execute({ summary: "Updated", valuation: selection }, exec);
+  expect(await read!.execute({}, exec)).toMatchObject({
+    draft: { summary: "Updated" },
+    handoffConfirmed: false,
+  });
 });
 
 function roleTask(

@@ -17,6 +17,7 @@ import {
 } from "../services/analysis-report.js";
 import type { RoleProvision } from "../host/dispatch.js";
 import type { SubmitReport } from "../host/report-submission.js";
+import type { ValuationOperations } from "../host/valuation-operations.js";
 import type { RunService } from "../services/runs.js";
 import type { QueryToolPolicy } from "../tools/query-inputs.js";
 import { readApplicationInput } from "./research-input.js";
@@ -65,6 +66,7 @@ const SCOPED_QUERIES = new Set(["stock_data_health", "stock_recall"]);
 export interface RoleServices {
   runs: RunService;
   submitReport: SubmitReport;
+  valuations: ValuationOperations;
   searchPublic(
     query: string,
     exec: ToolRunContext,

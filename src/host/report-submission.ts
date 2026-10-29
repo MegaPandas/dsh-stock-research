@@ -1,13 +1,13 @@
-import type { Agent } from "@deepseek-ai/dsh-agent";
 import { ResearchError } from "../contracts/errors.js";
 import type { ArtifactCommitResult } from "../contracts/runs.js";
 import type { ArtifactService } from "../services/artifacts.js";
-import { taskOperation, type SessionBindings } from "./bindings.js";
+import {
+  taskOperation,
+  type SessionBindings,
+  type ResearchCaller,
+} from "./bindings.js";
 
-export interface ReportCaller {
-  agent?: Agent | undefined;
-  signal: AbortSignal;
-}
+export type ReportCaller = ResearchCaller;
 
 /** ArtifactService owns validation of both assembled reports and external drafts. */
 export type SubmitReport = (

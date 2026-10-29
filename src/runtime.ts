@@ -3,3 +3,5 @@ export type { ResearchConfig, SourceId } from "./host/config.js";
 export { createResearchPlugin } from "./host/runtime.js";
 export type { ResearchRuntime } from "./host/runtime.js";
 export type { ReportCaller, SubmitReport } from "./host/report-submission.js";
+export type { ValuationOperations } from "./host/valuation-operations.js";
+export type { ResearchCaller } from "./host/bindings.js";

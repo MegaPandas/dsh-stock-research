@@ -14,7 +14,7 @@ import { ResearchError } from "../contracts/errors.js";
 import { parseAgentReport } from "../services/agent-reports.js";
 import { researchTool } from "../tools/errors.js";
 import { objectSchema, resultOutput } from "../tools/parameters.js";
-import { createSubmission } from "./agent-execution.js";
+import { createSubmissionSession } from "./agent-execution.js";
 import {
   stageHandoffSchema,
   STAGE_HANDOFF_MAX_CHARACTERS,
@@ -27,6 +27,12 @@ export type ReportDraft<Kind extends AgentReportKind> = {
   summary?: string;
   content: Partial<AgentReportContent<Kind>>;
 };
+
+/** Input sections are validated before resolving references into stored report sections. */
+export interface ReportDraftInput {
+  sections: Record<string, JsonSchemaNode>;
+  resolve(updates: Record<string, unknown>): Record<string, unknown>;
+}
 
 function validate(schema: JsonSchemaNode, value: unknown): void {
   const errors = validateJsonSchemaValue(schema, value, "reportDraft");
@@ -46,13 +52,14 @@ export function createReportDraft<Kind extends AgentReportKind, Result>(
   legacy = false,
   handoffOptions?: { seed?: StageHandoff },
   requiredContentSections: readonly string[] = [],
+  inputContract?: ReportDraftInput,
 ): {
   tools: ToolDefinition[];
   result(): Result;
   draft(): ReportDraft<Kind>;
 } {
   const schema = agentReportSchemas[kind];
-  const sections: Record<string, JsonSchemaNode> = {
+  const sections: Record<string, JsonSchemaNode> = inputContract?.sections ?? {
     summary: schema.properties.summary,
     ...schema.properties.content.properties,
   };
@@ -82,7 +89,7 @@ export function createReportDraft<Kind extends AgentReportKind, Result>(
       ? undefined
       : parseStageHandoff(handoffOptions.seed);
   let handoffConfirmed = false;
-  const submission = createSubmission(kind, (report, exec) =>
+  const submission = createSubmissionSession(kind, (report, exec) =>
     handoffOptions === undefined
       ? accept(report, exec)
       : accept(report, exec, handoff),
@@ -125,8 +132,9 @@ export function createReportDraft<Kind extends AgentReportKind, Result>(
               `${errors.join("\n")}\nSchema for ${section}: ${JSON.stringify(sections[section], (key, value: unknown) => (key === "description" ? undefined : value))}`,
             );
         }
+        const patch = legacy ? { [names[0]!]: input.value } : input;
         const updates = structuredClone(
-          legacy ? { [names[0]!]: input.value } : input,
+          inputContract === undefined ? patch : inputContract.resolve(patch),
         );
         const content = stored.content as Record<string, unknown>;
         for (const [section, sectionValue] of Object.entries(updates))
@@ -181,10 +189,13 @@ export function createReportDraft<Kind extends AgentReportKind, Result>(
       },
     }),
     researchTool({
-      ...submission.tool,
+      name: "stock_submit",
       description:
         "Submit the complete draft with {}; successful saving ends the current execution.",
       parameters: emptySchema,
+      output: resultOutput(
+        objectSchema({ status: { type: "string", const: "submitted" } }),
+      ),
       execute(value, exec) {
         exec.signal.throwIfAborted();
         validate(emptySchema, value);
@@ -205,7 +216,7 @@ export function createReportDraft<Kind extends AgentReportKind, Result>(
               "stageHandoff.risks must have exactly one summary for each report issue, in the same order.",
             );
         }
-        return submission.tool.execute(draft(), exec);
+        return submission.submit(draft(), exec);
       },
     }),
   ];

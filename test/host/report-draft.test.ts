@@ -197,6 +197,11 @@ describe("section report drafts", () => {
     expect(accept).toHaveBeenCalledWith(report, exec);
     expect(session.result()).toEqual({ receipt: "saved" });
     expect(exec.concludeTurn).toHaveBeenCalledOnce();
+    await expect(submit!.execute({}, exec)).resolves.toEqual({
+      status: "submitted",
+    });
+    expect(accept).toHaveBeenCalledOnce();
+    expect(session.result()).toEqual({ receipt: "saved" });
   });
 
   it("updates multiple sections atomically, preserves omitted sections and isolates input mutations", async () => {
@@ -346,6 +351,8 @@ describe("section report drafts", () => {
       execution(),
     );
     expect(session.draft().content.currentState).toEqual(["旧版继续写入。"]);
+    await session.tools[2]!.execute({}, execution());
+    expect(session.result()).toBe("saved");
   });
 
   it("does not mutate or save when cancelled", async () => {

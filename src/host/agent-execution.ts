@@ -80,52 +80,49 @@ export function agentInput(input: {
 }
 
 /** All research roles complete through a validated, successful business commit. */
-export function createSubmission<Kind extends AgentReportKind, Result>(
+export function createSubmissionSession<Kind extends AgentReportKind, Result>(
   kind: Kind,
   accept: (
     report: AgentReport<Kind>,
     exec: ToolRunContext,
   ) => Result | Promise<Result>,
-): { tool: ToolDefinition; result(): Result } {
+): {
+  submit(
+    value: unknown,
+    exec: ToolRunContext,
+  ): Promise<{ status: "submitted" }>;
+  result(): Result;
+} {
   let accepted: { value: Result } | undefined;
   let rejected: unknown;
   let failure: unknown;
   return {
-    tool: researchTool({
-      name: "stock_submit",
-      description:
-        "Submit this role's business JSON. Correct reported field errors in this session; successful submission ends execution.",
-      parameters: agentReportSchemas[kind],
-      output: resultOutput(
-        objectSchema({ status: { type: "string", const: "submitted" } }),
-      ),
-      async execute(value, exec) {
-        exec.signal.throwIfAborted();
-        if (accepted !== undefined) {
-          exec.concludeTurn();
-          return { status: "submitted" };
+    async submit(value, exec) {
+      exec.signal.throwIfAborted();
+      if (accepted !== undefined) {
+        exec.concludeTurn();
+        return { status: "submitted" };
+      }
+      try {
+        const report = parseAgentReport(kind, value);
+        const result = await accept(report, exec);
+        accepted = { value: result };
+        exec.concludeTurn();
+        return { status: "submitted" };
+      } catch (cause) {
+        rejected = cause;
+        const recoverable =
+          (cause instanceof ResearchError || cause instanceof HarnessError) &&
+          ["INVALID_INPUT", "INVALID_ARTIFACT", "NUMBER_MISMATCH"].includes(
+            cause.code,
+          );
+        if (!recoverable) {
+          failure = cause;
+          exec.agent?.cancel({ kind: "user" });
         }
-        try {
-          const report = parseAgentReport(kind, value);
-          const result = await accept(report, exec);
-          accepted = { value: result };
-          exec.concludeTurn();
-          return { status: "submitted" };
-        } catch (cause) {
-          rejected = cause;
-          const recoverable =
-            (cause instanceof ResearchError || cause instanceof HarnessError) &&
-            ["INVALID_INPUT", "INVALID_ARTIFACT", "NUMBER_MISMATCH"].includes(
-              cause.code,
-            );
-          if (!recoverable) {
-            failure = cause;
-            exec.agent?.cancel({ kind: "user" });
-          }
-          throw cause;
-        }
-      },
-    }),
+        throw cause;
+      }
+    },
     result() {
       if (accepted !== undefined) return accepted.value;
       if (failure !== undefined) throw failure;
@@ -137,5 +134,28 @@ export function createSubmission<Kind extends AgentReportKind, Result>(
         )
       );
     },
+  };
+}
+
+export function createSubmission<Kind extends AgentReportKind, Result>(
+  kind: Kind,
+  accept: (
+    report: AgentReport<Kind>,
+    exec: ToolRunContext,
+  ) => Result | Promise<Result>,
+): { tool: ToolDefinition; result(): Result } {
+  const session = createSubmissionSession(kind, accept);
+  return {
+    tool: researchTool({
+      name: "stock_submit",
+      description:
+        "Submit this role's business JSON. Correct reported field errors in this session; successful submission ends execution.",
+      parameters: agentReportSchemas[kind],
+      output: resultOutput(
+        objectSchema({ status: { type: "string", const: "submitted" } }),
+      ),
+      execute: session.submit,
+    }),
+    result: session.result,
   };
 }

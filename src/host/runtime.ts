@@ -1,6 +1,10 @@
 import { join } from "node:path";
 import type { Context } from "@deepseek-ai/cordis";
 import { createValuationTools } from "../tools/valuation.js";
+import {
+  createValuationOperations,
+  type ValuationOperations,
+} from "./valuation-operations.js";
 import type {
   Agent,
   AgentHandle,
@@ -69,6 +73,7 @@ export interface ResearchRuntime {
   readonly tools: readonly ToolDefinition[];
   readonly policy: QueryToolPolicy;
   readonly submitReport: SubmitReport;
+  readonly valuations: ValuationOperations;
   bindCoordinator(agent: Agent): () => void;
   authorizeCoordinatorRun(agent: Agent, runId: string): void;
   createDraftFile(
@@ -153,6 +158,7 @@ class Runtime implements ResearchRuntime {
   readonly dispatch: DispatchBridge;
   readonly tools: readonly ToolDefinition[];
   readonly submitReport: SubmitReport;
+  readonly valuations: ValuationOperations;
   readonly #pending = new Set<PendingAgent>();
   readonly #agents = new Map<Agent, AgentHandle>();
   #closing: Promise<void> | undefined;
@@ -174,6 +180,7 @@ class Runtime implements ResearchRuntime {
       components.bindings,
     );
     this.tools = this.createTools(capturedPolicy);
+    this.valuations = createValuationOperations(this.runs, components.bindings);
   }
 
   get policy(): QueryToolPolicy {

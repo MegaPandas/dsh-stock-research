@@ -3,6 +3,11 @@ import type { ResearchScope } from "../contracts/data.js";
 import { ResearchError } from "../contracts/errors.js";
 import type { TaskOperation } from "../contracts/runs.js";
 
+export interface ResearchCaller {
+  agent?: Agent | undefined;
+  signal: AbortSignal;
+}
+
 export type ResearchBinding =
   | { kind: "coordinator"; runIds: readonly string[] }
   | { kind: "task"; runId: string; taskId: string; attempt: number }
