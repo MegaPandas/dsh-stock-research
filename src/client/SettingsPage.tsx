@@ -45,6 +45,19 @@ const datasetLabels = {
   macro: "宏观",
   research: "公开研究",
 };
+const xueqiuCookieFields = [
+  { name: "xq_a_token", label: "访问令牌（xq_a_token）", type: "password" },
+  { name: "u", label: "用户 ID（u）", type: "password" },
+  { name: "xq_is_login", label: "登录标记（xq_is_login）", type: "text" },
+] as const;
+
+function xueqiuCookieValue(cookie: string | undefined, name: string): string {
+  const entry = cookie
+    ?.split(";")
+    .map((part) => part.trim())
+    .find((part) => part.startsWith(`${name}=`));
+  return entry?.slice(name.length + 1) ?? "";
+}
 
 function equal(left: unknown, right: unknown): boolean {
   return JSON.stringify(left) === JSON.stringify(right);
@@ -488,14 +501,17 @@ export function SettingsPage({
         message: "请填写有效的网络、缓存和新鲜度参数；容量和并发须为正整数。",
         field: invalidNumber[0],
       };
-    if (
-      draft.runtime.enabledSources.includes("xueqiu") &&
-      !draft.runtime.xueqiuCookie?.trim()
-    )
-      return {
-        message: "启用雪球前请填写 Cookie。",
-        field: "雪球 Cookie",
-      };
+    if (draft.runtime.enabledSources.includes("xueqiu")) {
+      const missing = xueqiuCookieFields.find(
+        ({ name }) =>
+          !xueqiuCookieValue(draft.runtime.xueqiuCookie, name).trim(),
+      );
+      if (missing)
+        return {
+          message: `请填写雪球 ${missing.name} 的 Value。`,
+          field: `雪球 ${missing.name}`,
+        };
+    }
     if (draft.runtime.enabledSources.includes("sec")) {
       if (!draft.runtime.secUserAgent?.trim())
         return {
@@ -747,22 +763,38 @@ export function SettingsPage({
             {draft.runtime.enabledSources.includes("xueqiu") && (
               <fieldset className="sr-card">
                 <legend>雪球请求配置</legend>
-                <label>
-                  Cookie
-                  <input
-                    type="password"
-                    aria-label="雪球 Cookie"
-                    autoComplete="off"
-                    value={draft.runtime.xueqiuCookie ?? ""}
-                    placeholder="xq_a_token=你的值; u=你的用户ID; xq_is_login=1"
-                    onChange={(event) =>
-                      edit(["runtime", "xueqiuCookie"], event.target.value)
-                    }
-                  />
-                </label>
-                <p className="sr-muted">
-                  格式：xq_a_token=你的值; u=你的用户ID; xq_is_login=1
-                </p>
+                {xueqiuCookieFields.map(({ name, label, type }) => (
+                  <label key={name}>
+                    {label}
+                    <input
+                      type={type}
+                      aria-label={`雪球 ${name}`}
+                      autoComplete="off"
+                      spellCheck={false}
+                      value={xueqiuCookieValue(
+                        draft.runtime.xueqiuCookie,
+                        name,
+                      )}
+                      placeholder={
+                        name === "xq_is_login"
+                          ? "1"
+                          : "粘贴对应 Cookie 的 Value"
+                      }
+                      onChange={(event) =>
+                        edit(
+                          ["runtime", "xueqiuCookie"],
+                          xueqiuCookieFields
+                            .map(
+                              (field) =>
+                                `${field.name}=${field.name === name ? event.target.value : xueqiuCookieValue(draft.runtime.xueqiuCookie, field.name)}`,
+                            )
+                            .join("; "),
+                        )
+                      }
+                    />
+                  </label>
+                ))}
+                <p className="sr-muted">只填各项的 Value，不含名称前缀。</p>
               </fieldset>
             )}
             {draft.runtime.enabledSources.includes("sec") && (

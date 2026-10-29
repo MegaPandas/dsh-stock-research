@@ -472,31 +472,57 @@ describe("stock research settings page", () => {
     ]);
   });
 
-  it("requires a masked Cookie before enabling Xueqiu and preserves it when disabled", async () => {
+  it("requires three Cookie values, masks credentials and saves the joined header", async () => {
     const h = fixture();
     render(<SettingsPage form={h.form} loadCatalog={loadCatalog} />);
     await ready();
     fireEvent.click(screen.getByText("数据来源"));
     const xueqiu = screen.getByRole("checkbox", { name: /雪球/ });
     expect((xueqiu as HTMLInputElement).checked).toBe(false);
-    expect(screen.queryByLabelText("雪球 Cookie")).toBeNull();
+    expect(screen.queryByRole("group", { name: "雪球请求配置" })).toBeNull();
     fireEvent.click(xueqiu);
     fireEvent.click(screen.getByRole("button", { name: "保存" }));
     expect(await screen.findByRole("alert")).toHaveProperty(
       "textContent",
-      "启用雪球前请填写 Cookie。",
+      "请填写雪球 xq_a_token 的 Value。",
     );
-    const cookie = screen.getByLabelText("雪球 Cookie");
-    expect(cookie.getAttribute("type")).toBe("password");
-    expect(document.activeElement).toBe(cookie);
+    const group = screen.getByRole("group", { name: "雪球请求配置" });
+    expect(group.querySelectorAll("input")).toHaveLength(3);
+    const token = screen.getByLabelText("雪球 xq_a_token");
+    const user = screen.getByLabelText("雪球 u");
+    const login = screen.getByLabelText("雪球 xq_is_login");
+    expect(token.getAttribute("type")).toBe("password");
+    expect(user.getAttribute("type")).toBe("password");
+    expect(document.activeElement).toBe(token);
     expect(h.mutate).not.toHaveBeenCalled();
-    fireEvent.change(cookie, { target: { value: "session=fixture" } });
+    fireEvent.change(token, { target: { value: "fixture-session==" } });
+    fireEvent.click(screen.getByRole("button", { name: "保存" }));
+    expect(await screen.findByRole("alert")).toHaveProperty(
+      "textContent",
+      "请填写雪球 u 的 Value。",
+    );
+    expect(document.activeElement).toBe(user);
+    fireEvent.change(user, { target: { value: "fixture-user" } });
+    fireEvent.click(screen.getByRole("button", { name: "保存" }));
+    expect(await screen.findByRole("alert")).toHaveProperty(
+      "textContent",
+      "请填写雪球 xq_is_login 的 Value。",
+    );
+    expect(document.activeElement).toBe(login);
+    expect(h.mutate).not.toHaveBeenCalled();
+    fireEvent.change(login, { target: { value: "1" } });
     fireEvent.click(xueqiu);
-    expect(screen.queryByLabelText("雪球 Cookie")).toBeNull();
+    expect(screen.queryByRole("group", { name: "雪球请求配置" })).toBeNull();
     fireEvent.click(xueqiu);
     expect(
-      (screen.getByLabelText("雪球 Cookie") as HTMLInputElement).value,
-    ).toBe("session=fixture");
+      (screen.getByLabelText("雪球 xq_a_token") as HTMLInputElement).value,
+    ).toBe("fixture-session==");
+    expect((screen.getByLabelText("雪球 u") as HTMLInputElement).value).toBe(
+      "fixture-user",
+    );
+    expect(
+      (screen.getByLabelText("雪球 xq_is_login") as HTMLInputElement).value,
+    ).toBe("1");
     fireEvent.click(screen.getByRole("button", { name: "保存" }));
     await waitFor(() =>
       expect(h.mutate).toHaveBeenCalledWith(
@@ -509,7 +535,8 @@ describe("stock research settings page", () => {
           {
             op: "set",
             path: ["runtime", "xueqiuCookie"],
-            value: "session=fixture",
+            value:
+              "xq_a_token=fixture-session==; u=fixture-user; xq_is_login=1",
           },
         ],
         7,
