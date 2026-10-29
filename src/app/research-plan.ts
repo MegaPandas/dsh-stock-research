@@ -3,7 +3,7 @@ import type { OpenRunInput, RunVersions } from "../contracts/runs.js";
 import type { RunDefinition, TaskDefinition } from "../contracts/workflow.js";
 import type { SourceDescription } from "../services/query-sources.js";
 import type { QueryToolPolicy } from "../tools/query-inputs.js";
-import { DIGEST_PROMPT_VERSION } from "../host/digest-model.js";
+import { DIGEST_HANDOFF_VERSION } from "../contracts/digests.js";
 import type { SourceCodeVersions } from "../data/versions.js";
 import {
   APPLICATION_INPUT_NAME,
@@ -96,7 +96,7 @@ export function researchVersions(
     mode: modeVersion,
     prompts: {
       roles: ROLE_PROMPT_VERSION,
-      digest: DIGEST_PROMPT_VERSION,
+      digest: DIGEST_HANDOFF_VERSION,
       coordinator: COORDINATOR_PROMPT_VERSION,
       valuationMethods: VALUATION_METHODS.version,
       valuationEngine: VALUATION_ENGINE_VERSION,

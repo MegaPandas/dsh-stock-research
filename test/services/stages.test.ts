@@ -17,8 +17,14 @@ import { RunStore } from "../../src/runs/store.js";
 import { DataRoot } from "../../src/storage/data-root.js";
 import { validateRunDefinition } from "../../src/services/definition.js";
 import { attachResearchStages } from "../../src/app/research-stages.js";
-import { createQuickInput } from "../../src/app/quick-plan.js";
-import { createDeepInput } from "../../src/app/deep-plan.js";
+import {
+  createQuickInput,
+  QUICK_RESEARCH_STAGES,
+} from "../../src/app/quick-plan.js";
+import {
+  createDeepInput,
+  DEEP_RESEARCH_STAGES,
+} from "../../src/app/deep-plan.js";
 import { US_SECURITY } from "../fixtures/market.js";
 
 const roots: DataRoot[] = [];
@@ -391,8 +397,8 @@ describe("interactive research stage plans", () => {
     };
     const quick = createQuickInput(scope, policy, []);
     const deep = createDeepInput(scope, policy, []);
-    const interactiveQuick = attachResearchStages(quick);
-    const interactiveDeep = attachResearchStages(deep);
+    const interactiveQuick = attachResearchStages(quick, QUICK_RESEARCH_STAGES);
+    const interactiveDeep = attachResearchStages(deep, DEEP_RESEARCH_STAGES);
     expect(quick.definition).not.toHaveProperty("stages");
     expect(deep.definition).not.toHaveProperty("stages");
     expect(interactiveQuick.definition.tasks).toEqual(quick.definition.tasks);
@@ -410,14 +416,47 @@ describe("interactive research stage plans", () => {
       interactiveDeep.definition.stages!.find((stage) => stage.id === "risk")!
         .taskIds,
     ).toEqual(["risk.finance", "risk.valuation", "risk.events"]);
+    expect(
+      interactiveQuick.definition
+        .stages!.filter(({ dispatch }) => dispatch === "together")
+        .map(({ id }) => id),
+    ).toEqual(["debate.1"]);
+    expect(
+      interactiveDeep.definition
+        .stages!.filter(({ dispatch }) => dispatch === "together")
+        .map(({ id }) => id),
+    ).toEqual(["debate.1", "debate.2"]);
     expect(() =>
       validateRunDefinition(interactiveQuick.definition),
     ).not.toThrow();
     expect(() =>
       validateRunDefinition(interactiveDeep.definition),
     ).not.toThrow();
-    quick.versions.prompts.digest = "11";
-    expect(attachResearchStages(quick).definition.stages).toHaveLength(7);
+    interactiveQuick.definition.stages![0]!.taskIds.pop();
+    expect(
+      attachResearchStages(quick, QUICK_RESEARCH_STAGES).definition.stages![0]!
+        .taskIds,
+    ).toHaveLength(4);
+  });
+
+  it("uses the supplied review groups independently of task names and prompt versions", () => {
+    const source = input(false);
+    const stages = [
+      {
+        id: "peer-review",
+        taskIds: ["a", "b"],
+        beforeTasks: ["digest"],
+        dispatch: "together" as const,
+      },
+    ];
+    const first = attachResearchStages(source, stages);
+    source.versions.prompts.digest = "different-prompt";
+    const second = attachResearchStages(source, stages);
+    expect(first.definition.stages).toEqual(stages);
+    expect(second.definition).toEqual(first.definition);
+    expect(source.definition).not.toHaveProperty("stages");
+    stages[0]!.taskIds.pop();
+    expect(first.definition.stages![0]!.taskIds).toEqual(["a", "b"]);
   });
 
   it("rejects invalid membership and gates outside the existing dependency graph", () => {

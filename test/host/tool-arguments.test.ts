@@ -1,12 +1,13 @@
 import * as PiAi from "@deepseek-ai/dsh-llm-pi-ai";
 import { afterEach, expect, it, vi } from "vitest";
-import type {
-  DigestDraft,
-  DigestModelInput,
-} from "../../src/contracts/digests.js";
-import { HostDigestModel } from "../../src/host/digest-model.js";
-import { digestBusinessDraft } from "../../src/services/digest-business.js";
-import { assembleDigest } from "../../src/services/digest-draft.js";
+import { createUserMessage } from "@deepseek-ai/dsh-llm";
+import { SessionId } from "@deepseek-ai/dsh-session";
+import {
+  createSubmission,
+  setupResearchTools,
+} from "../../src/host/agent-execution.js";
+import { observeModelCalls } from "../../src/host/model-events.js";
+import { agentAnalysisReport } from "../fixtures/analysis-report.js";
 import { captureModelLogs } from "../fixtures/dispatch-host.js";
 import { runtimeHost } from "../fixtures/runtime-host.js";
 
@@ -68,7 +69,7 @@ function toolResponse(
 }
 
 it.each(["business fields", "native arguments"] as const)(
-  "returns malformed %s diagnostics through real PiAi, then publishes one corrected digest",
+  "returns malformed %s diagnostics through real PiAi, then accepts one corrected role report",
   async (failureKind) => {
     vi.stubEnv("DSH_ARGUMENTS_TEST_KEY", "fixture-only-key");
     const h = await runtimeHost();
@@ -84,35 +85,7 @@ it.each(["business fields", "native arguments"] as const)(
         },
       },
     });
-    const input: DigestModelInput = {
-      scope: h.scope,
-      taskId: "digest",
-      instructionVersion: 2,
-      instruction: "Use the fixed input references.",
-      reports: [],
-      artifacts: [],
-      references: [],
-      numbers: [],
-      risks: [],
-      gaps: [],
-    };
-    const draft: DigestDraft = {
-      title: "Preserved draft",
-      body: "The original qualitative summary survives.",
-      inputRefs: [],
-      facts: [],
-      disagreements: [],
-      riskSummaries: [],
-    };
-    const business = {
-      summary: draft.body,
-      content: {
-        keyPoints: [],
-        disagreements: [],
-        riskSummaries: [],
-        openQuestions: [],
-      },
-    };
+    const business = agentAnalysisReport();
     const call = (name: string, args: unknown, id: string) => ({
       name,
       argumentsText: JSON.stringify(args),
@@ -146,7 +119,7 @@ it.each(["business fields", "native arguments"] as const)(
               "stock_submit",
               {
                 ...business,
-                content: { ...business.content, keyPoints: [42] },
+                content: { ...business.content, currentState: [42] },
               },
               "original-report",
             ),
@@ -160,7 +133,7 @@ it.each(["business fields", "native arguments"] as const)(
     const logs = captureModelLogs(h.ctx);
     const operation = {
       runId: "arguments-run",
-      taskId: "digest",
+      taskId: "analysis.market",
       attempt: 7,
       identity: "coordinator",
       sessionId: null,
@@ -171,23 +144,30 @@ it.each(["business fields", "native arguments"] as const)(
       attempt: operation.attempt,
       refs: [],
     };
-    const published: unknown[] = [];
-    const submit = vi.fn((value: unknown) => {
-      published.push(assembleDigest(value, input));
-      return committed;
+    const accept = vi.fn(() => committed);
+    const submission = createSubmission("analysis", accept);
+    const handle = await h.ctx.agents.create({
+      sessionId: SessionId("arguments-role"),
+      agentOptions: { provider: "fixture", model: "fixture" },
+      meta: { cwd: h.directory },
+      setup: (ctx, agent) => {
+        const verifyTools = setupResearchTools(ctx, agent, [submission.tool]);
+        observeModelCalls(agent, operation, "role");
+        return { commit: verifyTools };
+      },
     });
-    const host = new HostDigestModel(h.ctx, {
-      provider: "fixture",
-      model: "fixture",
-    });
-    expect(
-      await host.generate(
-        input,
-        new AbortController().signal,
-        operation,
-        submit,
-      ),
-    ).toEqual(committed);
+    try {
+      handle.agent.followup(
+        createUserMessage({
+          content: [{ type: "text", text: "Submit the analysis report." }],
+          source: { kind: "user" },
+        }),
+      );
+      await handle.agent.whenIdle();
+      expect(submission.result()).toEqual(committed);
+    } finally {
+      await handle.dispose();
+    }
     expect(requests).toHaveLength(2);
     const feedback = requests[1]!.messages.find(
       (message) =>
@@ -198,27 +178,32 @@ it.each(["business fields", "native arguments"] as const)(
     );
     expect(feedback?.content).toContain("INVALID_INPUT");
     if (failureKind === "business fields") {
-      expect(feedback?.content).toContain("keyPoints");
+      expect(feedback?.content).toContain("currentState");
       expect(feedback?.content).toMatch(/string/);
-      expect(feedback?.content).not.toContain(draft.body);
+      expect(feedback?.content).not.toContain(business.summary);
     } else {
       expect(feedback?.content).toContain('{"summary": [}');
       expect(feedback?.content).toMatch(/JSON|position|token/);
     }
-    expect(submit).toHaveBeenCalledExactlyOnceWith(
-      digestBusinessDraft(business, input),
+    expect(accept).toHaveBeenCalledExactlyOnceWith(
+      business,
+      expect.objectContaining({ agent: handle.agent }),
     );
-    expect(published).toHaveLength(1);
-    expect(published[0]).toMatchObject({ payload: { report: business } });
     expect(logs).toHaveLength(2);
     expect(
       logs.every(
         (log) =>
+          log.kind === "role" &&
           log.runId === operation.runId &&
           log.taskId === operation.taskId &&
           log.attempt === 7,
       ),
     ).toBe(true);
-    expect(new Set(logs.map((log) => log.sessionId)).size).toBe(1);
+    expect(logs.map((log) => log.sessionId)).toEqual([
+      handle.agent.id,
+      handle.agent.id,
+    ]);
+    expect(h.ctx.agents.list()).toEqual([h.outside.agent]);
+    expect(h.ctx.tools.get("stock_submit")).toBeUndefined();
   },
 );

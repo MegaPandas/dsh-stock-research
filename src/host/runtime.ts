@@ -40,7 +40,7 @@ import { createReadTools } from "../tools/read.js";
 import { createWriteTools } from "../tools/write.js";
 import { SessionBindings, type ResearchBinding } from "./bindings.js";
 import { Config, type ResearchConfig } from "./config.js";
-import { HostDigestModel } from "./digest-model.js";
+import { generateHandoffDigest } from "../services/handoff-digest.js";
 import { DispatchBridge, type PrepareRole } from "./dispatch.js";
 import { ResearchSessions } from "./sessions.js";
 import { createSources } from "./sources.js";
@@ -508,7 +508,7 @@ export function createResearchPlugin(prepareRole: PrepareRole) {
         const digests = new DigestService(
           runs,
           artifacts,
-          new HostDigestModel(ctx, config.digestModel).generate,
+          generateHandoffDigest,
         );
         acquired.push(() => digests.close());
         const decisions = new DecisionService(runs, now);

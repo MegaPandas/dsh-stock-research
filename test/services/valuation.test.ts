@@ -45,18 +45,13 @@ it("retains structured assumptions and explicit missing ranges without changing 
   };
   expect(parseAgentReport("analysis", report)).toEqual(report);
   expect(() =>
-    validateRoleValuation(report, "analysis.fundamentals", scope, methodIds),
+    validateRoleValuation(report, "research", scope, methodIds),
   ).not.toThrow();
   expect(() =>
-    validateRoleValuation(
-      decision(false),
-      "manager.decision",
-      scope,
-      methodIds,
-    ),
+    validateRoleValuation(decision(false), "decision", scope, methodIds),
   ).toThrow(/requires a six-month target price/);
   expect(() =>
-    validateRoleValuation(old, "analysis.fundamentals", scope, methodIds),
+    validateRoleValuation(old, "research", scope, methodIds),
   ).toThrow(/valuation section/);
 });
 
@@ -102,6 +97,6 @@ it.each([
   else if (problem === "missing-price-basis") record.targetPriceBasis = null;
   else record.methods[0]!.valueRange = null;
   expect(() =>
-    validateRoleValuation(report, "manager.decision", scope, methodIds),
+    validateRoleValuation(report, "decision", scope, methodIds),
   ).toThrowError(expect.objectContaining({ code: "INVALID_INPUT" }));
 });

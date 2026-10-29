@@ -5,11 +5,25 @@ import {
 } from "../contracts/agent-reports.js";
 import type { ResearchArtifactInput } from "../contracts/artifact-payloads.js";
 import type { ArtifactRef } from "../contracts/data.js";
-import type { DigestDraft, DigestModelInput } from "../contracts/digests.js";
+import type {
+  DigestDraft,
+  DigestModelInput,
+  GenerateDigest,
+} from "../contracts/digests.js";
 import { ResearchError } from "../contracts/errors.js";
 import type { StageHandoff } from "../contracts/stage-handoff.js";
 import { parseAgentReport } from "./agent-reports.js";
 import { artifactKey } from "./run-dependencies.js";
+
+export const generateHandoffDigest: GenerateDigest = async (
+  input,
+  signal,
+  _operation,
+  submit,
+) => {
+  signal.throwIfAborted();
+  return submit(handoffDigest(input));
+};
 
 /** Assemble accepted role handoffs without generating another interpretation. */
 export function handoffDigest(input: DigestModelInput): DigestDraft {

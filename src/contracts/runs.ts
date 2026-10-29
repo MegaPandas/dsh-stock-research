@@ -3,7 +3,11 @@ import type { JsonValue } from "./cache.js";
 import type { ArtifactRef, ISOTime, ResearchScope, SourceRef } from "./data.js";
 import type { ContentRef, StoredRun } from "./storage.js";
 import type { MemoryInputRegistration, RunEvidence } from "./task-data.js";
-import type { RunDefinition, TaskDefinition } from "./workflow.js";
+import type {
+  RunDefinition,
+  StageDefinition,
+  TaskDefinition,
+} from "./workflow.js";
 import type { RunLineage } from "./replay.js";
 
 export type RunStatus = "active" | "blocked" | "completed" | "cancelled";
@@ -159,10 +163,7 @@ export interface StageReviewResult {
   runId: string;
   review: StageReview;
 }
-export interface StageView {
-  id: string;
-  taskIds: string[];
-  beforeTasks: string[];
+export interface StageView extends StageDefinition {
   readyForReview: boolean;
   accepted: boolean;
   refs: ArtifactRef[];

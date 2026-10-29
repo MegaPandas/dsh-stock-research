@@ -5,10 +5,6 @@ export {
 } from "../host/bindings.js";
 export type { ResearchBinding, BoundCaller } from "../host/bindings.js";
 export { ResearchSessions } from "../host/sessions.js";
-export {
-  HostDigestModel,
-  DIGEST_PROMPT_VERSION,
-} from "../host/digest-model.js";
 export { DispatchBridge } from "../host/dispatch.js";
 export type {
   DispatchResult,

@@ -3,7 +3,6 @@ import type { QueryCachePolicy } from "../contracts/query.js";
 import { ResearchError } from "../contracts/errors.js";
 import type { HttpClientOptions } from "../data/http.js";
 import type { QueryToolPolicy } from "../tools/query-inputs.js";
-import { ModelConfig } from "../app/model-config.js";
 
 export const SOURCE_IDS = [
   "yahoo",
@@ -25,7 +24,6 @@ export interface ResearchConfig {
   http: HttpClientOptions;
   cache: { maxEntries: number; ttl: QueryCachePolicy };
   policy: QueryToolPolicy;
-  digestModel?: ModelConfig;
   secUserAgent?: string;
   xueqiuCookie?: string;
 }
@@ -87,7 +85,6 @@ const schema = closed({
       )
       .required(),
   }),
-  digestModel: ModelConfig.required(false),
   secUserAgent: text.required(false),
   xueqiuCookie: z.string().required(false),
 });

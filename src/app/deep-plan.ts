@@ -1,6 +1,6 @@
 import type { ResearchScope } from "../contracts/data.js";
 import type { OpenRunInput } from "../contracts/runs.js";
-import type { TaskDefinition } from "../contracts/workflow.js";
+import type { StageDefinition, TaskDefinition } from "../contracts/workflow.js";
 import type { SourceDescription } from "../services/query-sources.js";
 import type { QueryToolPolicy } from "../tools/query-inputs.js";
 import type { QuickQuerySnapshot } from "./quick-snapshots.js";
@@ -12,7 +12,37 @@ import {
   SHARED_BRIEFS,
 } from "./research-plan.js";
 
-export const DEEP_MODE_VERSION = "deep/7";
+export const DEEP_MODE_VERSION = "deep/8";
+const ANALYSTS = [
+  "analysis.market",
+  "analysis.fundamentals",
+  "analysis.macro",
+  "analysis.business",
+  "analysis.geopolitics",
+  "analysis.sentiment",
+  "analysis.public",
+];
+const RISKS = ["risk.finance", "risk.valuation", "risk.events"];
+export const DEEP_RESEARCH_STAGES: readonly StageDefinition[] = [
+  { id: "analysis", taskIds: [...ANALYSTS], beforeTasks: ["digest.analysis"] },
+  ...[1, 2].map((round): StageDefinition => ({
+    id: `debate.${round}`,
+    taskIds: [`debate.${round}.bull`, `debate.${round}.bear`],
+    beforeTasks: [`digest.debate.${round}`],
+    dispatch: "together",
+  })),
+  {
+    id: "manager.research",
+    taskIds: ["manager.research"],
+    beforeTasks: ["digest.plan"],
+  },
+  { id: "risk", taskIds: [...RISKS], beforeTasks: ["digest.risk"] },
+  {
+    id: "manager.decision",
+    taskIds: ["manager.decision"],
+    beforeTasks: ["finalize"],
+  },
+];
 const BRIEFS = {
   ...SHARED_BRIEFS,
   "analysis.business":
@@ -47,17 +77,8 @@ export function createDeepInput(
   snapshots: readonly QuickQuerySnapshot[] = [],
   publicSearchLimit: number = PUBLIC_SEARCH_LIMITS.maxSearches,
 ): OpenRunInput {
-  const analysts = [
-    "analysis.market",
-    "analysis.fundamentals",
-    "analysis.macro",
-    "analysis.business",
-    "analysis.geopolitics",
-    "analysis.sentiment",
-    "analysis.public",
-  ];
-  const tasks: TaskDefinition[] = analysts.map((id) =>
-    task(
+  const tasks: TaskDefinition[] = ANALYSTS.map((id) => ({
+    ...task(
       id,
       {
         kind: "role",
@@ -67,9 +88,12 @@ export function createDeepInput(
       [],
       ["analysis"],
     ),
-  );
+    ...(id === "analysis.fundamentals"
+      ? { valuation: "research" as const }
+      : {}),
+  }));
   tasks.push(
-    task("digest.analysis", { kind: "service", service: "digest" }, analysts, [
+    task("digest.analysis", { kind: "service", service: "digest" }, ANALYSTS, [
       "digest",
     ]),
   );
@@ -107,8 +131,7 @@ export function createDeepInput(
       ["digest"],
     ),
   );
-  const risks = ["risk.finance", "risk.valuation", "risk.events"];
-  for (const id of risks)
+  for (const id of RISKS)
     tasks.push(
       task(
         id,
@@ -121,15 +144,18 @@ export function createDeepInput(
     task(
       "digest.risk",
       { kind: "service", service: "digest" },
-      ["digest.plan", ...risks],
+      ["digest.plan", ...RISKS],
       ["digest"],
     ),
-    task(
-      "manager.decision",
-      { kind: "role", role: "manager", specialty: "decision" },
-      ["digest.risk"],
-      ["decision_draft"],
-    ),
+    {
+      ...task(
+        "manager.decision",
+        { kind: "role", role: "manager", specialty: "decision" },
+        ["digest.risk"],
+        ["decision_draft"],
+      ),
+      valuation: "decision",
+    },
     task(
       "finalize",
       { kind: "service", service: "finalize" },

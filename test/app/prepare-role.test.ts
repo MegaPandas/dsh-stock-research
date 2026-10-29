@@ -275,7 +275,7 @@ describe("persisted research role preparation", () => {
     await parent.dispose();
   });
 
-  it("continues protocol 23 fundamentals without a method catalogue or new mandatory section", async () => {
+  it("rejects a missing valuation catalogue even when prompt metadata names an older protocol", async () => {
     const h = await host();
     h.input.versions.prompts.roles = "23";
     delete h.input.versions.prompts.valuationMethods;
@@ -288,22 +288,9 @@ describe("persisted research role preparation", () => {
       "analysis.fundamentals",
       "claim-v23",
     );
-    const provision = prepareResearchRole(h.runtime, context);
-    expect(prompt(provision).context).not.toHaveProperty("valuationMethods");
-    expect(
-      provision.tools.some(
-        ({ name }) => name === "stock_read_valuation_method",
-      ),
-    ).toBe(false);
-    expect(
-      await provision.tools
-        .find(({ name }) => name === "stock_read_report_draft")!
-        .execute({}, {
-          signal: new AbortController().signal,
-        } as ToolRunContext),
-    ).toMatchObject({
-      missingSections: expect.not.arrayContaining(["valuation"]),
-    });
+    expect(() => prepareResearchRole(h.runtime, context)).toThrowError(
+      expect.objectContaining({ code: "VERSION_UNAVAILABLE" }),
+    );
   });
   it("provides direct input once and omits it from the lookup catalog", async () => {
     const h = await host();

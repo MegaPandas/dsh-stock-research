@@ -121,6 +121,12 @@ function definition(value: unknown): RunDefinition {
     for (const kind of array(task.outputKinds, "definition task.outputKinds"))
       oneOf(kind, ARTIFACT_KINDS, "definition task.outputKinds");
     number(task.instructionVersion, "definition task.instructionVersion");
+    if (task.valuation !== undefined)
+      oneOf(
+        task.valuation,
+        ["research", "decision"],
+        "definition task.valuation",
+      );
     for (const value of array(
       task.dataRequirements,
       "definition task.dataRequirements",
@@ -142,6 +148,8 @@ function definition(value: unknown): RunDefinition {
       string(stage.id, "stage.id");
       strings(stage.taskIds, "stage.taskIds");
       strings(stage.beforeTasks, "stage.beforeTasks");
+      if (stage.dispatch !== undefined)
+        oneOf(stage.dispatch, ["together"], "stage.dispatch");
     }
   }
   const result = definition as unknown as RunDefinition;

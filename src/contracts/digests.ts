@@ -8,6 +8,8 @@ import type { ReportedGap, RiskIssue } from "./artifact-payloads.js";
 import type { ArtifactCommitResult, TaskOperation } from "./runs.js";
 import type { AgentReport } from "./agent-reports.js";
 
+export const DIGEST_HANDOFF_VERSION = "12";
+
 export interface DigestNumberCandidate {
   candidateId: string;
   input: Extract<NumberInput, { kind: "artifact" }>;
@@ -15,7 +17,6 @@ export interface DigestNumberCandidate {
   estimated: boolean;
 }
 export interface DigestModelInput {
-  protocolVersion?: string;
   scope: ResearchScope;
   taskId: string;
   instructionVersion: number;
@@ -36,7 +37,7 @@ export interface DigestDraft {
   disagreements: string[];
   riskSummaries: { issueId: string; text: string }[];
 }
-/** The DSH task submits revisions through the domain's validation/publication boundary. */
+/** Digest generation publishes through the domain's validation boundary. */
 export type GenerateDigest = (
   input: DigestModelInput,
   signal: AbortSignal,

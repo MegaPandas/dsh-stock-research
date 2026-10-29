@@ -36,6 +36,15 @@ function checkOutputs(task: TaskDefinition): void {
     outputs.size !== allowed.length
   )
     invalid(task.id, "finalize must publish both decision and report.");
+  if (task.valuation !== undefined) {
+    const requiredKind =
+      task.valuation === "research" ? "analysis" : "decision_draft";
+    if (executor.kind !== "role" || !outputs.has(requiredKind))
+      invalid(
+        task.id,
+        `valuation ${task.valuation} requires ${requiredKind} output.`,
+      );
+  }
 }
 
 export function validateRunDefinition(definition: RunDefinition): void {
@@ -82,6 +91,11 @@ export function validateRunDefinition(definition: RunDefinition): void {
       if (!tasks.has(id) || stagedTasks.has(id))
         invalid(id, "stage task must exist and belong to one stage.");
       stagedTasks.add(id);
+      if (
+        stage.dispatch === "together" &&
+        tasks.get(id)!.executor.kind !== "role"
+      )
+        invalid(id, "together dispatch requires role tasks.");
     }
     if (new Set(stage.beforeTasks).size !== stage.beforeTasks.length)
       throw new ResearchError(

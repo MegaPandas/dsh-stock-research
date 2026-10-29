@@ -4,7 +4,6 @@ import type {
   DigestModelInput,
 } from "../../src/contracts/digests.js";
 import { assembleDigest } from "../../src/services/digest-draft.js";
-import { digestBusinessDraft } from "../../src/services/digest-business.js";
 import { US_SECURITY } from "../fixtures/market.js";
 
 describe("digest identity diagnostics", () => {
@@ -193,7 +192,17 @@ describe("digest identity diagnostics", () => {
       },
     };
     const artifact = assembleDigest(
-      digestBusinessDraft(report, context),
+      {
+        report,
+        title: "Risk digest",
+        body: report.summary,
+        inputRefs: [],
+        facts: [
+          { text: report.content.keyPoints[0]!, inputRefs: [], numbers: [] },
+        ],
+        disagreements: [],
+        riskSummaries: report.content.riskSummaries,
+      },
       context,
     );
     expect(artifact.payload.report).toEqual(report);

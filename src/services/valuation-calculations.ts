@@ -1,7 +1,6 @@
 import { isDeepStrictEqual } from "node:util";
 import catalogue from "../valuation/methods.json" with { type: "json" };
 import {
-  DETERMINISTIC_VALUATION_PROTOCOL,
   VALUATION_ENGINE_VERSION,
   VALUATION_METHODS_INPUT,
   type ValuationCalculation,
@@ -15,6 +14,8 @@ import type {
 import type { DecisionProposal } from "../contracts/artifact-payloads.js";
 import type { NumericClaim } from "../contracts/artifacts.js";
 import type { TaskOperation } from "../contracts/runs.js";
+import type { TaskDefinition } from "../contracts/workflow.js";
+import type { ResearchScope } from "../contracts/data.js";
 import { ResearchError } from "../contracts/errors.js";
 import { decisionPolicy } from "../contracts/rating-policy.js";
 import { evaluateValuation } from "../valuation/index.js";
@@ -57,32 +58,54 @@ export function savedValuationMethods(
   return methods;
 }
 function calculationRegistry(runs: RunService, runId: string) {
-  const tasks = runs.numberContext(runId).tasks;
+  const { tasks, scope } = runs.numberContext(runId);
+  const attempts = new Map(
+    tasks.map((task) => [task.taskId, task.attempts.at(-1)!]),
+  );
   const entries = new Map(
     runs
       .inputCatalog(runId)
       .inputs.filter((entry) => entry.calculation !== undefined)
       .map((entry) => [entry.ref.id, entry]),
   );
+  const validity = new Map<string, boolean>();
+  const records = new Map<string, ValuationCalculation>();
   function current(id: string): boolean {
+    const known = validity.get(id);
+    if (known !== undefined) return known;
     const calculation = entries.get(id)!.calculation!;
-    const latest = tasks
-      .find(({ taskId }) => taskId === calculation.taskId)!
-      .attempts.at(-1)!;
-    return (
+    const latest = attempts.get(calculation.taskId)!;
+    const valid =
       latest.number === calculation.attempt &&
       !["invalidated", "failed", "cancelled"].includes(latest.status) &&
-      calculation.dependencies.every(current)
-    );
+      calculation.dependencies.every(current);
+    validity.set(id, valid);
+    return valid;
   }
-  return { entries, current };
+  function read(id: string): ValuationCalculation {
+    const entry = entries.get(id);
+    if (entry === undefined)
+      invalid(`Calculation ${id} is not registered in this run.`);
+    if (!current(id))
+      invalid(
+        `Calculation ${id} or its dependency belongs to a superseded or unsuccessful attempt.`,
+      );
+    let record = records.get(id);
+    if (record === undefined) {
+      record = runs.readInput<ValuationCalculation>(runId, entry.ref);
+      records.set(id, record);
+    }
+    return record;
+  }
+  // A registry belongs to one synchronous operation; later calls observe redo/cancellation.
+  return { scope, entries, current, read };
 }
 export function valuationCalculationCatalog(runs: RunService, runId: string) {
-  const { entries, current } = calculationRegistry(runs, runId);
+  const { entries, current, read } = calculationRegistry(runs, runId);
   return [...entries.values()]
     .filter(({ ref }) => current(ref.id))
     .map(({ ref }) => {
-      const record = runs.readInput<ValuationCalculation>(runId, ref);
+      const record = read(ref.id);
       return {
         calculationId: record.calculationId,
         taskId: record.taskId,
@@ -101,19 +124,10 @@ export function readValuationCalculation(
   runId: string,
   calculationId: string,
 ): ValuationCalculation {
-  const { entries, current } = calculationRegistry(runs, runId);
-  const entry = entries.get(calculationId);
-  if (entry === undefined)
-    invalid(`Calculation ${calculationId} is not registered in this run.`);
-  if (!current(calculationId))
-    invalid(
-      `Calculation ${calculationId} or its dependency belongs to a superseded or unsuccessful attempt.`,
-    );
-  return runs.readInput<ValuationCalculation>(runId, entry.ref);
+  return calculationRegistry(runs, runId).read(calculationId);
 }
 function dependencies(
-  runs: RunService,
-  runId: string,
+  read: (id: string) => ValuationCalculation,
   request: ValuationRequest,
   currency: string,
   valueDate: string,
@@ -121,7 +135,7 @@ function dependencies(
   const ids = valuationDependencyIds(request);
   return new Map(
     ids.map((id) => {
-      const record = readValuationCalculation(runs, runId, id);
+      const record = read(id);
       if (
         record.currency !== currency ||
         record.valueDate !== valueDate ||
@@ -154,17 +168,14 @@ export function calculateValuation(
     request.purpose === "valuation"
       ? scope.date
       : decisionPolicy(scope.date).horizonEndDate;
+  let registry: ReturnType<typeof calculationRegistry> | undefined;
+  const read = (id: string) =>
+    (registry ??= calculationRegistry(runs, operation.runId)).read(id);
   const evaluate = (input: ValuationRequest) =>
     evaluateValuation(
       input,
       scope.security.currency,
-      dependencies(
-        runs,
-        operation.runId,
-        input,
-        scope.security.currency,
-        valueDate,
-      ),
+      dependencies(read, input, scope.security.currency, valueDate),
       valueDate,
     );
   const result = evaluate(request);
@@ -204,13 +215,12 @@ export interface ValuationSelection {
   targetPriceBasis: string | null;
 }
 function materializeMethod(
-  runs: RunService,
-  runId: string,
+  scope: ResearchScope,
+  read: (id: string) => ValuationCalculation,
   selection: ValuationSelection["methods"][number],
 ): ValuationRecord["methods"][number] {
-  const scope = runs.view({ runId }).scope;
   const records = selection.calculationIds.map((id) => {
-    const record = readValuationCalculation(runs, runId, id);
+    const record = read(id);
     if (
       record.request.methodId !== selection.methodId ||
       record.request.purpose !== "valuation" ||
@@ -286,13 +296,13 @@ export function materializeValuation(
   runId: string,
   selection: ValuationSelection,
 ): ValuationRecord {
-  const scope = runs.view({ runId }).scope;
+  const { scope, read } = calculationRegistry(runs, runId);
   return {
     companyProfile: selection.companyProfile,
     valuationDate: scope.date,
     targetDate: decisionPolicy(scope.date).horizonEndDate,
     methods: selection.methods.map((method) =>
-      materializeMethod(runs, runId, method),
+      materializeMethod(scope, read, method),
     ),
     targetPriceBasis: selection.targetPriceBasis,
   };
@@ -302,8 +312,13 @@ export function materializeTargetPrice(
   runId: string,
   calculationId: string,
 ): NonNullable<AgentReport<"decision_draft">["content"]["targetPrice"]> {
-  const record = readValuationCalculation(runs, runId, calculationId);
-  const scope = runs.view({ runId }).scope;
+  const { scope, read } = calculationRegistry(runs, runId);
+  return targetPrice(scope, read(calculationId));
+}
+function targetPrice(
+  scope: ResearchScope,
+  record: ValuationCalculation,
+): NonNullable<AgentReport<"decision_draft">["content"]["targetPrice"]> {
   if (
     record.request.purpose !== "target_price" ||
     record.valueDate !== decisionPolicy(scope.date).horizonEndDate ||
@@ -314,7 +329,7 @@ export function materializeTargetPrice(
       "A target price requires one nonnegative target-date calculated per-share value. A negative equity residual supports solvency analysis; calculate an applicable common-share pricing scenario for the target price.",
     );
   return {
-    calculationId,
+    calculationId: record.calculationId,
     value: record.result.perShareValues[0]!,
     method: `${record.request.methodId}; engine=${record.engineVersion}`,
     assumptions: [...record.request.assumptions],
@@ -322,19 +337,23 @@ export function materializeTargetPrice(
 }
 export function validateCalculatedReport(
   runs: RunService,
-  operation: TaskOperation,
+  runId: string,
   report: AgentReport,
+  requirement: TaskDefinition["valuation"],
 ): void {
-  if (
-    runs.inputCatalog(operation.runId).versions.prompts.roles !==
-    DETERMINISTIC_VALUATION_PROTOCOL
-  )
-    return;
+  const hasValuation =
+    "valuation" in report.content && report.content.valuation != null;
+  const hasTarget =
+    "targetPrice" in report.content && report.content.targetPrice !== null;
+  if (requirement === undefined && !hasValuation && !hasTarget) return;
+  const { scope, read } = calculationRegistry(runs, runId);
   validateRoleValuation(
     report,
-    operation.taskId,
-    runs.view(operation).scope,
-    savedValuationMethods(runs, operation.runId).methods.map(({ id }) => id),
+    requirement,
+    scope,
+    hasValuation
+      ? savedValuationMethods(runs, runId).methods.map(({ id }) => id)
+      : [],
   );
   if ("valuation" in report.content && report.content.valuation != null) {
     const record = report.content.valuation;
@@ -343,7 +362,7 @@ export function validateCalculatedReport(
         invalid(
           "Use calculationIds; model-written valuation results are not accepted.",
         );
-      const expected = materializeMethod(runs, operation.runId, {
+      const expected = materializeMethod(scope, read, {
         ...method,
         calculationIds: method.calculationIds,
       });
@@ -362,21 +381,18 @@ export function validateCalculatedReport(
           );
     }
     if (
-      operation.taskId === "analysis.fundamentals" &&
+      requirement === "research" &&
       !record.methods.some(({ calculationIds }) => calculationIds!.length > 0)
     )
       invalid(
-        "Fundamentals requires at least one saved research-date valuation calculation. Read the financial statement details, select an applicable model, justify forecast assumptions and call stock_calculate_valuation before submitting.",
+        "This task requires at least one saved research-date valuation calculation. Read the financial statement details, select an applicable model, justify forecast assumptions and call stock_calculate_valuation before submitting.",
       );
   }
   if ("targetPrice" in report.content && report.content.targetPrice !== null) {
     const target = report.content.targetPrice;
     if (
       target.calculationId === undefined ||
-      !isDeepStrictEqual(
-        target,
-        materializeTargetPrice(runs, operation.runId, target.calculationId),
-      )
+      !isDeepStrictEqual(target, targetPrice(scope, read(target.calculationId)))
     )
       invalid(
         "The target price must be the immutable referenced calculation result.",

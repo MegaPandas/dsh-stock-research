@@ -20,7 +20,6 @@ function input(): ResearchConfig {
       freshness: { market: 0, fundamentals: 1, macro: 0 },
       secCiks: { "US:NVDA": "0001045810" },
     },
-    digestModel: { provider: "fixture", model: "fixture" },
   };
 }
 
@@ -32,16 +31,14 @@ describe("Research runtime configuration boundary", () => {
     expect(parse(config)).toEqual(config);
   });
 
-  it("allows the digest to inherit its caller model and validates explicit overrides", () => {
+  it("rejects the removed digest model setting", () => {
     const config = input();
-    delete config.digestModel;
-    expect(parse(config)).toEqual(config);
     expect(() =>
-      parse({ ...config, digestModel: { provider: "fixture" } }),
-    ).toThrow();
-    expect(() =>
-      parse({ ...config, digestModel: { model: "fixture" } }),
-    ).toThrow();
+      parse({
+        ...config,
+        digestModel: { provider: "fixture", model: "fixture" },
+      }),
+    ).toThrow("Unknown configuration field digestModel.");
   });
 
   it("skips unconfigured SEC and preserves the other selected sources", () => {
@@ -147,16 +144,13 @@ describe("Research runtime configuration boundary", () => {
     ).toThrow();
   });
 
-  it("rejects invalid CIK and empty deployment identity values", () => {
+  it("rejects invalid CIK and cache capacity", () => {
     const config = input();
     expect(() =>
       parse({
         ...config,
         policy: { ...config.policy, secCiks: { "US:NVDA": "0000000000" } },
       }),
-    ).toThrow();
-    expect(() =>
-      parse({ ...config, digestModel: { provider: " ", model: "fixture" } }),
     ).toThrow();
     expect(() =>
       parse({ ...config, cache: { ...config.cache, maxEntries: 0 } }),

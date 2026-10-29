@@ -15,6 +15,10 @@ afterEach(async () => {
 
 async function host(
   scripts: ModelScript[] = [{ kind: "save" }, { kind: "save" }],
+  options: {
+    taskIds?: [string, string];
+    together?: boolean;
+  } = {},
 ) {
   const h = await dispatchHost(
     scripts.map((script, index) =>
@@ -41,19 +45,21 @@ async function host(
     ),
   );
   cleanups.push(h.close);
-  const tasks = ["debate.1.bull", "debate.1.bear"].map((id) => ({
-    id,
-    executor: {
-      kind: "role" as const,
-      role: "discussion" as const,
-      specialty: id.endsWith("bull") ? "bull" : "bear",
-    },
-    dependsOn: [],
-    inputTasks: [],
-    outputKinds: ["debate" as const],
-    dataRequirements: [],
-    instructionVersion: 1,
-  }));
+  const tasks = (options.taskIds ?? ["debate.1.bull", "debate.1.bear"]).map(
+    (id, index) => ({
+      id,
+      executor: {
+        kind: "role" as const,
+        role: "discussion" as const,
+        specialty: index === 0 ? "bull" : "bear",
+      },
+      dependsOn: [],
+      inputTasks: [],
+      outputKinds: ["debate" as const],
+      dataRequirements: [],
+      instructionVersion: 1,
+    }),
+  );
   const { runId } = h.runs.open(
     "stage-owner",
     {
@@ -66,6 +72,9 @@ async function host(
             id: "debate.1",
             taskIds: tasks.map(({ id }) => id),
             beforeTasks: [],
+            ...(options.together === false
+              ? {}
+              : { dispatch: "together" as const }),
           },
         ],
       },
@@ -99,6 +108,53 @@ async function host(
 }
 
 describe("stage dispatch", () => {
+  it("enforces the saved together policy for roles without debate task names", async () => {
+    const h = await host(undefined, { taskIds: ["long-case", "short-case"] });
+    expect(h.runs.view({ runId: h.runId }).stages![0]!.dispatch).toBe(
+      "together",
+    );
+    expect(
+      await h.call("stock_dispatch_task", {
+        runId: h.runId,
+        taskId: "long-case",
+        requestId: "single",
+      }),
+    ).toMatchObject({ isError: true });
+    expect(h.prepared).toEqual([]);
+    expect(
+      await h.call("stock_dispatch_stage", {
+        runId: h.runId,
+        stageId: "debate.1",
+        requestId: "pair",
+      }),
+    ).toMatchObject({
+      isError: false,
+      value: {
+        results: [
+          { taskId: "long-case", status: "succeeded" },
+          { taskId: "short-case", status: "succeeded" },
+        ],
+      },
+    });
+  });
+
+  it("does not infer together dispatch from debate task or stage names", async () => {
+    const h = await host(undefined, { together: false });
+    expect(
+      await h.call("stock_dispatch_task", {
+        runId: h.runId,
+        taskId: "debate.1.bull",
+        requestId: "single",
+      }),
+    ).toMatchObject({ isError: false, value: { status: "succeeded" } });
+    expect(
+      h.runs
+        .view({ runId: h.runId })
+        .tasks.find(({ taskId }) => taskId === "debate.1.bear")!.status,
+    ).toBe("pending");
+    expect(h.prepared).toHaveLength(1);
+  });
+
   it("starts independent roles before either finishes and replays one batch", async () => {
     const first = modelGate();
     const second = modelGate();

@@ -79,7 +79,10 @@ function request(): Extract<
     ],
   };
 }
-function setup(tasks?: OpenRunInput["definition"]["tasks"]) {
+function setup(
+  tasks?: OpenRunInput["definition"]["tasks"],
+  roleVersion = DETERMINISTIC_VALUATION_PROTOCOL,
+) {
   const path = fs.mkdtempSync(join(tmpdir(), "valuation-calculation-"));
   let root = new DataRoot(path);
   const now = () => "2024-07-01T12:00:00.000Z";
@@ -103,6 +106,7 @@ function setup(tasks?: OpenRunInput["definition"]["tasks"]) {
           dependsOn: [],
           inputTasks: [],
           outputKinds: ["analysis"],
+          valuation: "research",
           dataRequirements: [],
           instructionVersion: 1,
         },
@@ -112,7 +116,7 @@ function setup(tasks?: OpenRunInput["definition"]["tasks"]) {
       plugin: "1",
       mode: "quick-1",
       prompts: {
-        roles: DETERMINISTIC_VALUATION_PROTOCOL,
+        roles: roleVersion,
         valuationEngine: "2",
         valuationMethods: catalogue.version,
       },
@@ -330,12 +334,12 @@ it("saves negative equity residuals and their diagnostics without treating them 
     "股权残值为负，不能作为目标股价；应分析偿付能力和索取权分配。",
   ]);
   expect(() =>
-    validateCalculatedReport(f.runs, f.operation, report),
+    validateCalculatedReport(f.runs, f.operation.runId, report, "research"),
   ).not.toThrow();
   report.content.valuation.methods[0]!.limitations = ["Unrelated limitation."];
-  expect(() => validateCalculatedReport(f.runs, f.operation, report)).toThrow(
-    /limitations/,
-  );
+  expect(() =>
+    validateCalculatedReport(f.runs, f.operation.runId, report, "research"),
+  ).toThrow(/limitations/);
   const target = calculateValuation(
     f.runs,
     f.operation,
@@ -433,13 +437,38 @@ it("formats report values while preserving exact calculations and range endpoint
   const report = agentAnalysisReport();
   report.content.valuation = valuation;
   expect(() =>
-    validateCalculatedReport(f.runs, f.operation, report),
+    validateCalculatedReport(f.runs, f.operation.runId, report, "research"),
   ).not.toThrow();
 });
 
-it("rejects a fundamentals report that only lists uncomputed valuation methods", () => {
-  const f = setup();
+it("enforces explicit research valuation on an independently named task", () => {
+  const f = setup([{ ...roleTask("company-value"), valuation: "research" }]);
   const report = agentAnalysisReport();
+  const artifacts = new ArtifactService(f.runs, new NumberService(f.runs));
+  const unvalued = assembleAgentArtifact("analysis", report, {
+    taskId: f.operation.taskId,
+    specialty: "fundamentals",
+    title: "Missing valuation",
+    inputRefs: [],
+    currency: "USD",
+    referencePrice: null,
+    scope: f.input.definition.scope,
+  });
+  expect(() =>
+    artifacts.validateArtifact(f.operation, [unvalued], "missing"),
+  ).toThrow(/valuation section/);
+  const legacyPayload = {
+    findings: [{ text: "Synthetic finding", evidence: [], numbers: [] }],
+    risks: [],
+    gaps: [],
+  };
+  expect(() =>
+    artifacts.validateArtifact(
+      f.operation,
+      [{ ...unvalued, payload: legacyPayload }],
+      "missing-report",
+    ),
+  ).toThrow(/requires a report/);
   report.content.valuation = materializeValuation(f.runs, f.operation.runId, {
     companyProfile: "Synthetic loss-making company",
     methods: [
@@ -461,7 +490,6 @@ it("rejects a fundamentals report that only lists uncomputed valuation methods",
     referencePrice: null,
     scope: f.runs.view(f.operation).scope,
   });
-  const artifacts = new ArtifactService(f.runs, new NumberService(f.runs));
   expect(() =>
     artifacts.submitArtifact(f.operation, [artifact], "uncomputed"),
   ).toThrow(/at least one saved research-date valuation calculation/);
@@ -469,12 +497,8 @@ it("rejects a fundamentals report that only lists uncomputed valuation methods",
     status: "running",
     outputRefs: [],
   });
-});
-
-it("materializes reports from calculation references and rejects forged or unreferenced results under the current protocol", () => {
-  const f = setup();
-  const saved = calculateValuation(f.runs, f.operation, request(), "ps");
-  const valuation = materializeValuation(f.runs, f.operation.runId, {
+  const saved = calculateValuation(f.runs, f.operation, request(), "research");
+  report.content.valuation = materializeValuation(f.runs, f.operation.runId, {
     companyProfile: "Synthetic company",
     methods: [
       {
@@ -486,40 +510,42 @@ it("materializes reports from calculation references and rejects forged or unref
     ],
     targetPriceBasis: null,
   });
-  expect(valuation.methods[0]!.valueRange).toEqual({
-    low: 13.5,
-    high: 22.5,
-    unit: "USD/share",
+  const calculated = assembleAgentArtifact("analysis", report, {
+    taskId: f.operation.taskId,
+    specialty: "fundamentals",
+    title: "Calculated valuation",
+    inputRefs: [],
+    currency: "USD",
+    referencePrice: null,
+    scope: f.input.definition.scope,
   });
-  expect(saved.result.steps[0]!.label).toBe("Comparable metric");
-  expect(valuation.methods[0]!.calculation).toContain(
-    "倍数法经济指标=450 亿USD",
-  );
-  expect(valuation.methods[0]!.calculation).toContain(
-    "普通股每股价值1=13.5 USD/股",
-  );
-  const report = agentAnalysisReport();
-  report.content.valuation = valuation;
-  expect(() =>
-    validateCalculatedReport(f.runs, f.operation, report),
-  ).not.toThrow();
-  valuation.methods[0]!.valueRange!.high = 99;
-  expect(() => validateCalculatedReport(f.runs, f.operation, report)).toThrow(
-    /valueRange/,
-  );
-  delete valuation.methods[0]!.calculationIds;
-  expect(() => validateCalculatedReport(f.runs, f.operation, report)).toThrow(
-    /calculationIds/,
-  );
-  valuation.methods[0]!.calculationIds = [saved.calculationId];
-  f.runs.redo(
-    { runId: f.operation.runId, identity: "coordinator" },
-    f.operation.taskId,
-    "redo",
-  );
-  expect(() =>
-    materializeValuation(f.runs, f.operation.runId, {
-      companyProfile: valuation.companyProfile,
+  artifacts.submitArtifact(f.operation, [calculated], "calculated");
+  expect(f.runs.view(f.operation).tasks[0]!.status).toBe("succeeded");
+});
+
+it("does not infer a required valuation from a reserved task name", () => {
+  const f = setup([roleTask("analysis.fundamentals")]);
+  const artifact = assembleAgentArtifact("analysis", agentAnalysisReport(), {
+    taskId: f.operation.taskId,
+    specialty: "fundamentals",
+    title: "Ordinary analysis",
+    inputRefs: [],
+    currency: "USD",
+    referencePrice: null,
+    scope: f.input.definition.scope,
+  });
+  const service = new ArtifactService(f.runs, new NumberService(f.runs));
+  service.submitArtifact(f.operation, [artifact], "ordinary");
+  expect(f.runs.view(f.operation).tasks[0]!.status).toBe("succeeded");
+});
+
+it.each([DETERMINISTIC_VALUATION_PROTOCOL, "23"])(
+  "validates calculated results regardless of prompt version %s",
+  (roleVersion) => {
+    const f = setup(undefined, roleVersion);
+    const saved = calculateValuation(f.runs, f.operation, request(), "ps");
+    const valuation = materializeValuation(f.runs, f.operation.runId, {
+      companyProfile: "Synthetic company",
       methods: [
         {
           methodId: "comparable_multiples",
@@ -529,9 +555,54 @@ it("materializes reports from calculation references and rejects forged or unref
         },
       ],
       targetPriceBasis: null,
-    }),
-  ).toThrow(/superseded|unsuccessful/);
-});
+    });
+    expect(valuation.methods[0]!.valueRange).toEqual({
+      low: 13.5,
+      high: 22.5,
+      unit: "USD/share",
+    });
+    expect(saved.result.steps[0]!.label).toBe("Comparable metric");
+    expect(valuation.methods[0]!.calculation).toContain(
+      "倍数法经济指标=450 亿USD",
+    );
+    expect(valuation.methods[0]!.calculation).toContain(
+      "普通股每股价值1=13.5 USD/股",
+    );
+    const report = agentAnalysisReport();
+    report.content.valuation = valuation;
+    expect(() =>
+      validateCalculatedReport(f.runs, f.operation.runId, report, "research"),
+    ).not.toThrow();
+    valuation.methods[0]!.valueRange!.high = 99;
+    expect(() =>
+      validateCalculatedReport(f.runs, f.operation.runId, report, "research"),
+    ).toThrow(/valueRange/);
+    delete valuation.methods[0]!.calculationIds;
+    expect(() =>
+      validateCalculatedReport(f.runs, f.operation.runId, report, "research"),
+    ).toThrow(/calculationIds/);
+    valuation.methods[0]!.calculationIds = [saved.calculationId];
+    f.runs.redo(
+      { runId: f.operation.runId, identity: "coordinator" },
+      f.operation.taskId,
+      "redo",
+    );
+    expect(() =>
+      materializeValuation(f.runs, f.operation.runId, {
+        companyProfile: valuation.companyProfile,
+        methods: [
+          {
+            methodId: "comparable_multiples",
+            suitability: "Revenue comparison",
+            calculationIds: [saved.calculationId],
+            limitations: [],
+          },
+        ],
+        targetPriceBasis: null,
+      }),
+    ).toThrow(/superseded|unsuccessful/);
+  },
+);
 
 it("calculates selected methods separately and preserves their values and order in the report", async () => {
   const f = setup();
@@ -594,7 +665,7 @@ it("calculates selected methods separately and preserves their values and order 
   ]);
   expect(methods[0]!.calculationIds).not.toEqual(methods[1]!.calculationIds);
   expect(() =>
-    validateCalculatedReport(f.runs, f.operation, report),
+    validateCalculatedReport(f.runs, f.operation.runId, report, "research"),
   ).not.toThrow();
 });
 
@@ -803,7 +874,8 @@ it.each(["different-value", "missing-calculation"] as const)(
         executor: { kind: "service", service: "digest" },
       },
       {
-        ...roleTask("manager.decision", ["decision_draft"]),
+        ...roleTask("portfolio-price", ["decision_draft"]),
+        valuation: "decision",
         executor: { kind: "role", role: "manager", specialty: "decision" },
       },
     ]);
@@ -830,12 +902,12 @@ it.each(["different-value", "missing-calculation"] as const)(
     ).refs[0]!;
     const claimed = f.runs.claim(
       { runId: f.operation.runId, identity: "coordinator" },
-      "manager.decision",
+      "portfolio-price",
       "manager",
     );
     const operation = {
       ...f.operation,
-      taskId: "manager.decision",
+      taskId: "portfolio-price",
       attempt: claimed.attempt,
       identity: "manager",
       sessionId: "manager",

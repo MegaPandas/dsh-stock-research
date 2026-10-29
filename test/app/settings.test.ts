@@ -7,7 +7,7 @@ import z from "@deepseek-ai/schemastery";
 import { runtimeHost } from "../fixtures/runtime-host.js";
 import { gate } from "../fixtures/runtime-host.js";
 import { workflowModel } from "../fixtures/research-workflow.js";
-import { initialInput, researchCommands } from "../fixtures/quick-host.js";
+import { researchCommands } from "../fixtures/quick-host.js";
 import { readApplicationInput } from "../../src/app/research-input.js";
 import { askAnswerResponse, askCollection } from "../fixtures/ask-host.js";
 import * as Application from "../../src/plugin.js";
@@ -35,7 +35,6 @@ async function host(
   const config: ApplicationConfig = {
     runtime: h.config({ enabledSources: [] }),
   };
-  delete config.runtime.digestModel;
   const userPresets = await h.ctx.agentPresets.remoteExportList();
   h.ctx.loader.builtins["stock-research"] = Application;
   await h.ctx.loader.root.update([
@@ -147,15 +146,11 @@ describe("live stock research settings", () => {
       expect(() => Configuration({ ...h.config, publicSearchLimit })).toThrow();
   });
 
-  it("keeps model, digest and search allowance snapshots while collection is running", async () => {
+  it("keeps model and search allowance snapshots while collection is running", async () => {
     const workflow = workflowModel();
     const h = await host(workflow.respond);
     const before = structuredClone(h.config);
     before.model = { provider: "runtime-fixture", model: "first" };
-    before.runtime.digestModel = {
-      provider: "runtime-fixture",
-      model: "first-digest",
-    };
     before.publicSearchLimit = 2;
     await h.save(before);
     const paused = gate<void>();
@@ -177,10 +172,6 @@ describe("live stock research settings", () => {
       await h.save({
         ...before,
         model: { provider: "runtime-fixture", model: "second" },
-        runtime: {
-          ...before.runtime,
-          digestModel: { provider: "runtime-fixture", model: "second-digest" },
-        },
         publicSearchLimit: 7,
       });
     } finally {
@@ -192,10 +183,7 @@ describe("live stock research settings", () => {
         expect(request.model).toBe("runtime");
         continue;
       }
-      const input = initialInput<{ task: { role: string } }>(request);
-      expect(request.model).toBe(
-        input.task.role === "digest" ? "first-digest" : "first",
-      );
+      expect(request.model).toBe("first");
     }
     expect(
       readApplicationInput(h.ctx.stockResearch.runs, workflow.state.runId!)

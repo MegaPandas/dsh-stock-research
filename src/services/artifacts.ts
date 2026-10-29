@@ -31,7 +31,6 @@ import {
   validateCalculatedReport,
   validateCalculatedTarget,
 } from "./valuation-calculations.js";
-import { DETERMINISTIC_VALUATION_PROTOCOL } from "../contracts/valuation.js";
 
 function invalid(detail: string): never {
   throw new ResearchError("INVALID_ARTIFACT", detail);
@@ -79,44 +78,45 @@ export class ArtifactService {
     if (!Array.isArray(contents) || contents.length === 0)
       invalid("A submission requires the complete artifact array.");
     const captured = structuredClone(contents.map(parseArtifactInput));
-    const computedValuation =
-      this.runs.inputCatalog(operation.runId).versions.prompts.roles ===
-      DETERMINISTIC_VALUATION_PROTOCOL;
+    const definition = this.runs.readDefinition(operation.runId);
+    const valuation = definition.tasks.find(
+      ({ id }) => id === operation.taskId,
+    )!.valuation;
     for (const content of captured) {
       if (
-        computedValuation &&
-        ["analysis.fundamentals", "manager.decision"].includes(
-          operation.taskId,
-        ) &&
+        ((valuation === "research" && content.kind === "analysis") ||
+          (valuation === "decision" && content.kind === "decision_draft")) &&
         !("report" in content.payload)
       )
         invalid(
-          "The current valuation protocol requires a report referencing saved calculation results.",
+          "This task requires a report referencing saved valuation calculation results.",
         );
       if (content.kind === "analysis" && "report" in content.payload)
-        validateCalculatedReport(this.runs, operation, content.payload.report);
+        validateCalculatedReport(
+          this.runs,
+          operation.runId,
+          content.payload.report,
+          valuation,
+        );
       if (
         content.kind === "decision_draft" &&
         content.payload.report !== undefined
       ) {
-        if ("rating" in content.payload.report.content) {
-          if (computedValuation)
-            invalid(
-              "A current valuation report cannot use the legacy decision protocol.",
-            );
-        } else {
-          validateCalculatedReport(
-            this.runs,
-            operation,
-            content.payload.report,
+        if ("rating" in content.payload.report.content)
+          invalid(
+            "Decision submission requires the current calculated report contract.",
           );
-          if (computedValuation)
-            validateCalculatedTarget(
-              content.payload,
-              content.claims,
-              this.runs.view(operation).scope.security.currency,
-            );
-        }
+        validateCalculatedReport(
+          this.runs,
+          operation.runId,
+          content.payload.report,
+          valuation,
+        );
+        validateCalculatedTarget(
+          content.payload,
+          content.claims,
+          definition.scope.security.currency,
+        );
       }
     }
     this.checkReferences(operation, captured);
@@ -158,7 +158,7 @@ export class ArtifactService {
     const warnings = [...basics.warnings];
     try {
       checkDecisionRequirements(
-        this.runs.readDefinition(operation.runId).tasks,
+        definition.tasks,
         [
           ...context.tasks
             .flatMap((task) => task.outputRefs)

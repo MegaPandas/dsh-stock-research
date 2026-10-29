@@ -1,5 +1,4 @@
 import type { Context } from "@deepseek-ai/cordis";
-import type { Agent } from "@deepseek-ai/dsh-agent";
 import type {
   CommandInvocation,
   CommandResult,
@@ -11,8 +10,6 @@ import { withActivity } from "./activity.js";
 export interface ResearchSettings {
   readonly model: ModelConfig | undefined;
   readonly publicSearchLimit: number;
-  capture(agent: Agent, model: ModelConfig | undefined): void;
-  digestFor(agent: Agent): ModelConfig | undefined;
   runTool(
     name: string,
     value: unknown,

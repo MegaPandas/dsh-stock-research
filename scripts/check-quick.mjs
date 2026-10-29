@@ -286,7 +286,7 @@ try {
         config: {
           ...bundleConfig,
           model: route,
-          runtime: { ...bundleConfig.runtime, dataRoot, digestModel: route },
+          runtime: { ...bundleConfig.runtime, dataRoot },
         },
       },
     ]),
@@ -367,10 +367,7 @@ try {
   const stock = await import(
     pathToFileURL(join(packageDirectory, "dist/core.mjs")).href
   );
-  const { DIGEST_PROMPT_VERSION } = await import(
-    pathToFileURL(join(packageDirectory, "dist/tools.mjs")).href
-  );
-  record.runtimePrompts = { digest: DIGEST_PROMPT_VERSION };
+  record.runtimePrompts = { digest: stock.DIGEST_HANDOFF_VERSION };
   stock.parseLocalDate(date);
   record.policy = ctx.stockResearch.policy;
 

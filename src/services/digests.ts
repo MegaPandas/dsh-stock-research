@@ -164,10 +164,7 @@ export class DigestService {
       const inputs = new ArtifactInputs(this.runs);
       const roots = claimed.inputRefs.map((ref) => inputs.artifact(ref));
       const versions = inputs.closure(claimed.inputRefs);
-      const protocolVersion = this.runs.inputCatalog(taskOperation.runId)
-        .versions.prompts.digest;
       const context: DigestModelInput = {
-        ...(protocolVersion === undefined ? {} : { protocolVersion }),
         scope,
         taskId: taskOperation.taskId,
         instructionVersion: claimed.instructionVersion,

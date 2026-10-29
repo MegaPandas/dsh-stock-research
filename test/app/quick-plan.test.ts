@@ -90,7 +90,15 @@ describe("quick application plan", () => {
         ?.instruction,
     ).toContain("latest completed daily bar");
     expect(input.versions.mode).toBe(QUICK_MODE_VERSION);
-    expect(QUICK_MODE_VERSION).toBe("quick/9");
+    expect(QUICK_MODE_VERSION).toBe("quick/10");
+    expect(
+      input.definition.tasks
+        .filter(({ valuation }) => valuation !== undefined)
+        .map(({ id, valuation }) => ({ id, valuation })),
+    ).toEqual([
+      { id: "analysis.fundamentals", valuation: "research" },
+      { id: "manager.decision", valuation: "decision" },
+    ]);
     expect(
       input.definition.tasks
         .filter((task) => task.id.startsWith("digest."))

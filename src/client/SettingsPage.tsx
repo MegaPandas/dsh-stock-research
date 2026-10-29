@@ -97,8 +97,7 @@ function differences(
 ): Operation[] {
   if (equal(before, after)) return [];
   if (after === undefined) return [{ op: "unset", path }];
-  const model =
-    path.join(".") === "model" || path.join(".") === "runtime.digestModel";
+  const model = path.join(".") === "model";
   if (
     !model &&
     after !== null &&
@@ -163,9 +162,7 @@ function ModelEditor({
             );
           }}
         >
-          <option value="inherit">
-            {label === "摘要模型" ? "继承研究模型" : "继承当前会话"}
-          </option>
+          <option value="inherit">继承当前会话</option>
           <option value="custom">自定义</option>
         </select>
       </label>
@@ -412,45 +409,37 @@ export function SettingsPage({
         message: "免审批搜索次数上限须为非负安全整数。",
         field: "免审批搜索次数上限",
       };
-    for (const [label, value, inherited] of [
-      ["研究模型", draft.model, inheritedModel ?? catalog?.default],
-      [
-        "摘要模型",
-        draft.runtime.digestModel,
-        draft.model?.provider
-          ? (draft.model as ModelRoute)
-          : (inheritedModel ?? catalog?.default),
-      ],
-    ] as const) {
-      if (value?.provider !== undefined) {
-        if (!value.provider.trim() || !value.model?.trim())
-          return {
-            message: `请选择${label}提供方和模型。`,
-            field: `${label}${value.provider.trim() ? "名称" : "提供方"}`,
-          };
-        const item = catalog?.groups
-          .find(({ id }) => id === value.provider)
-          ?.models.find(({ id }) => id === value.model);
-        if (!item)
-          return {
-            message: `${label}不在宿主当前可用模型列表中，请重新选择。`,
-            field: `${label}名称`,
-          };
-      }
-      const route = value?.provider ? value : inherited;
-      const item = catalog?.groups
-        .find(({ id }) => id === route?.provider)
-        ?.models.find(({ id }) => id === route?.model);
-      if (
-        value?.reasoningEffort &&
-        item &&
-        !item.reasoning?.efforts.some(({ id }) => id === value.reasoningEffort)
-      )
+    const value = draft.model;
+    if (value?.provider !== undefined) {
+      if (!value.provider.trim() || !value.model?.trim())
         return {
-          message: `${label}不支持所选思考强度，请重新选择。`,
-          field: `${label}思考强度`,
+          message: "请选择研究模型提供方和模型。",
+          field: `研究模型${value.provider.trim() ? "名称" : "提供方"}`,
+        };
+      const item = catalog?.groups
+        .find(({ id }) => id === value.provider)
+        ?.models.find(({ id }) => id === value.model);
+      if (!item)
+        return {
+          message: "研究模型不在宿主当前可用模型列表中，请重新选择。",
+          field: "研究模型名称",
         };
     }
+    const route = value?.provider
+      ? value
+      : (inheritedModel ?? catalog?.default);
+    const item = catalog?.groups
+      .find(({ id }) => id === route?.provider)
+      ?.models.find(({ id }) => id === route?.model);
+    if (
+      value?.reasoningEffort &&
+      item &&
+      !item.reasoning?.efforts.some(({ id }) => id === value.reasoningEffort)
+    )
+      return {
+        message: "研究模型不支持所选思考强度，请重新选择。",
+        field: "研究模型思考强度",
+      };
     if (!draft.runtime.dataRoot.trim())
       return { message: "请填写数据目录。", field: "数据目录" };
     const numeric: [string, number, number, boolean, number][] = [
@@ -596,16 +585,6 @@ export function SettingsPage({
       setSaving(false);
     }
   };
-  const effectiveResearch =
-    draft.model?.provider && draft.model.model
-      ? {
-          provider: draft.model.provider,
-          model: draft.model.model,
-          ...(draft.model.reasoningEffort
-            ? { reasoningEffort: draft.model.reasoningEffort }
-            : {}),
-        }
-      : inheritedModel;
   const refreshDraft = () => {
     const current = form.getSnapshot();
     let rebased = structuredClone(current.value!);
@@ -627,8 +606,8 @@ export function SettingsPage({
         <span className="sr-eyebrow">STOCK RESEARCH</span>
         <h2>股票研究</h2>
         <p className="sr-muted">
-          主 Agent 使用当前 DSH 会话模型。下方配置用于下一次研究的子
-          Agent、摘要与数据。
+          主 Agent 使用当前 DSH 会话模型。下方配置用于下一次研究的子 Agent
+          与数据。
         </p>
       </header>
       {!snapshot.writable && (
@@ -666,20 +645,6 @@ export function SettingsPage({
               。实际继承值在运行时随调用会话解析。
             </p>
           )}
-          <details>
-            <summary>
-              旧版摘要模型与思考强度<span>用于旧版研究的摘要任务</span>
-            </summary>
-            <ModelEditor
-              label="摘要模型"
-              value={draft.runtime.digestModel}
-              inherited={effectiveResearch}
-              catalog={catalog}
-              disabled={disabled}
-              onChange={(value) => edit(["runtime", "digestModel"], value)}
-              onReset={() => edit(["runtime", "digestModel"], {})}
-            />
-          </details>
           <fieldset className="sr-card">
             <legend>调研 Agents</legend>
             <label>

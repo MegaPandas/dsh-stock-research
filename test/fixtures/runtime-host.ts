@@ -144,7 +144,6 @@ export async function runtimeHost(
           freshness: { market: 0, fundamentals: 0, macro: 0 },
           secCiks: {},
         },
-        digestModel: { provider: "runtime-fixture", model: "runtime" },
         ...changes,
       };
     }

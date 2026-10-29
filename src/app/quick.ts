@@ -39,8 +39,8 @@ import {
 } from "./collection-input.js";
 import { COORDINATOR_PROMPT } from "./coordinator-prompt.js";
 import { savedCoordinator } from "./coordinator-input.js";
-import { createQuickInput } from "./quick-plan.js";
-import { createDeepInput } from "./deep-plan.js";
+import { createQuickInput, QUICK_RESEARCH_STAGES } from "./quick-plan.js";
+import { createDeepInput, DEEP_RESEARCH_STAGES } from "./deep-plan.js";
 import { attachResearchStages } from "./research-stages.js";
 import {
   captureResearchModels,
@@ -273,11 +273,7 @@ class ResearchApplication {
       return existing.work;
     }
     const settings = this.ctx.get("stockResearchSettings");
-    const models = captureResearchModels(
-      owner,
-      this.model ?? settings?.model,
-      settings?.digestFor(owner),
-    );
+    const models = captureResearchModels(owner, this.model ?? settings?.model);
     const publicSearchLimit =
       settings?.publicSearchLimit ?? PUBLIC_SEARCH_LIMITS.maxSearches;
     const runtime = this.ctx.stockResearch;
@@ -326,6 +322,7 @@ class ResearchApplication {
             ),
             collection,
           ),
+          mode === "quick" ? QUICK_RESEARCH_STAGES : DEEP_RESEARCH_STAGES,
         );
         input.inputs = [
           ...(input.inputs ?? []),

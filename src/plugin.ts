@@ -2,7 +2,6 @@ import type { Context } from "@deepseek-ai/cordis";
 import fs from "node:fs";
 import { join } from "node:path";
 import { isDeepStrictEqual } from "node:util";
-import type { Agent } from "@deepseek-ai/dsh-agent";
 import type { CommandInvocation } from "@deepseek-ai/dsh-commands";
 import type {} from "@deepseek-ai/dsh-settings";
 import { interpolate } from "@deepseek-ai/cordis-plugin-loader";
@@ -84,11 +83,6 @@ function formSchema(schema: z): z {
 }
 export const Config = formSchema(Configuration).volatile();
 
-function resources(config: ApplicationConfig) {
-  const runtime = { ...config.runtime };
-  delete runtime.digestModel;
-  return runtime;
-}
 export const name = "stock-research-application";
 export const inject = [
   "tools",
@@ -107,14 +101,13 @@ export async function apply(
     let applied = Configuration(structuredClone(configuration.get()));
     let switching: Promise<void> | undefined;
     let closed = false;
-    const digestModels = new WeakMap<Agent, ModelConfig | undefined>();
     const createRuntime = (config: ApplicationConfig) => {
       const plugin = createResearchPlugin((context, parent) =>
         prepareResearchRole(runtime.ctx.stockResearch, context, parent),
       );
       if (config.runtime.enabledSources.includes("dsh-web"))
         plugin.inject.push("web");
-      return ctx.plugin(plugin, resources(config));
+      return ctx.plugin(plugin, config.runtime);
     };
     let runtime = createRuntime(applied);
     yield () => runtime.dispose();
@@ -173,7 +166,7 @@ export async function apply(
       const next = structuredClone(configuration.get());
       if (
         switching === undefined &&
-        isDeepStrictEqual(resources(next), resources(applied))
+        isDeepStrictEqual(next.runtime, applied.runtime)
       )
         return false;
       if (switching === undefined) {
@@ -200,14 +193,6 @@ export async function apply(
           PUBLIC_SEARCH_LIMITS.maxSearches
         );
       },
-      capture(agent, model) {
-        digestModels.set(agent, structuredClone(model));
-      },
-      digestFor(agent) {
-        return digestModels.has(agent)
-          ? digestModels.get(agent)
-          : configuration.get().runtime.digestModel;
-      },
       async runTool(name, value, exec, run) {
         if (await prepare(exec))
           return ctx.tools.get(name, exec.agent)!.execute(value, exec);
@@ -225,10 +210,7 @@ export async function apply(
       if (this !== ctx.fiber) return value;
       const candidate = Configuration(interpolate(ctx, structuredClone(value)));
       if (
-        !isDeepStrictEqual(
-          resources(candidate),
-          resources(configuration.get()),
-        ) &&
+        !isDeepStrictEqual(candidate.runtime, configuration.get().runtime) &&
         (switching !== undefined ||
           isApplicationBusy(runtime.ctx.stockResearch))
       )

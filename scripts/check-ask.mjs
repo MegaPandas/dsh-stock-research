@@ -109,7 +109,6 @@ try {
         freshness: { market: 7 * 86_400_000, fundamentals: 0, macro: 0 },
         secCiks: {},
       },
-      digestModel: { provider: "magpie", model },
     },
   );
   runtime = ctx.stockResearch;

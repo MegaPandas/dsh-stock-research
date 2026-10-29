@@ -61,7 +61,7 @@ function content(
 }
 
 describe("DigestService", () => {
-  it("forwards the recorded digest protocol to the selected generator", async () => {
+  it("uses the selected generator independently of prompt version metadata", async () => {
     const c = setup();
     const catalog = c.runs.inputCatalog(c.operation.runId);
     vi.spyOn(c.runs, "inputCatalog").mockReturnValue({
@@ -77,7 +77,8 @@ describe("DigestService", () => {
       c.artifacts,
       oneDigest(generate),
     ).makeDigest(c.operation, "digest", "recorded-protocol");
-    expect(generate.mock.calls[0]![0].protocolVersion).toBe("8");
+    expect(generate).toHaveBeenCalledOnce();
+    expect(generate.mock.calls[0]![0]).not.toHaveProperty("protocolVersion");
   });
 
   it("keeps the same attempt running after a rejected draft and publishes its correction", async () => {

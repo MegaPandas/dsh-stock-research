@@ -257,7 +257,9 @@ describe("public role follow-up contract", () => {
       input.instructions[0]!.instruction += " first-round";
       runId = h.ctx.stockResearch.runs.open(
         "owner",
-        attachResearchStages(input),
+        attachResearchStages(input, [
+          { id: "analysis", taskIds: ["analysis.public"], beforeTasks: [] },
+        ]),
         "followup-run",
       ).runId;
       const parent = await h.ctx.agents.create({

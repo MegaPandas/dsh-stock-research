@@ -38,7 +38,7 @@ describe("application bundle role dispatch", () => {
     { mode: "deep", route: "selected" },
     { mode: "quick", route: "override" },
   ])(
-    "uses the $route model for ask, $mode, roles, digests and review",
+    "uses the $route model for ask, $mode roles and review",
     async ({ mode, route }) => {
       vi.useFakeTimers({ toFake: ["Date"] });
       vi.setSystemTime(new Date("2024-01-03T08:00:00.000Z"));
@@ -79,12 +79,6 @@ describe("application bundle role dispatch", () => {
       }
       await h.ctx.plugin(CommandRuntime);
       const runtimeConfig = h.config({ enabledSources: [] });
-      if (route === "override")
-        runtimeConfig.digestModel = {
-          provider: "runtime-fixture",
-          model: "digest-override",
-        };
-      else delete runtimeConfig.digestModel;
       await h.ctx.plugin(Application, {
         runtime: runtimeConfig,
         ...(route === "override"

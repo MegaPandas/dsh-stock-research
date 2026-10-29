@@ -20,6 +20,7 @@ export interface TaskDefinition {
   inputTasks: string[];
   outputKinds: ArtifactKind[];
   dataRequirements: DataRequirement[];
+  valuation?: "research" | "decision";
   instructionVersion: number;
 }
 
@@ -34,4 +35,6 @@ export interface StageDefinition {
   id: string;
   taskIds: string[];
   beforeTasks: string[];
+  /** Together stages dispatch all ready peers in one batch; a single ready revision may run alone. */
+  dispatch?: "together";
 }

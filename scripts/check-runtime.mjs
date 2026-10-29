@@ -71,7 +71,6 @@ try {
       freshness: { market: 0, fundamentals: 0, macro: 0 },
       secCiks: {},
     },
-    digestModel: { provider: "unused", model: "unused" },
   });
   plugin = ctx.plugin(
     createResearchPlugin((context, parent) =>

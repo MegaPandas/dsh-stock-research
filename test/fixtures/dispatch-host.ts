@@ -15,7 +15,6 @@ import {
   type GenerateOptions,
   type HarnessError,
   type StreamChunk,
-  type FinishReason,
   type TokenUsage,
 } from "@deepseek-ai/dsh-llm";
 import { SessionId } from "@deepseek-ai/dsh-session";
@@ -487,66 +486,6 @@ export class DigestAdapter extends LlmAdapter {
     this.requests.push(request);
     return this.respond(request);
   }
-}
-
-export async function* digestText(
-  text: string,
-  reason: FinishReason = { kind: "stop" },
-  usage?: TokenUsage,
-): AsyncIterable<StreamChunk> {
-  yield { type: "block-start", index: 0, blockType: "text" };
-  yield { type: "text-delta", index: 0, text };
-  yield { type: "block-end", index: 0, block: { type: "text", text } };
-  if (usage !== undefined) yield { type: "usage", usage };
-  yield { type: "finish", reason };
-}
-
-export async function* digestSubmit(
-  request: GenerateOptions,
-  draft: object,
-  usage?: TokenUsage,
-): AsyncIterable<StreamChunk> {
-  if (request.messages.some((message) => message.role === "tool")) {
-    yield* digestText("Digest submission finished.", { kind: "stop" }, usage);
-    return;
-  }
-  let submitted = draft;
-  if ("body" in draft && "facts" in draft) {
-    const old = draft as {
-      body: string;
-      facts: (string | { text: string })[];
-      disagreements: string[];
-      riskSummaries: { issueId: string; text: string }[];
-    };
-    submitted = {
-      summary: old.body,
-      content: {
-        keyPoints: old.facts.map((fact) =>
-          typeof fact === "string" ? fact : fact.text,
-        ),
-        disagreements: old.disagreements,
-        riskSummaries: old.riskSummaries,
-        openQuestions: [],
-      },
-    };
-  }
-  const id = ToolCallId("submit-digest");
-  const args = JSON.stringify(submitted);
-  yield { type: "block-start", index: 0, blockType: "tool-call" };
-  yield {
-    type: "tool-call-delta",
-    index: 0,
-    id,
-    name: "stock_submit",
-    argumentsDelta: args,
-  };
-  yield {
-    type: "block-end",
-    index: 0,
-    block: { type: "tool-call", id, name: "stock_submit", arguments: args },
-  };
-  if (usage !== undefined) yield { type: "usage", usage };
-  yield { type: "finish", reason: { kind: "tool-calls" } };
 }
 
 export function captureModelLogs(ctx: Context): ModelCallRecord[] {

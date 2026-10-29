@@ -1,6 +1,6 @@
 import type { ResearchScope } from "../contracts/data.js";
 import type { OpenRunInput } from "../contracts/runs.js";
-import type { TaskDefinition } from "../contracts/workflow.js";
+import type { StageDefinition, TaskDefinition } from "../contracts/workflow.js";
 import type { SourceDescription } from "../services/query-sources.js";
 import type { QueryToolPolicy } from "../tools/query-inputs.js";
 import type { QuickQuerySnapshot } from "./quick-snapshots.js";
@@ -12,7 +12,28 @@ import {
   SHARED_BRIEFS,
 } from "./research-plan.js";
 
-export const QUICK_MODE_VERSION = "quick/9";
+export const QUICK_MODE_VERSION = "quick/10";
+const ANALYSTS = [
+  "analysis.market",
+  "analysis.fundamentals",
+  "analysis.macro",
+  "analysis.public",
+] as const;
+export const QUICK_RESEARCH_STAGES: readonly StageDefinition[] = [
+  { id: "analysis", taskIds: [...ANALYSTS], beforeTasks: ["digest.analysis"] },
+  {
+    id: "debate.1",
+    taskIds: ["debate.1.bull", "debate.1.bear"],
+    beforeTasks: ["digest.debate.1"],
+    dispatch: "together",
+  },
+  { id: "risk", taskIds: ["risk.main"], beforeTasks: ["digest.risk"] },
+  {
+    id: "manager.decision",
+    taskIds: ["manager.decision"],
+    beforeTasks: ["finalize"],
+  },
+];
 const BRIEFS = {
   ...SHARED_BRIEFS,
   "digest.analysis": `Combine the four analyses' core judgments, drivers, outlooks and key disagreements. Identify specific questions affecting the debate; preserve factual periods and business definitions. ${DIGEST_RISK_RULE}`,
@@ -29,14 +50,8 @@ export function createQuickInput(
   snapshots: readonly QuickQuerySnapshot[] = [],
   publicSearchLimit: number = PUBLIC_SEARCH_LIMITS.maxSearches,
 ): OpenRunInput {
-  const analysts = [
-    "analysis.market",
-    "analysis.fundamentals",
-    "analysis.macro",
-    "analysis.public",
-  ] as const;
-  const tasks: TaskDefinition[] = analysts.map((id) =>
-    task(
+  const tasks: TaskDefinition[] = ANALYSTS.map((id) => ({
+    ...task(
       id,
       {
         kind: "role",
@@ -46,12 +61,15 @@ export function createQuickInput(
       [],
       ["analysis"],
     ),
-  );
+    ...(id === "analysis.fundamentals"
+      ? { valuation: "research" as const }
+      : {}),
+  }));
   tasks.push(
     task(
       "digest.analysis",
       { kind: "service", service: "digest" },
-      [...analysts],
+      [...ANALYSTS],
       ["digest"],
     ),
     task(
@@ -84,12 +102,15 @@ export function createQuickInput(
       ["digest.debate.1", "risk.main"],
       ["digest"],
     ),
-    task(
-      "manager.decision",
-      { kind: "role", role: "manager", specialty: "decision" },
-      ["digest.risk"],
-      ["decision_draft"],
-    ),
+    {
+      ...task(
+        "manager.decision",
+        { kind: "role", role: "manager", specialty: "decision" },
+        ["digest.risk"],
+        ["decision_draft"],
+      ),
+      valuation: "decision",
+    },
     task(
       "finalize",
       { kind: "service", service: "finalize" },

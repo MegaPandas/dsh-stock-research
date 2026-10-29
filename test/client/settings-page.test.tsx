@@ -140,7 +140,7 @@ describe("stock research settings page", () => {
     await ready();
     expect(
       screen.getByText(
-        "主 Agent 使用当前 DSH 会话模型。下方配置用于下一次研究的子 Agent、摘要与数据。",
+        "主 Agent 使用当前 DSH 会话模型。下方配置用于下一次研究的子 Agent 与数据。",
       ),
     ).toBeTruthy();
     expect(
@@ -148,7 +148,7 @@ describe("stock research settings page", () => {
         "研究模型与思考强度用于研究子 Agent，默认继承主 Agent 的会话设置。",
       ),
     ).toBeTruthy();
-    expect(screen.getByRole("option", { name: "继承研究模型" })).toBeTruthy();
+    expect(screen.queryByLabelText("摘要模型模式")).toBeNull();
     expect(
       (screen.getByLabelText("研究模型模式") as HTMLSelectElement).value,
     ).toBe("inherit");
@@ -220,14 +220,14 @@ describe("stock research settings page", () => {
     expect(h.mutate).not.toHaveBeenCalled();
   });
 
-  it("searches configured models and saves a separate digest route", async () => {
+  it("searches configured models and saves the research route", async () => {
     const h = fixture();
     render(<SettingsPage form={h.form} loadCatalog={loadCatalog} />);
     await ready();
-    chooseCustom("摘要模型");
-    const model = screen.getByRole("combobox", { name: "摘要模型名称" });
+    chooseCustom();
+    const model = screen.getByRole("combobox", { name: "研究模型名称" });
     fireEvent.click(model);
-    const options = screen.getByRole("listbox", { name: "摘要模型名称" });
+    const options = screen.getByRole("listbox", { name: "研究模型名称" });
     expect(within(options).getAllByRole("option")).toHaveLength(2);
     fireEvent.change(model, {
       target: { value: "推理" },
@@ -240,8 +240,8 @@ describe("stock research settings page", () => {
     fireEvent.click(
       within(options).getByRole("option", { name: "推理模型 reasoner" }),
     );
-    expect(screen.queryByLabelText("搜索摘要模型")).toBeNull();
-    fireEvent.change(screen.getByLabelText("摘要模型思考强度"), {
+    expect(screen.queryByLabelText("搜索研究模型")).toBeNull();
+    fireEvent.change(screen.getByLabelText("研究模型思考强度"), {
       target: { value: "effort:short" },
     });
     fireEvent.click(screen.getByRole("button", { name: "保存" }));
@@ -250,7 +250,7 @@ describe("stock research settings page", () => {
         [
           {
             op: "set",
-            path: ["runtime", "digestModel"],
+            path: ["model"],
             value: {
               provider: "fixture",
               model: "reasoner",

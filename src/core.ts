@@ -295,3 +295,5 @@ export type {
   GenerateDigest,
 } from "./contracts/digests.js";
 export { DigestService } from "./services/digests.js";
+export { DIGEST_HANDOFF_VERSION } from "./contracts/digests.js";
+export { generateHandoffDigest } from "./services/handoff-digest.js";

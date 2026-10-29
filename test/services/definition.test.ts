@@ -49,6 +49,40 @@ function invalid(value: RunDefinition, detail: string): void {
 }
 
 describe("run definition semantics", () => {
+  it("accepts valuation requirements by output contract independently of task names", () => {
+    const analysis = { ...task("company"), valuation: "research" as const };
+    const manager: TaskDefinition = {
+      ...task("portfolio", ["company"]),
+      executor: { kind: "role", role: "manager", specialty: "portfolio" },
+      outputKinds: ["decision_draft"],
+      valuation: "decision",
+    };
+    expect(() =>
+      validateRunDefinition(definition([analysis, manager])),
+    ).not.toThrow();
+    manager.valuation = "research";
+    invalid(definition([analysis, manager]), "requires analysis output");
+    analysis.outputKinds = ["debate"];
+    analysis.executor = { kind: "role", role: "discussion", specialty: "bull" };
+    invalid(definition([analysis]), "requires analysis output");
+  });
+
+  it("requires role executors for together dispatch stages", () => {
+    const value = definition([task("a"), task("b")]);
+    value.stages = [
+      {
+        id: "peers",
+        taskIds: ["a", "b"],
+        beforeTasks: [],
+        dispatch: "together",
+      },
+    ];
+    expect(() => validateRunDefinition(value)).not.toThrow();
+    value.tasks[1]!.executor = { kind: "service", service: "digest" };
+    value.tasks[1]!.outputKinds = ["digest"];
+    invalid(value, "together dispatch requires role tasks");
+  });
+
   it("accepts an unsorted diamond graph and a subset of dependency inputs without modifying it", () => {
     const value = definition([
       task("join", ["left", "right"], ["right"]),

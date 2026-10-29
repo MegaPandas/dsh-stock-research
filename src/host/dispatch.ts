@@ -169,15 +169,13 @@ export class DispatchBridge {
       const stage = definition.stages?.find((entry) =>
         entry.taskIds.includes(taskId),
       );
-      if (taskId.startsWith("debate.") && stage !== undefined) {
+      if (stage?.dispatch === "together") {
         const ready = new Set(this.runs.view({ runId }).readyTasks);
-        const readyDebaters = stage.taskIds.filter(
-          (id) => id.startsWith("debate.") && ready.has(id),
-        );
-        if (readyDebaters.length > 1)
+        const readyPeers = stage.taskIds.filter((id) => ready.has(id));
+        if (readyPeers.length > 1)
           throw new ResearchError(
             "INVALID_INPUT",
-            `Independent debate roles must start together. Use stock_dispatch_stage with stageId=${stage.id}.`,
+            `This stage requires ready roles to start together. Use stock_dispatch_stage with stageId=${stage.id}.`,
           );
       }
       return this.#startRole(parent, runId, taskId, requestId, signal);

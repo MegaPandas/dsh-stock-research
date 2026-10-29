@@ -6,6 +6,7 @@ import type { ResearchScope } from "../contracts/data.js";
 import { ResearchError } from "../contracts/errors.js";
 import { decisionPolicy } from "../contracts/rating-policy.js";
 import { parseLocalDate } from "../contracts/time.js";
+import type { TaskDefinition } from "../contracts/workflow.js";
 
 function invalid(detail: string): never {
   throw new ResearchError("INVALID_INPUT", `valuation: ${detail}`);
@@ -43,14 +44,12 @@ export function validateValuationRecord(record: ValuationRecord): void {
 
 export function validateRoleValuation(
   report: AgentReport,
-  taskId: string,
+  requirement: TaskDefinition["valuation"],
   scope: ResearchScope,
   methodIds: readonly string[],
 ): void {
-  const ownsValuation =
-    taskId === "analysis.fundamentals" || taskId === "manager.decision";
   if (!("valuation" in report.content) || report.content.valuation == null) {
-    if (ownsValuation)
+    if (requirement !== undefined)
       invalid(
         "Write the valuation section with calculated results, assumptions and method limitations.",
       );
@@ -82,7 +81,7 @@ export function validateRoleValuation(
         invalid("Common-share price ranges must be nonnegative.");
     }
   }
-  if (taskId === "manager.decision") {
+  if (requirement === "decision") {
     const targetPrice = (report as AgentReport<"decision_draft">).content
       .targetPrice;
     if (targetPrice === null)

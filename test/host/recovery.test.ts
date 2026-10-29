@@ -1,11 +1,10 @@
 import { SessionId } from "@deepseek-ai/dsh-session";
 import { afterEach, describe, expect, it } from "vitest";
 import type { TaskOperation } from "../../src/contracts/runs.js";
-import { HostDigestModel } from "../../src/host/digest-model.js";
+import { agentAnalysisReport } from "../fixtures/analysis-report.js";
+import { digestGate, gatedDigest } from "../fixtures/digest-execution.js";
 import {
   analysis,
-  DigestAdapter,
-  digestSubmit,
   dispatchHost,
   modelGate,
   type ModelScript,
@@ -73,10 +72,9 @@ describe("confirmed interruption recovery at the host boundary", () => {
     ).toBeUndefined();
   });
 
-  it("rejects recovery while the digest agent's cancelled model producer still belongs to this host", async () => {
-    const gate = modelGate();
-    const route = { provider: "recovery-fixture", model: "digest" };
-    const h = await host([], (ctx) => new HostDigestModel(ctx, route).generate);
+  it("rejects recovery while a cancelled digest execution still belongs to this host", async () => {
+    const gate = digestGate();
+    const h = await host([], () => gatedDigest(gate));
     cleanups.push(async () => {
       gate.released.resolve();
     });
@@ -86,33 +84,25 @@ describe("confirmed interruption recovery at the host boundary", () => {
       identity: "analyst-worker",
       sessionId: null,
     };
-    const upstream = h.artifacts.submitArtifact(
+    h.artifacts.submitArtifact(
       roleOperation,
-      [analysis()],
+      [
+        {
+          ...analysis(),
+          payload: {
+            schemaVersion: 3,
+            report: agentAnalysisReport(),
+            stageHandoff: {
+              keyPoints: ["Fixed finding"],
+              disagreements: [],
+              risks: [],
+              openQuestions: [],
+            },
+          },
+        },
+      ],
       "fixed-analysis",
     );
-    const adapter = new DigestAdapter(async function* (request) {
-      const aborted = () => gate.aborted.resolve();
-      request.signal?.addEventListener("abort", aborted, { once: true });
-      gate.started.resolve(request);
-      try {
-        await gate.released.promise;
-        request.signal?.throwIfAborted();
-        yield* digestSubmit(request, {
-          title: "Digest",
-          body: "Fixed summary",
-          inputRefs: upstream.refs,
-          facts: [
-            { text: "Fixed finding", inputRefs: upstream.refs, numbers: [] },
-          ],
-          disagreements: [],
-          riskSummaries: [],
-        });
-      } finally {
-        request.signal?.removeEventListener("abort", aborted);
-      }
-    });
-    h.ctx.llm.registerAdapter([route.provider], adapter);
     const controller = new AbortController();
     const work = observe(
       h.bridge.makeDigest(h.operation, "digest", "digest", controller.signal),
@@ -127,13 +117,8 @@ describe("confirmed interruption recovery at the host boundary", () => {
       sessionId: null,
       outputRefs: [],
     });
-    const digestAgent = h.ctx.agents
-      .list()
-      .find((agent) => agent.id === adapter.requests[0]!.sessionId);
-    expect(digestAgent).toBeDefined();
-    expect(h.ctx.agents.list()).toEqual(
-      expect.arrayContaining([h.parent.agent, digestAgent]),
-    );
+    expect(h.ctx.agents.list()).toEqual([h.parent.agent]);
+    expect(h.adapter.requests).toHaveLength(0);
 
     expect(() =>
       h.bridge.recoverInterrupted(h.operation, [target], "recover-live-digest"),

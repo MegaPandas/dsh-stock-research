@@ -1,23 +1,22 @@
 import fs from "node:fs";
 import { setImmediate } from "node:timers/promises";
-import { errorChain, type GenerateOptions } from "@deepseek-ai/dsh-llm";
+import { errorChain } from "@deepseek-ai/dsh-llm";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { TaskOperation } from "../../src/contracts/runs.js";
-import { HostDigestModel } from "../../src/host/digest-model.js";
+import type { GenerateDigest } from "../../src/contracts/digests.js";
+import { handoffDigest } from "../../src/services/handoff-digest.js";
+import { agentAnalysisReport } from "../fixtures/analysis-report.js";
+import { digestGate, gatedDigest } from "../fixtures/digest-execution.js";
 import {
   analysis,
   captureModelLogs,
-  DigestAdapter,
-  digestSubmit,
   dispatchHost,
   modelGate,
-  type ModelGate,
   type ModelScript,
 } from "../fixtures/dispatch-host.js";
 import { MARKET_FIXTURE } from "../fixtures/market.js";
 
 const cleanups: (() => Promise<void>)[] = [];
-const route = { provider: "digest-fixture", model: "digest" };
 const usage = {
   inputTokens: 9,
   outputTokens: 2,
@@ -25,41 +24,17 @@ const usage = {
   cacheWriteTokens: 4,
   totalTokens: 18,
 };
-function draft(request: GenerateOptions) {
-  const first = request.messages.find((message) => message.role === "user")!
-    .content[0]!;
-  if (first.type !== "text")
-    throw new Error("Expected the fixed digest context");
-  const input = JSON.parse(first.text) as {
-    context: {
-      materials: { body: string }[];
-      requiredRisks: { issueId: string }[];
-    };
-  };
-  return {
-    title: "Host digest",
-    body: input.context.materials.map((item) => item.body).join("\n"),
-    facts: ["Fixed upstream finding"],
-    disagreements: [],
-    riskSummaries: input.context.requiredRisks.map((risk) => ({
-      issueId: risk.issueId,
-      text: "Inherited risk",
-    })),
-  };
-}
 async function host(
   scripts: ModelScript[] = [],
-  respond: ConstructorParameters<typeof DigestAdapter>[0] = (request) =>
-    digestSubmit(request, draft(request), usage),
+  generate: GenerateDigest = async (input, signal, _operation, submit) => {
+    signal.throwIfAborted();
+    return submit(handoffDigest(input));
+  },
 ) {
-  const h = await dispatchHost(
-    scripts,
-    (ctx) => new HostDigestModel(ctx, route).generate,
-  );
+  const generateDigest = vi.fn(generate);
+  const h = await dispatchHost(scripts, () => generateDigest);
   cleanups.push(h.close);
-  const digestAdapter = new DigestAdapter(respond);
-  h.ctx.llm.registerAdapter([route.provider], digestAdapter);
-  return { ...h, digestAdapter, logs: captureModelLogs(h.ctx) };
+  return { ...h, generateDigest, logs: captureModelLogs(h.ctx) };
 }
 type Fixture = Awaited<ReturnType<typeof host>>;
 function fixedAnalysis(h: Fixture) {
@@ -81,7 +56,19 @@ function fixedAnalysis(h: Fixture) {
     { envelope, candidates: [] },
     "fixed-price",
   );
-  const content = analysis();
+  const content = {
+    ...analysis(),
+    payload: {
+      schemaVersion: 3 as const,
+      report: agentAnalysisReport(),
+      stageHandoff: {
+        keyPoints: ["Observed 12 USD/share."],
+        disagreements: [],
+        risks: [],
+        openQuestions: [],
+      },
+    },
+  };
   content.body = "Observed {{number:close}}.";
   content.claims = [
     {
@@ -92,22 +79,7 @@ function fixedAnalysis(h: Fixture) {
       source: { ...source, selector: "/data/bars/1/close" },
     },
   ];
-  if (content.kind !== "analysis") throw new Error("Expected analysis fixture");
-  content.payload.findings[0]!.numbers = [{ kind: "local", claimId: "close" }];
   return h.artifacts.submitArtifact(operation, [content], "fixed-analysis");
-}
-async function* gatedDigest(request: GenerateOptions, gate: ModelGate) {
-  const aborted = () => gate.aborted.resolve();
-  request.signal?.addEventListener("abort", aborted, { once: true });
-  if (request.signal?.aborted) aborted();
-  yield { type: "usage" as const, usage };
-  gate.started.resolve(request);
-  try {
-    await gate.released.promise;
-    yield* digestSubmit(request, draft(request));
-  } finally {
-    request.signal?.removeEventListener("abort", aborted);
-  }
 }
 function observe<T>(work: Promise<T>) {
   return work.then(
@@ -119,8 +91,8 @@ afterEach(async () => {
   for (const cleanup of cleanups.splice(0).reverse()) await cleanup();
 });
 
-describe("host model ownership through the research service facade", () => {
-  it("submits a numeric fixed-input digest through the SDK tool and replays without model calls", async () => {
+describe("host execution ownership through the research service facade", () => {
+  it("submits a numeric fixed-input handoff digest and replays without another execution", async () => {
     const h = await host();
     const upstream = fixedAnalysis(h);
     const args = { runId: h.runId, taskId: "digest", requestId: "digest" };
@@ -131,16 +103,19 @@ describe("host model ownership through the research service facade", () => {
     });
     const saved = await h.bridge.makeDigest(h.operation, "digest", "digest");
     expect(result.value).toEqual(saved);
-    expect(h.digestAdapter.requests).toHaveLength(1);
+    expect(h.generateDigest.mock.calls).toHaveLength(1);
     const version = h.runs.readArtifact(saved.refs[0]!);
     expect(version.content).toMatchObject({
       kind: "digest",
       inputRefs: upstream.refs,
       claims: [],
       payload: {
+        numbers: [
+          { kind: "artifact", artifact: upstream.refs[0], claimId: "close" },
+        ],
         facts: [
           {
-            evidence: [],
+            evidence: upstream.refs,
             numbers: [],
           },
         ],
@@ -148,32 +123,24 @@ describe("host model ownership through the research service facade", () => {
     });
     expect(version.content.body).toContain("12");
     expect(version.content.body).not.toContain("{{number:");
-    expect(h.logs.filter((record) => record.kind === "digest")).toEqual([
-      expect.objectContaining({
-        runId: h.runId,
-        taskId: "digest",
-        attempt: 1,
-        sessionId: h.digestAdapter.requests[0]!.sessionId,
-        usage,
-        outcome: "committed",
-      }),
-    ]);
+    expect(h.logs.filter((record) => record.kind === "digest")).toEqual([]);
+    expect(h.adapter.requests).toHaveLength(0);
   });
 
-  it("rejects invalid business fields at the native submission boundary without publishing a digest", async () => {
-    const h = await host([], (request) =>
-      digestSubmit(request, { unexpected: "field" }),
+  it("rejects invalid draft fields at the submission boundary without publishing a digest", async () => {
+    const h = await host([], async (_input, _signal, _operation, submit) =>
+      submit({ unexpected: "field" }),
     );
     fixedAnalysis(h);
     await expect(
       h.bridge.makeDigest(h.operation, "digest", "invalid-draft"),
-    ).rejects.toMatchObject({ code: "INVALID_INPUT" });
+    ).rejects.toMatchObject({ code: "INVALID_ARTIFACT" });
     expect(
       h.runs.readAttempt({ runId: h.runId, taskId: "digest", attempt: 1 }),
     ).toMatchObject({
       status: "failed",
       outputRefs: [],
-      failure: { code: "INVALID_INPUT" },
+      failure: { code: "INVALID_ARTIFACT" },
     });
   });
 
@@ -189,16 +156,15 @@ describe("host model ownership through the research service facade", () => {
     await expect(
       h.bridge.makeDigest(h.operation, "digest", "lost"),
     ).rejects.toMatchObject({ code: "STALE_ATTEMPT" });
-    expect(h.digestAdapter.requests).toHaveLength(0);
+    expect(h.generateDigest.mock.calls).toHaveLength(0);
   });
 
   it("drains an invalidated digest before its replacement starts while an independent role can finish", async () => {
-    const gate = modelGate();
+    const gate = digestGate();
     let calls = 0;
-    const h = await host([{ kind: "save" }], (request) =>
-      ++calls === 1
-        ? gatedDigest(request, gate)
-        : digestSubmit(request, draft(request)),
+    const waiting = gatedDigest(gate);
+    const h = await host([{ kind: "save" }], async (...args) =>
+      ++calls === 1 ? waiting(...args) : args[3](handoffDigest(args[0])),
     );
     cleanups.push(async () => {
       gate.released.resolve();
@@ -224,7 +190,7 @@ describe("host model ownership through the research service facade", () => {
       "replacement",
     );
     await setImmediate();
-    expect(h.digestAdapter.requests).toHaveLength(1);
+    expect(h.generateDigest.mock.calls).toHaveLength(1);
     expect(
       h.runs.view(h.operation).tasks.find((task) => task.taskId === "digest"),
     ).toMatchObject({ status: "pending", attempt: 1 });
@@ -244,14 +210,14 @@ describe("host model ownership through the research service facade", () => {
       status: "succeeded",
       outputRefs: saved.refs,
     });
-    expect(h.digestAdapter.requests).toHaveLength(2);
+    expect(h.generateDigest.mock.calls).toHaveLength(2);
   });
 
   it.each(["cancel", "close"] as const)(
     "%s cancels and drains an owned digest without committing a late submission",
     async (method) => {
-      const gate = modelGate();
-      const h = await host([], (request) => gatedDigest(request, gate));
+      const gate = digestGate();
+      const h = await host([], gatedDigest(gate));
       cleanups.push(async () => {
         gate.released.resolve();
       });
@@ -288,17 +254,13 @@ describe("host model ownership through the research service facade", () => {
         status: method === "cancel" ? "cancelled" : "failed",
         outputRefs: [],
       });
-      expect(h.logs.find((record) => record.kind === "digest")).toMatchObject({
-        outcome: "committed",
-        finish: null,
-        usage,
-      });
+      expect(h.logs.filter((record) => record.kind === "digest")).toEqual([]);
     },
   );
 
   it("surfaces failed failure-recording to the original caller and close", async () => {
-    const gate = modelGate();
-    const h = await host([], (request) => gatedDigest(request, gate));
+    const gate = digestGate();
+    const h = await host([], gatedDigest(gate));
     cleanups.push(async () => {
       gate.released.resolve();
     });
@@ -404,8 +366,8 @@ describe("host model ownership through the research service facade", () => {
   });
 
   it("invalidates a same-tick role start during upstream redo without bypassing a digest drain", async () => {
-    const gate = modelGate();
-    const h = await host([], (request) => gatedDigest(request, gate));
+    const gate = digestGate();
+    const h = await host([], gatedDigest(gate));
     cleanups.push(async () => {
       gate.released.resolve();
     });

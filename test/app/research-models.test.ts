@@ -8,15 +8,9 @@ import {
   type ResearchModels,
 } from "../../src/app/research-models.js";
 import type { JsonValue } from "../../src/contracts/cache.js";
-import type { DigestModelInput } from "../../src/contracts/digests.js";
 import type { RunService } from "../../src/services/runs.js";
-import { HostDigestModel } from "../../src/host/digest-model.js";
 import { runtimeHost } from "../fixtures/runtime-host.js";
-import {
-  dispatchHost,
-  DigestAdapter,
-  digestSubmit,
-} from "../fixtures/dispatch-host.js";
+import { dispatchHost } from "../fixtures/dispatch-host.js";
 
 const cleanups: (() => Promise<void>)[] = [];
 afterEach(async () => {
@@ -54,7 +48,7 @@ function openSnapshot(
 }
 
 describe("research run model snapshots", () => {
-  it("captures inherited options independently for research and digest without changing the main Agent", async () => {
+  it("captures detached inherited research options without changing the main Agent", async () => {
     const { agent } = await parent();
     const models = captureResearchModels(agent);
     const expected = {
@@ -63,13 +57,12 @@ describe("research run model snapshots", () => {
       reasoningEffort: "high",
       maxTokens: 1024,
     };
-    expect(models).toEqual({ research: expected, digest: expected });
-    models.digest.model = "digest-only";
-    expect(models.research.model).toBe("runtime");
+    expect(models).toEqual({ research: expected });
+    models.research.model = "research-only";
     expect(agent.options).toEqual(expected);
   });
 
-  it("lets digest inherit a custom research route and output limit", async () => {
+  it("overrides the research route while inheriting the output limit", async () => {
     const { agent } = await parent();
     expect(
       captureResearchModels(agent, {
@@ -84,38 +77,19 @@ describe("research run model snapshots", () => {
         reasoningEffort: "low",
         maxTokens: 1024,
       },
-      digest: {
-        provider: "research",
-        model: "research-model",
-        reasoningEffort: "low",
-        maxTokens: 1024,
-      },
     });
     expect(agent.options.model).toBe("runtime");
   });
 
-  it("applies independent digest overrides and clears inherited effort on route changes", async () => {
+  it("clears inherited effort on research route changes or an explicit default", async () => {
     const { agent } = await parent();
-    const models = captureResearchModels(
-      agent,
-      {
-        provider: "research",
-        model: "research-model",
-        reasoningEffort: ReasoningEffortId("low"),
-      },
-      { provider: "digest", model: "digest-model" },
-    );
-    expect(models.research.reasoningEffort).toBe("low");
-    expect(models.digest).toEqual({
-      provider: "digest",
-      model: "digest-model",
-      maxTokens: 1024,
+    const models = captureResearchModels(agent, {
+      provider: "research",
+      model: "research-model",
     });
-    expect(
-      captureResearchModels(agent, undefined, { reasoningEffort: null }).digest,
-    ).toEqual({
-      provider: "runtime-fixture",
-      model: "runtime",
+    expect(models.research).toEqual({
+      provider: "research",
+      model: "research-model",
       maxTokens: 1024,
     });
     expect(
@@ -124,7 +98,7 @@ describe("research run model snapshots", () => {
     ).toBeUndefined();
   });
 
-  it("reads detached persistent snapshots and keeps legacy runs without a snapshot", async () => {
+  it("reads detached persistent snapshots and allows unsnapshotted runtime tasks", async () => {
     const h = await dispatchHost();
     cleanups.push(h.close);
     expect(readResearchModels(h.runs, h.runId)).toBeUndefined();
@@ -134,8 +108,8 @@ describe("research run model snapshots", () => {
     h.parent.agent.options.model = "new-main-model";
     const stored = readResearchModels(h.runs, runId)!;
     expect(stored.research.model).toBe("dispatch-fixture");
-    stored.digest.model = "changed-read";
-    expect(readResearchModels(h.runs, runId)!.digest.model).toBe(
+    stored.research.model = "changed-read";
+    expect(readResearchModels(h.runs, runId)!.research.model).toBe(
       "dispatch-fixture",
     );
   });
@@ -189,86 +163,5 @@ describe("research run model snapshots", () => {
     const child: Agent = h.children.get(result.sessionId!)!.agent;
     expect(child.options.reasoningEffort).toBeUndefined();
     expect(child.options.maxTokens).toBeUndefined();
-  });
-
-  it("generates a digest from its saved options instead of the current deployment config", async () => {
-    const h = await runtimeHost();
-    cleanups.push(h.close);
-    const { runtime } = await h.mount(h.config({ enabledSources: [] }));
-    const base = runtime.runs.open(
-      "fixture",
-      {
-        definition: { scope: h.scope, mode: "quick", tasks: [] },
-        versions: {
-          plugin: "fixture",
-          mode: "fixture",
-          prompts: {},
-          skills: {},
-          adapters: {},
-          normalization: {},
-        },
-        inputs: [],
-      },
-      "base",
-    ).runId;
-    const models = captureResearchModels(h.outside.agent, undefined, {
-      provider: "saved-digest",
-      model: "snapshot",
-    });
-    models.digest.maxTokens = 512;
-    const runId = openSnapshot(runtime.runs, base, models);
-    const adapter = new DigestAdapter((request) =>
-      digestSubmit(request, {
-        summary: "固定摘要",
-        content: {
-          keyPoints: [],
-          disagreements: [],
-          riskSummaries: [],
-          openQuestions: [],
-        },
-      }),
-    );
-    h.ctx.llm.registerAdapter(["saved-digest"], adapter);
-    const host = new HostDigestModel(h.ctx, {
-      provider: "unavailable-live",
-      model: "changed",
-    });
-    const input: DigestModelInput = {
-      scope: h.scope,
-      taskId: "digest",
-      instructionVersion: 2,
-      instruction: "Summarize the saved input.",
-      artifacts: [],
-      reports: [],
-      references: [],
-      numbers: [],
-      risks: [],
-      gaps: [],
-    };
-    const operation = {
-      runId,
-      taskId: "digest",
-      attempt: 1,
-      identity: h.outside.agent.id,
-      sessionId: null,
-    };
-    const committed = { runId, taskId: "digest", attempt: 1, refs: [] };
-    expect(
-      await host.generate(
-        input,
-        new AbortController().signal,
-        operation,
-        () => committed,
-      ),
-    ).toEqual(committed);
-    expect(adapter.requests[0]).toMatchObject({
-      provider: "saved-digest",
-      model: "snapshot",
-      maxTokens: 512,
-    });
-    expect(h.outside.agent.options).toEqual({
-      provider: "runtime-fixture",
-      model: "runtime",
-    });
   });
 });

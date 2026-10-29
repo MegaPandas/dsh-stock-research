@@ -213,6 +213,41 @@ function taskDataFixture() {
 }
 
 describe("stored run restoration boundary", () => {
+  it("preserves explicit workflow policy and rejects malformed policy at the storage boundary", () => {
+    const base = fixture();
+    const value = {
+      ...base,
+      definition: {
+        ...base.definition,
+        tasks: base.definition.tasks.map((task) => ({
+          ...task,
+          valuation: "research",
+        })),
+        stages: [
+          {
+            id: "analysis",
+            taskIds: ["analysis"],
+            beforeTasks: [],
+            dispatch: "together",
+          },
+        ],
+      },
+      stageReviews: [],
+    };
+    const before = structuredClone(value);
+    expect(() => assertStoredRun(value)).not.toThrow();
+    expect(value).toEqual(before);
+    for (const field of ["valuation", "dispatch"] as const) {
+      const damaged = structuredClone(value);
+      if (field === "valuation")
+        damaged.definition.tasks[0]!.valuation = "unknown";
+      else damaged.definition.stages[0]!.dispatch = "unknown";
+      expect(() => assertStoredRun(damaged)).toThrowError(
+        expect.objectContaining({ code: "STORAGE_FAILED" }),
+      );
+    }
+  });
+
   it("accepts a complete stored state without changing it", () => {
     const value = fixture();
     const before = structuredClone(value);

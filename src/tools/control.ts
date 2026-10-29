@@ -63,7 +63,7 @@ export function createControlTools(
       name,
       description:
         name === "stock_dispatch_task"
-          ? "Dispatch a ready task with executor.kind=role; wait for execution and cleanup, then return status and artifact references. Use stock_make_digest for digests and stock_decide for finalization."
+          ? "Dispatch a ready task with executor.kind=role; wait for execution and cleanup, then return status and artifact references. If its stage declares dispatch=together and multiple peers are ready, use stock_dispatch_stage. Use stock_make_digest for digests and stock_decide for finalization."
           : name === "stock_followup_task"
             ? "Request revisions from the original child agent after submission, preserving its session and draft; return a new version. Rerun and review affected downstream tasks. Set resumeSearch=true when the user or primary agent decides to resume search; retain usage and require approval for each search over budget."
             : "Redo a task and affected downstream tasks in an authorized run, preserving historical versions. Wait for invalidated role executions to release before returning the receipt.",
@@ -141,7 +141,7 @@ export function createControlTools(
     researchTool({
       name: "stock_dispatch_stage",
       description:
-        "When all roles in a stage are ready, dispatch them in parallel; wait for execution and cleanup, then return individual results for primary-agent review. Use this for independent bull and bear tasks ready together; use stock_dispatch_task for one-sided rework.",
+        "When all roles in a stage are ready, dispatch them in parallel; wait for execution and cleanup, then return individual results for primary-agent review. Stages declaring dispatch=together require this entry for multiple ready peers; use stock_dispatch_task for a single ready revision.",
       parameters: objectSchema({
         runId: stringSchema,
         stageId: stringSchema,

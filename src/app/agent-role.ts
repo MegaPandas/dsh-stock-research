@@ -33,7 +33,6 @@ import { createPublicSearchSession } from "./public-search.js";
 import { referencePrice, type RegisteredTable } from "./reference-price.js";
 import { decisionPolicy } from "../contracts/rating-policy.js";
 import { researchStageFeedback } from "./research-stages.js";
-import { ROLE_PROMPT_VERSION } from "./research-prompts.js";
 import {
   createValuationMethodTool,
   financialMetricContext,
@@ -42,7 +41,6 @@ import {
   valuationMethodContext,
 } from "./valuation-methods.js";
 import { validateRoleValuation } from "../services/valuation.js";
-import { DETERMINISTIC_VALUATION_PROTOCOL } from "../contracts/valuation.js";
 import { valuationCalculationCatalog } from "../services/valuation-calculations.js";
 import {
   computedValuationDraftTools,
@@ -103,23 +101,15 @@ export function prepareUnifiedRole(
   let systemPrompt = profile.prompts[definition.executor.role];
   const tools = reader.catalog.length === 0 ? [] : [reader.tool];
   const details: Record<string, unknown> = {};
-  const valuationMethods =
-    usesValuationMethods(claim.taskId) &&
-    ["24", ROLE_PROMPT_VERSION].includes(
-      services.runs.inputCatalog(claim.runId).versions.prompts.roles!,
-    )
-      ? readValuationMethods(services.runs, claim.runId)
-      : undefined;
+  const valuationMethods = usesValuationMethods(definition)
+    ? readValuationMethods(services.runs, claim.runId)
+    : undefined;
   if (valuationMethods !== undefined) {
     systemPrompt += `\n${profile.prompts.valuation}`;
     tools.push(createValuationMethodTool(valuationMethods));
     details.valuationMethods = valuationMethodContext(valuationMethods, scope);
   }
-  const computedValuation =
-    valuationMethods !== undefined &&
-    services.runs.inputCatalog(claim.runId).versions.prompts.roles ===
-      DETERMINISTIC_VALUATION_PROTOCOL;
-  if (computedValuation) {
+  if (valuationMethods !== undefined) {
     const collection = readCollection(services.runs, claim.runId);
     if (collection !== null)
       details.financialMetrics = financialMetricContext(collection.packets);
@@ -226,7 +216,7 @@ export function prepareUnifiedRole(
     if (valuationMethods !== undefined)
       validateRoleValuation(
         report,
-        claim.taskId,
+        definition.valuation,
         scope,
         valuationMethods.methods.map(({ id }) => id),
       );
@@ -292,11 +282,7 @@ export function prepareUnifiedRole(
             ? {}
             : { seed: previous.stageHandoff }
           : undefined,
-        valuationMethods !== undefined &&
-          (claim.taskId === "analysis.fundamentals" ||
-            reportKind === "decision_draft")
-          ? ["valuation"]
-          : [],
+        definition.valuation === undefined ? [] : ["valuation"],
       )
     : createSubmission(reportKind, accept);
   return {
@@ -304,7 +290,7 @@ export function prepareUnifiedRole(
     tools: [
       ...tools,
       ...("tools" in submission
-        ? computedValuation
+        ? valuationMethods !== undefined
           ? computedValuationDraftTools(
               submission.tools,
               services.runs,

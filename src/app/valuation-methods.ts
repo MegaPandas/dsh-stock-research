@@ -1,6 +1,7 @@
 import catalogue from "../valuation/methods.json" with { type: "json" };
 export { VALUATION_METHODS_INPUT } from "../contracts/valuation.js";
 import type { ResearchScope } from "../contracts/data.js";
+import type { TaskDefinition } from "../contracts/workflow.js";
 import type { CollectionPacket } from "../contracts/collection.js";
 import { decisionPolicy } from "../contracts/rating-policy.js";
 import { VALUATION_ENGINE_VERSION } from "../contracts/valuation.js";
@@ -18,13 +19,14 @@ import {
 export const VALUATION_METHODS = catalogue;
 export type ValuationMethods = typeof catalogue;
 
-export function usesValuationMethods(taskId: string): boolean {
+export function usesValuationMethods(task: TaskDefinition): boolean {
   return (
-    taskId === "analysis.fundamentals" ||
-    taskId.startsWith("debate.") ||
-    taskId === "risk.main" ||
-    taskId === "risk.valuation" ||
-    taskId === "manager.decision"
+    task.valuation !== undefined ||
+    (task.executor.kind === "role" &&
+      task.executor.role === "discussion" &&
+      ["bull", "bear", "risk", "risk.valuation"].includes(
+        task.executor.specialty,
+      ))
   );
 }
 

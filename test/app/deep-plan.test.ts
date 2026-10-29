@@ -87,7 +87,15 @@ describe("deep application plan", () => {
       input.instructions?.every((item) => item.instruction.trim().length > 0),
     ).toBe(true);
     expect(input.versions.mode).toBe(DEEP_MODE_VERSION);
-    expect(DEEP_MODE_VERSION).toBe("deep/7");
+    expect(DEEP_MODE_VERSION).toBe("deep/8");
+    expect(
+      input.definition.tasks
+        .filter(({ valuation }) => valuation !== undefined)
+        .map(({ id, valuation }) => ({ id, valuation })),
+    ).toEqual([
+      { id: "analysis.fundamentals", valuation: "research" },
+      { id: "manager.decision", valuation: "decision" },
+    ]);
     validateRunDefinition(input.definition);
   });
 
