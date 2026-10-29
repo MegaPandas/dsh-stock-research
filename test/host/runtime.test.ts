@@ -10,6 +10,7 @@ import {
 import type { WebSearchRequest } from "@deepseek-ai/dsh-web";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DataRoot } from "../../src/storage/data-root.js";
+import { createQuickInput } from "../../src/app/quick-plan.js";
 import {
   deferred,
   gate,
@@ -62,6 +63,38 @@ function stockNames(h: Awaited<ReturnType<typeof host>>) {
 }
 
 describe("research runtime plugin with the real DSH host", () => {
+  it("mounts with a damaged historical run and opens an unrelated research", async () => {
+    const h = await host();
+    const first = await h.mount();
+    const input = createQuickInput(h.scope, first.runtime.policy, []);
+    const unbind = first.runtime.bindCoordinator(h.outside.agent);
+    const old = first.runtime.openRun(h.outside.agent, input, "old");
+    unbind();
+    await first.fiber.dispose();
+    const file = join(
+      h.directory,
+      "runs",
+      h.scope.date,
+      `US_NVDA-quick-${old.runId}`,
+      "manifest.json",
+    );
+    fs.writeFileSync(file, "{");
+    const second = await h.mount();
+    const release = second.runtime.bindCoordinator(h.outside.agent);
+    try {
+      const current = second.runtime.openRun(h.outside.agent, input, "new");
+      expect(current.status).toBe("active");
+      expect(current.runId).not.toBe(old.runId);
+      expect(() =>
+        second.runtime.openRun(h.outside.agent, input, "old"),
+      ).toThrowError(expect.objectContaining({ code: "STORAGE_FAILED" }));
+      expect(fetch).not.toHaveBeenCalled();
+      expect(h.adapter.requests).toHaveLength(0);
+    } finally {
+      release();
+    }
+  });
+
   it("publishes its ready service and tool definitions without globally registering tools or querying sources", async () => {
     let searches = 0;
     const h = await host({

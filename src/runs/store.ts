@@ -21,8 +21,9 @@ import {
   writeImmutable,
 } from "../storage/files.js";
 import { syncProjectionFiles } from "./projections.js";
+import { creationRunId, isKeyedRunId, RUN_ID as ID } from "./creation-id.js";
 
-const ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+const UUID_LENGTH = 36;
 
 function invalid(detail: string): never {
   throw new ResearchError(
@@ -163,13 +164,14 @@ export class RunStore<State extends object> {
       for (const run of runs) {
         if (!run.isDirectory()) continue;
         const path = join(parent, run.name);
-        if (!this.hasManifest(path)) continue;
-        const manifest = decode<State>(readJson(join(path, "manifest.json")));
-        if (!run.name.endsWith(`-${manifest.runId}`))
-          invalid("run directory and identifier differ");
-        if (this.#directories.has(manifest.runId))
-          invalid("duplicate run identifier");
-        this.#directories.set(manifest.runId, { path, committed: true });
+        const committed = this.hasManifest(path);
+        const runId = run.name.slice(-UUID_LENGTH);
+        // An unfinished keyed creation is still a reservation for that request.
+        if (!committed && !(ID.test(runId) && isKeyedRunId(runId))) continue;
+        if (!ID.test(runId) || !run.name.endsWith(`-${runId}`))
+          invalid("run directory has no valid identifier");
+        if (this.#directories.has(runId)) invalid("duplicate run identifier");
+        this.#directories.set(runId, { path, committed });
       }
     }
   }
@@ -177,9 +179,16 @@ export class RunStore<State extends object> {
   create(
     location: RunLocation,
     build: (runId: string, writer: ContentWriter) => State,
+    creationKey?: string,
   ): StoredRun<State> {
     this.root.assertOpen();
-    const runId = randomUUID();
+    const runId =
+      creationKey === undefined ? randomUUID() : creationRunId(creationKey);
+    if (this.#directories.has(runId))
+      throw new ResearchError(
+        "STORAGE_FAILED",
+        `Run ${runId} already has a directory; read its manifest before retrying creation.`,
+      );
     const security = location.securityId.replace(/[^A-Za-z0-9._-]/g, "_");
     const directory = join(
       this.root.path,
@@ -187,17 +196,16 @@ export class RunStore<State extends object> {
       location.date,
       `${security}-${location.mode}-${runId}`,
     );
+    const entry = { path: directory, committed: false };
     storageIO("Cannot create run directory.", () => {
       const parent = join(this.root.path, "runs", location.date);
       createDirectory(parent);
       fs.mkdirSync(directory);
+      this.#directories.set(runId, entry);
       // Persist both the new directory inode and its name in the parent.
       syncDirectory(directory);
       syncDirectory(parent);
     });
-    // Keep the locator even if publication reports an ambiguous post-rename failure.
-    const entry = { path: directory, committed: false };
-    this.#directories.set(runId, entry);
     const writer = new FileContents(directory, []);
     const state = build(runId, writer);
     const manifest: StoredRun<State> = {
@@ -212,6 +220,12 @@ export class RunStore<State extends object> {
     return manifest;
   }
 
+  findCreation(key: string): string | null {
+    this.root.assertOpen();
+    const runId = creationRunId(key);
+    return this.#directories.has(runId) ? runId : null;
+  }
+
   read(runId: string): StoredRun<State> {
     this.root.assertOpen();
     const entry = this.entry(runId);
@@ -221,14 +235,17 @@ export class RunStore<State extends object> {
     return manifest;
   }
 
-  list(): StoredRun<State>[] {
+  listRunIds(): string[] {
     this.root.assertOpen();
-    const result: StoredRun<State>[] = [];
+    const result: string[] = [];
     for (const [runId, entry] of this.#directories) {
-      if (entry.committed || this.hasManifest(entry.path))
-        result.push(this.read(runId));
+      if (entry.committed || this.hasManifest(entry.path)) result.push(runId);
     }
     return result;
+  }
+
+  list(): StoredRun<State>[] {
+    return this.listRunIds().map((runId) => this.read(runId));
   }
 
   commit(

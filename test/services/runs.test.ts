@@ -225,6 +225,100 @@ describe("run service transactions", () => {
     expect(reopened.store.list()).toHaveLength(2);
   });
 
+  it("initializes and opens unrelated requests without reading historical manifests", () => {
+    const { service, root, path } = setup();
+    const history = Array.from(
+      { length: 4 },
+      (_, i) => service.open("owner", input(), `old-${i}`).runId,
+    );
+    root.close();
+    const read = vi.spyOn(fs, "readFileSync");
+    const reopened = setup(path);
+    const current = reopened.service.open("owner", input(), "new");
+    expect(history).not.toContain(current.runId);
+    expect(
+      read.mock.calls.filter(([file]) =>
+        String(file).endsWith("/manifest.json"),
+      ),
+    ).toHaveLength(0);
+    expect(reopened.service.view(current).status).toBe("active");
+  });
+
+  it.each(["json", "state-version", "manifest-version"])(
+    "isolates historical %s errors from startup, new requests and healthy runs",
+    (problem) => {
+      const { service, root, path, store } = setup();
+      const bad = service.open("owner", input(), "bad");
+      const good = service.open("owner", input(), "good");
+      const original = store.read(bad.runId);
+      root.close();
+      const file = join(runDirectory(path, bad.runId), "manifest.json");
+      const damaged =
+        problem === "json"
+          ? "{"
+          : JSON.stringify({
+              ...original,
+              ...(problem === "state-version"
+                ? { stateVersion: 999 }
+                : { schemaVersion: 999 }),
+            });
+      fs.writeFileSync(file, damaged);
+      const reopened = setup(path);
+      expect(reopened.service.view(good).status).toBe("active");
+      expect(reopened.service.open("owner", input(), "good")).toEqual(good);
+      const fresh = reopened.service.open("owner", input(), "fresh");
+      expect(reopened.service.view(fresh).status).toBe("active");
+      const code =
+        problem === "json" ? "STORAGE_FAILED" : "VERSION_UNAVAILABLE";
+      expect(() => reopened.service.view(bad)).toThrowError(
+        expect.objectContaining({ code }),
+      );
+      expect(() => reopened.service.open("owner", input(), "bad")).toThrowError(
+        expect.objectContaining({ code }),
+      );
+      expect(fs.readFileSync(file, "utf8")).toBe(damaged);
+      expect(reopened.store.listRunIds()).toHaveLength(3);
+    },
+  );
+
+  it("rejects a located run whose creation receipt identity does not match", () => {
+    const { service, root, path, store } = setup();
+    const opened = service.open("owner", input(), "request");
+    const run = store.read(opened.runId);
+    run.receipts[0]!.scope = JSON.stringify(["another-owner"]);
+    root.close();
+    fs.writeFileSync(
+      join(runDirectory(path, run.runId), "manifest.json"),
+      JSON.stringify(run),
+    );
+    const reopened = setup(path);
+    expect(() =>
+      reopened.service.open("owner", input(), "request"),
+    ).toThrowError(expect.objectContaining({ code: "STORAGE_FAILED" }));
+    expect(reopened.store.listRunIds()).toEqual([run.runId]);
+  });
+
+  it("does not recreate an uncertain initial request after publication failed", () => {
+    const { service, root, path } = setup();
+    vi.spyOn(fs, "renameSync").mockImplementation(() => {
+      throw new Error("publication failed");
+    });
+    expect(() => service.open("owner", input(), "request")).toThrowError(
+      expect.objectContaining({ code: "STORAGE_FAILED" }),
+    );
+    vi.restoreAllMocks();
+    root.close();
+    const reopened = setup(path);
+    expect(() =>
+      reopened.service.open("owner", input(), "request"),
+    ).toThrowError(expect.objectContaining({ code: "STORAGE_FAILED" }));
+    const fresh = reopened.service.open("owner", input(), "another-request");
+    expect(reopened.service.view(fresh).status).toBe("active");
+    expect(
+      fs.readdirSync(join(path, "runs", input().definition.scope.date)),
+    ).toHaveLength(2);
+  });
+
   it("rejects unsatisfied dependencies and competing claims without creating another attempt", () => {
     const { service, store } = setup();
     const { runId } = service.open("coordinator", input(), "open");

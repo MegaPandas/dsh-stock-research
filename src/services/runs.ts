@@ -221,15 +221,12 @@ function initialInstructions(input: OpenRunInput) {
 }
 
 export class RunService {
-  readonly #opened = new Map<string, string>();
   readonly #restored = new Set<string>();
 
   constructor(
     private readonly store: RunStore<RunState>,
     private readonly now: () => ISOTime,
-  ) {
-    this.rebuildOpenIndex();
-  }
+  ) {}
 
   open(
     identity: string,
@@ -238,15 +235,16 @@ export class RunService {
   ): { runId: string } {
     const scope = controlScope(identity);
     const key = JSON.stringify([scope, requestId]);
-    if (!this.#opened.has(key)) this.rebuildOpenIndex();
-    const existing = this.#opened.get(key);
-    if (existing !== undefined) {
+    const existing = this.store.findCreation(key);
+    if (existing !== null) {
       const run = this.read(existing);
-      return this.replay(
-        run,
-        findReceipt(run, scope, "open", requestId)!,
-        input,
-      ) as { runId: string };
+      const receipt = findReceipt(run, scope, "open", requestId);
+      if (receipt === undefined)
+        throw new ResearchError(
+          "STORAGE_FAILED",
+          `Run ${existing} does not contain the matching creation receipt.`,
+        );
+      return this.replay(run, receipt, input) as { runId: string };
     }
     let prepared: OpenRunInput;
     let replay: PreparedReplay | null = null;
@@ -330,8 +328,8 @@ export class RunService {
             : { stageReviews: [] }),
         };
       },
+      key,
     );
-    this.#opened.set(key, run.runId);
     this.#restored.add(run.runId);
     return { runId: run.runId };
   }
@@ -1390,22 +1388,5 @@ export class RunService {
       this.#restored.add(runId);
     }
     return run;
-  }
-
-  private rebuildOpenIndex(): void {
-    this.#opened.clear();
-    for (const stored of this.store.list()) {
-      const run = this.read(stored.runId);
-      for (const receipt of run.receipts) {
-        if (receipt.action !== "open") continue;
-        const key = JSON.stringify([receipt.scope, receipt.requestId]);
-        if (this.#opened.has(key))
-          throw new ResearchError(
-            "STORAGE_FAILED",
-            "Duplicate run creation receipt.",
-          );
-        this.#opened.set(key, run.runId);
-      }
-    }
   }
 }

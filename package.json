@@ -97,6 +97,7 @@
     "bench:memory-service": "node scripts/benchmark-memory-service.mjs",
     "bench:report": "node scripts/benchmark-report.mjs",
     "bench:run-service": "node scripts/benchmark-run-service.mjs",
+    "bench:run-opening": "node scripts/benchmark-run-opening.mjs",
     "bench:run-control": "node scripts/benchmark-run-control.mjs",
     "bench:run-data": "node scripts/benchmark-run-data.mjs",
     "bench:query": "node scripts/benchmark-query.mjs",

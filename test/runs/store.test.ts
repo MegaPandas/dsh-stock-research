@@ -65,6 +65,36 @@ afterEach(() => {
 });
 
 describe("single-writer run store", () => {
+  it("discovers run identifiers without reading historical manifests", () => {
+    const { path, root, store } = open();
+    const first = store.create(location, () => ({ label: "first" }));
+    const second = store.create(location, () => ({ label: "second" }));
+    root.close();
+    const read = vi.spyOn(fs, "readFileSync");
+    const reopened = open(path).store;
+    expect(reopened.listRunIds().sort()).toEqual(
+      [first.runId, second.runId].sort(),
+    );
+    expect(read).not.toHaveBeenCalled();
+    expect(reopened.read(first.runId)).toEqual(first);
+    expect(read.mock.calls.map(([file]) => String(file))).toEqual([
+      manifestPath(path, first.runId),
+    ]);
+  });
+
+  it("rejects directory and manifest identity mismatches on targeted reads", () => {
+    const { path, root, store } = open();
+    const first = store.create(location, () => ({ label: "first" }));
+    const second = store.create(location, () => ({ label: "second" }));
+    fs.writeFileSync(manifestPath(path, first.runId), JSON.stringify(second));
+    root.close();
+    const reopened = open(path).store;
+    expect(() => reopened.read(first.runId)).toThrowError(
+      expect.objectContaining({ code: "STORAGE_FAILED" }),
+    );
+    expect(reopened.read(second.runId)).toEqual(second);
+  });
+
   it("batch reads registered contents in request order with one manifest read", () => {
     const { path, store } = open();
     const run = store.create(location, (_runId, writer) => {
@@ -630,7 +660,12 @@ describe("single-writer run store", () => {
       root.close();
       const nextRoot = new DataRoot(path);
       roots.push(nextRoot);
-      expect(() => new RunStore<State>(nextRoot)).toThrowError(
+      const reopened = new RunStore<State>(nextRoot);
+      expect(reopened.listRunIds()).toEqual([run.runId]);
+      expect(() => reopened.read(run.runId)).toThrowError(
+        expect.objectContaining({ code: expected }),
+      );
+      expect(() => reopened.list()).toThrowError(
         expect.objectContaining({ code: expected }),
       );
       expect(fs.readFileSync(manifestPath(path, run.runId), "utf8")).toBe(
