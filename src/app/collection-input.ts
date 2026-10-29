@@ -112,6 +112,8 @@ function belongsToTask(
       roleVersion !== "20" &&
       roleVersion !== "21" &&
       roleVersion !== "22" &&
+      roleVersion !== "23" &&
+      roleVersion !== "24" &&
       roleVersion !== ROLE_PROMPT_VERSION
     )
       return dataset === "market" || id === "benchmark.bondYields";

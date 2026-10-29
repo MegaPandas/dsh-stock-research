@@ -33,6 +33,21 @@ import { createPublicSearchSession } from "./public-search.js";
 import { referencePrice, type RegisteredTable } from "./reference-price.js";
 import { decisionPolicy } from "../contracts/rating-policy.js";
 import { researchStageFeedback } from "./research-stages.js";
+import { ROLE_PROMPT_VERSION } from "./research-prompts.js";
+import {
+  createValuationMethodTool,
+  financialMetricContext,
+  readValuationMethods,
+  usesValuationMethods,
+  valuationMethodContext,
+} from "./valuation-methods.js";
+import { validateRoleValuation } from "../services/valuation.js";
+import { DETERMINISTIC_VALUATION_PROTOCOL } from "../contracts/valuation.js";
+import { valuationCalculationCatalog } from "../services/valuation-calculations.js";
+import {
+  computedValuationDraftTools,
+  scopedCalculationReader,
+} from "./valuation-tools.js";
 
 export function prepareUnifiedRole(
   services: RoleServices,
@@ -88,6 +103,44 @@ export function prepareUnifiedRole(
   let systemPrompt = profile.prompts[definition.executor.role];
   const tools = [reader.tool];
   const details: Record<string, unknown> = {};
+  const valuationMethods =
+    usesValuationMethods(claim.taskId) &&
+    ["24", ROLE_PROMPT_VERSION].includes(
+      services.runs.inputCatalog(claim.runId).versions.prompts.roles!,
+    )
+      ? readValuationMethods(services.runs, claim.runId)
+      : undefined;
+  if (valuationMethods !== undefined) {
+    tools.push(createValuationMethodTool(valuationMethods));
+    details.valuationMethods = valuationMethodContext(valuationMethods, scope);
+  }
+  const computedValuation =
+    valuationMethods !== undefined &&
+    services.runs.inputCatalog(claim.runId).versions.prompts.roles ===
+      DETERMINISTIC_VALUATION_PROTOCOL;
+  if (computedValuation) {
+    const collection = readCollection(services.runs, claim.runId);
+    if (collection !== null)
+      details.financialMetrics = financialMetricContext(collection.packets);
+    const calculationTools = services.createTools(profile.policy);
+    tools.push(
+      calculationTools.find(
+        ({ name }) => name === "stock_calculate_valuation",
+      )!,
+    );
+    tools.push(
+      scopedCalculationReader(
+        calculationTools.find(
+          ({ name }) => name === "stock_read_valuation_calculation",
+        )!,
+        claim.runId,
+      ),
+    );
+    details.valuationCalculations = valuationCalculationCatalog(
+      services.runs,
+      claim.runId,
+    );
+  }
   let search = previous?.search;
   let publicSearchAsOf = previous?.publicSearchAsOf;
   const revisionFeedback = researchStageFeedback(
@@ -169,6 +222,13 @@ export function prepareUnifiedRole(
     exec: ToolRunContext,
     stageHandoff?: StageHandoff,
   ) => {
+    if (valuationMethods !== undefined)
+      validateRoleValuation(
+        report,
+        claim.taskId,
+        scope,
+        valuationMethods.methods.map(({ id }) => id),
+      );
     const artifact = assembleAgentArtifact(
       reportKind,
       report,
@@ -231,13 +291,26 @@ export function prepareUnifiedRole(
             ? {}
             : { seed: previous.stageHandoff }
           : undefined,
+        valuationMethods !== undefined &&
+          (claim.taskId === "analysis.fundamentals" ||
+            reportKind === "decision_draft")
+          ? ["valuation"]
+          : [],
       )
     : createSubmission(reportKind, accept);
   return {
     systemPrompt,
     tools: [
       ...tools,
-      ...("tools" in submission ? submission.tools : [submission.tool]),
+      ...("tools" in submission
+        ? computedValuation
+          ? computedValuationDraftTools(
+              submission.tools,
+              services.runs,
+              claim.runId,
+            )
+          : submission.tools
+        : [submission.tool]),
     ],
     followup(next, { resumeSearch }) {
       if (resumeSearch) search?.resume();

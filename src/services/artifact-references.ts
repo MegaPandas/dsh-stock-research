@@ -7,17 +7,40 @@ import type {
 import type { NumberInput } from "../contracts/artifacts.js";
 import type { ArtifactRef, SourceRef } from "../contracts/data.js";
 
+export function artifactCalculationIds(
+  content: ResearchArtifactInput,
+): string[] {
+  const ids: string[] = [];
+  for (const claim of content.claims)
+    if (claim.kind === "estimated" && claim.calculationId !== undefined)
+      ids.push(claim.calculationId);
+  if ("report" in content.payload && content.payload.report !== undefined) {
+    const report = content.payload.report;
+    if ("valuation" in report.content && report.content.valuation != null)
+      for (const method of report.content.valuation.methods)
+        ids.push(...(method.calculationIds ?? []));
+    if (
+      "targetPrice" in report.content &&
+      report.content.targetPrice?.calculationId !== undefined
+    )
+      ids.push(report.content.targetPrice.calculationId);
+  }
+  return ids;
+}
+
 export function artifactReferences(content: ResearchArtifactInput): {
   artifacts: ArtifactRef[];
   sources: SourceRef[];
   origins: SourceRef[];
   numbers: NumberInput[];
+  calculations: string[];
 } {
   const refs = {
     artifacts: [] as ArtifactRef[],
     sources: [] as SourceRef[],
     origins: [] as SourceRef[],
     numbers: [] as NumberInput[],
+    calculations: artifactCalculationIds(content),
   };
   function statement(
     item: Pick<SupportedStatement, "evidence" | "numbers">,

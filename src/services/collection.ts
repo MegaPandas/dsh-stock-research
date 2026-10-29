@@ -1,3 +1,4 @@
+import { deriveFinancialMetrics } from "../data/financial-metrics.js";
 import type { SqliteCache } from "../cache/index.js";
 import { serializeJson } from "../cache/json.js";
 import type {
@@ -484,6 +485,8 @@ export class CollectionService {
     snapshot.packets.sort(
       (left, right) => (order.get(left.id) ?? -1) - (order.get(right.id) ?? -1),
     );
+    const metrics = deriveFinancialMetrics(scope, snapshot.packets);
+    if (metrics) snapshot.packets.push(metrics);
     Object.assign(snapshot.diagnostics!, cache, {
       finishedAt: new Date().toISOString(),
     });

@@ -74,7 +74,9 @@ function savedInputs(h: Awaited<ReturnType<typeof quickHost>>, runId: string) {
     static: catalog.inputs
       .filter(
         (input) =>
-          input.instruction === undefined && input.memory === undefined,
+          input.instruction === undefined &&
+          input.memory === undefined &&
+          input.calculation === undefined,
       )
       .map((input) => ({
         name: input.name,
@@ -97,6 +99,20 @@ function savedInputs(h: Awaited<ReturnType<typeof quickHost>>, runId: string) {
 }
 
 describe("stock-replay command", () => {
+  it("rejects replay with an unavailable recorded valuation engine while retaining the source run", async () => {
+    const h = await quickHost(workflowModel().respond);
+    cleanups.push(h.close);
+    const input = createQuickInput(scope, h.runtime.policy, []);
+    input.versions.prompts.roles = "25";
+    input.versions.prompts.valuationEngine = "1";
+    const { runId } = h.runtime.runs.open("owner", input, "legacy-engine");
+    const before = h.runtime.runs.view({ runId });
+    expect(() => createReplayInput(h.runtime.runs, runId)).toThrowError(
+      expect.objectContaining({ code: "VERSION_UNAVAILABLE" }),
+    );
+    expect(h.runtime.runs.view({ runId })).toEqual(before);
+  });
+
   it.each([
     { mode: "quick", nodes: 12 },
     { mode: "deep", nodes: 22 },
@@ -191,6 +207,26 @@ describe("stock-replay command", () => {
         originalManifest.content.versions,
       );
       expect(savedInputs(h, replayId)).toEqual(originalInputs);
+      const calculationValues = (id: string) =>
+        h.runtime.runs
+          .inputCatalog(id)
+          .inputs.filter(({ calculation }) => calculation !== undefined)
+          .map(({ ref }) => {
+            const result = h.runtime.runs.readInput<
+              import("../../src/contracts/valuation.js").ValuationCalculation
+            >(id, ref);
+            return {
+              methodId: result.request.methodId,
+              purpose: result.request.purpose,
+              request: result.request,
+              engineVersion: result.engineVersion,
+              result: result.result,
+            };
+          });
+      expect(calculationValues(sourceRunId)).toHaveLength(2);
+      expect(calculationValues(replayId)).toEqual(
+        calculationValues(sourceRunId),
+      );
       expect(manifest(h, replayId).content.createdAt).toBe(
         "2024-01-04T08:00:00.000Z",
       );
@@ -279,6 +315,11 @@ describe("stock-replay command", () => {
     cleanups.push(h.close);
     const input = createQuickInput(scope, h.runtime.policy, []);
     input.versions.prompts.roles = "21";
+    input.versions.mode = "quick/7";
+    delete input.versions.prompts.valuationMethods;
+    input.inputs = input.inputs.filter(
+      ({ name }) => name !== "stock-research:valuation-methods",
+    );
     input.versions.prompts.digest = "11";
     input.versions.prompts.coordinator = "10";
     const { runId } = h.runtime.runs.open(
@@ -287,6 +328,7 @@ describe("stock-replay command", () => {
       "old-source",
     );
     const replay = createReplayInput(h.runtime.runs, runId);
+    expect(replay.versions.mode).toBe("quick/7");
     expect(replay.versions.prompts).toMatchObject({
       roles: "21",
       digest: "11",

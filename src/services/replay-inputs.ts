@@ -95,7 +95,9 @@ export function prepareReplay(
       inputs: source.inputs
         .filter(
           (entry) =>
-            entry.memory === undefined && entry.instruction === undefined,
+            entry.memory === undefined &&
+            entry.instruction === undefined &&
+            entry.calculation === undefined,
         )
         .map((entry) => ({
           name: entry.name,

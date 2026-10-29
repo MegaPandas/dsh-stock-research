@@ -6,6 +6,14 @@ import { collectionDataTools } from "../../src/app/collection-tools.js";
 import { createPublicSearchSession } from "../../src/app/public-search.js";
 import { createReportReader } from "../../src/app/report-reader.js";
 import { createReportDraft } from "../../src/host/report-draft.js";
+import {
+  computedValuationDraftTools,
+  scopedCalculationReader,
+} from "../../src/app/valuation-tools.js";
+import {
+  createValuationMethodTool,
+  VALUATION_METHODS,
+} from "../../src/app/valuation-methods.js";
 import { quickHost } from "../fixtures/quick-host.js";
 import { textResponse } from "../fixtures/runtime-host.js";
 
@@ -103,6 +111,13 @@ it.each(protocols)(
       .schemas(h.outside.agent)
       .filter(({ name }) => name.startsWith("stock_"));
     const roleTools = [
+      createValuationMethodTool(VALUATION_METHODS),
+      scopedCalculationReader(
+        h.runtime.tools.find(
+          ({ name }) => name === "stock_read_valuation_calculation",
+        )!,
+        "fixture-run",
+      ),
       ...collectionDataTools([]),
       createReportReader([], []).tool,
       createPublicSearchSession({
@@ -111,9 +126,16 @@ it.each(protocols)(
         },
         approve: async () => false,
       }).tool,
-      ...createReportDraft("analysis", () => undefined, undefined, false, {})
-        .tools,
+      ...computedValuationDraftTools(
+        createReportDraft("analysis", () => undefined, undefined, false, {})
+          .tools,
+        h.runtime.runs,
+        "fixture-run",
+      ),
     ];
+    for (let i = declarations.length - 1; i >= 0; i--)
+      if (roleTools.some(({ name }) => name === declarations[i]!.name))
+        declarations.splice(i, 1);
     declarations.push(
       ...roleTools.map(({ name, description, parameters }) => ({
         name,
@@ -130,6 +152,9 @@ it.each(protocols)(
       "stock_get_fundamentals",
       "stock_describe_collection",
       "stock_read_collection",
+      "stock_read_valuation_method",
+      "stock_calculate_valuation",
+      "stock_read_valuation_calculation",
       "stock_resume_research",
       "stock_cancel_research",
       "stock_recover_research",

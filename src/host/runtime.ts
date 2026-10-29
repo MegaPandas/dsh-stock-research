@@ -1,5 +1,6 @@
 import { join } from "node:path";
 import type { Context } from "@deepseek-ai/cordis";
+import { createValuationTools } from "../tools/valuation.js";
 import type {
   Agent,
   AgentHandle,
@@ -299,6 +300,7 @@ class Runtime implements ResearchRuntime {
         },
         bindings,
       ),
+      ...createValuationTools(this.runs, bindings),
       ...createDataTools({ runs: this.runs, queries }, bindings, policy),
       ...createWriteTools(
         { artifacts, decisions, memory: this.memory, digests: this.dispatch },

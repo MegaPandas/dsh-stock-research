@@ -33,6 +33,7 @@ export type NumericClaim =
   | {
       id: string;
       kind: "estimated";
+      calculationId?: string;
       value: number;
       unit: string;
       method: string;

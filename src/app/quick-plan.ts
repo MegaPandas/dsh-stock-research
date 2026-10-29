@@ -12,7 +12,7 @@ import {
   SHARED_BRIEFS,
 } from "./research-plan.js";
 
-export const QUICK_MODE_VERSION = "quick/7";
+export const QUICK_MODE_VERSION = "quick/9";
 const BRIEFS = {
   ...SHARED_BRIEFS,
   "digest.analysis": `汇总四份分析的核心判断、驱动机制、展望与关键分歧，提炼影响后续讨论的具体问题，保留事实的期间与业务口径。${DIGEST_RISK_RULE}`,

@@ -1,0 +1,762 @@
+{
+  "version": "2",
+  "reviewedAt": "2026-10-29",
+  "language": "zh-CN",
+  "purpose": "供研究角色按需读取的估值方法知识；不含实时参数，不是可执行公式或报告提交协议。",
+  "guide": "docs/valuation-methods.md",
+  "selectionBasis": "基于所列文献的项目综合建议，未经自动选模实证验证；模型可叠加，行业和阶段标签不互斥。",
+  "conventions": {
+    "timing": "执行工具提供forecastStartDate和各期endDate；流量为整个期间总额并按期间内均匀发生处理，代码剔除已过部分、在期末折现，Gordon将末期流量年化。",
+    "rates": "利率和概率采用小数；现金流币种、名义或实际口径与折现率匹配。",
+    "discounting": "执行工具采用ACT/365F，t=价值日期至现金流期末的实际天数/365；DF_t(r)=(1+r)^t。折现率可直接假设或提供CAPM/WACC分量由代码合成。",
+    "commonEquityBridge": "E_common=V_op+单列超额现金+其他非经营资产-融资债务-优先股-适用少数股东权益-其他索取权；现金不重复计入其他资产，权益倍数不再桥接。",
+    "perShare": "P_common=E_common/N_common；股数、股类、员工期权与融资处理须一致，不能机械采用会计稀释加权平均股数。",
+    "missingInputs": "缺失值不是零。采用假设须显式记录依据和影响；缺少关键输入且无可支持假设时停止数值估值。",
+    "terminalConstraint": "仅稳态业务用永续终值，折现率大于增长率；代码从增长率与资本回报率推导再投资、派息及剩余收益。有限回收提供末期实际净回收金额，RI会扣除期末账面权益。",
+    "negativeEquity": "负股权残值正常保存并返回诊断，不作为输入错误、不归零；不能作为目标股价，不为取得正值调整假设。",
+    "financialMetrics": "financial.metrics预计算TTM、单季、同比、利润率、现金流和权益对照；按各列定义及期间读取，预测假设与观察数值分别记录。"
+  },
+  "methods": [
+    {
+      "id": "fcff_dcf",
+      "name": "企业自由现金流折现",
+      "valueObject": "operating_assets",
+      "formulas": [
+        "EBIT_t=Revenue_t*OperatingMargin_t; NOPAT_t=EBIT_t*(1-taxRate_t)",
+        "FCFF_t=NOPAT_t+DA_t-Capex_t-delta_NWC_t",
+        "V_op=sum(t=1..n, FCFF_t/DF_t(WACC))+TV_n/DF_n(WACC)",
+        "TV_n=FCFF_(n+1)/(WACC_stable-g)",
+        "FCFF_(n+1)=annualized_NOPAT_n*(1+g)*(1-g/ROIC)"
+      ],
+      "requiredInputs": [
+        "预测起点及各期期末日期、收入、经营利润率和可实现经营税率",
+        "折旧摊销",
+        "经营资本投入",
+        "期初和逐期末非现金经营营运资本余额",
+        "WACC或其合成分量",
+        "稳态资本回报率和增长率或有限期实际净回收",
+        "普通股价值桥接和股数"
+      ],
+      "useWhen": [
+        "非金融经营现金流和再投资可以建模",
+        "成长阶段可用多阶段预测，允许早期负 FCFF"
+      ],
+      "invalidWhen": [
+        "经营负债和融资债务未能区分，现金流口径未建立",
+        "永续终值未满足稳态或 WACC_stable<=g",
+        "关键资本投入缺失却直接使用 EBITDA 替代 FCFF"
+      ],
+      "notes": [
+        "亏损税收收益仅在可实现时计入",
+        "ΔNWC 增加及 Capex 为现金流出",
+        "终值不包含已列的第 n 年现金流",
+        "结果须桥接为普通股价值"
+      ],
+      "sourceIds": ["D06", "DAPP", "DTV", "DTG", "KR95"]
+    },
+    {
+      "id": "fcfe_dcf",
+      "name": "普通股自由现金流折现",
+      "valueObject": "common_equity",
+      "formulas": [
+        "FCFE_t=NI_common_t+DA_t-Capex_t-delta_NWC_t+NewDebt_t-PrincipalRepaid_t",
+        "E_common=sum(t=1..n, FCFE_t/DF_t(ke))+TV_equity_n/DF_n(ke)",
+        "TV_equity_n=FCFE_(n+1)/(ke_stable-g)"
+      ],
+      "requiredInputs": [
+        "扣除优先股应得收益后的普通股净收益",
+        "折旧摊销及再投资",
+        "新增借款及还本路径",
+        "股权成本",
+        "稳态增长率和ROE或有限期净回收；代码推导留存比例",
+        "与出资和股类处理一致的股数"
+      ],
+      "useWhen": ["债务政策和股东资本需求可以明确预测"],
+      "invalidWhen": [
+        "借还款无法建模",
+        "股权现金流配 WACC",
+        "永续终值 ke_stable<=g"
+      ],
+      "notes": [
+        "借款流入为正，还本为负；利息已在净收益中扣除",
+        "已是股权价值，不再次扣净债务",
+        "不重复计入负 FCFE 对应的股东出资和同一融资稀释"
+      ],
+      "sourceIds": ["DFCFE", "DAPP", "DTV"]
+    },
+    {
+      "id": "dividend_discount",
+      "name": "普通股股利折现",
+      "valueObject": "common_equity",
+      "formulas": [
+        "E_common=sum(t=1..n, Dividend_common_t/DF_t(ke))+TV_equity_n/DF_n(ke)",
+        "TV_equity_n=Dividend_common_(n+1)/(ke_stable-g)",
+        "P0_stable=DPS_1/(ke-g)"
+      ],
+      "requiredInputs": [
+        "普通股分红路径或每股分红路径",
+        "资本留存和分配政策",
+        "股权成本",
+        "稳态增长",
+        "采用每股模型时的股数路径"
+      ],
+      "useWhen": [
+        "分红预测与未来支付能力、资本需求相容",
+        "成熟分配型企业或受资本约束的金融中介"
+      ],
+      "invalidWhen": [
+        "仅依据当前零分红推断永久无价值",
+        "稳定模型 ke<=g",
+        "回购、发行和股数处理重复或不一致"
+      ],
+      "notes": [
+        "普通股总股利与每股股利不能混用",
+        "预测期不必已经成熟，稳态要求适用于终值阶段"
+      ],
+      "sourceIds": ["DF09", "GO12", "DTV"]
+    },
+    {
+      "id": "regulatory_capital_fcfe",
+      "name": "监管资本约束下的股权现金流",
+      "valueObject": "common_equity",
+      "formulas": [
+        "FCFE_reg_t=NI_common_t-delta_RequiredCommonEquityCapital_t",
+        "E_common=sum(t=1..n, FCFE_reg_t/DF_t(ke))+TV_equity_n/DF_n(ke)"
+      ],
+      "requiredInputs": [
+        "普通股净收益",
+        "逐期业务规模和风险资产或相应资本需求",
+        "适用资本约束及管理资本目标",
+        "期初及逐期末必要普通股资本余额；代码计算变化",
+        "股权成本",
+        "资本与增长相容的终值"
+      ],
+      "useWhen": [
+        "银行保险等经营负债难与融资区分、股权资本留存可预测的金融中介"
+      ],
+      "invalidWhen": [
+        "没有适用资本要求和业务预测",
+        "将报表权益增量直接视为必要资本增量",
+        "将存款等经营投入机械扣作非金融融资债务"
+      ],
+      "notes": [
+        "资本释放需满足实际分配约束",
+        "不将所有名称含金融的企业自动归入本模型"
+      ],
+      "sourceIds": ["DF09"]
+    },
+    {
+      "id": "residual_income",
+      "name": "普通股剩余收益",
+      "valueObject": "common_equity",
+      "formulas": [
+        "RI_t=NI_common_t+OCI_t-ke_t*B_common_(t-1) for full annual periods",
+        "E_common=B_common_0+sum(t=1..n, RI_t/DF_t(ke))+CV_RI_n/DF_n(ke)",
+        "CV_RI_n=RI_(n+1)/(ke_stable-g_RI) when residual income has stable perpetual growth",
+        "RI_(n+1)=(ROE_terminal-ke)*B_common_n; Dividend_(n+1)=(ROE_terminal-g)*B_common_n",
+        "Finite continuation residual=actual_recovery_n-B_common_n"
+      ],
+      "requiredInputs": [
+        "预测起点时的普通股账面权益和各期期末日期",
+        "逐期普通股收益",
+        "派息率、净发行及账面权益衔接；代码滚存至价值日期",
+        "其他综合收益和会计调整",
+        "股权成本",
+        "终端ROE与增长率或实际回收金额；代码推导剩余收益"
+      ],
+      "useWhen": [
+        "账面权益和收益可建立净盈余衔接",
+        "金融中介或会计资本对收益预测有用的企业"
+      ],
+      "invalidWhen": [
+        "账面权益与收益及股东交易无法调和",
+        "把完整股权终值当剩余收益继续价值",
+        "无解释地对亏损或无形密集企业套用稳定 ROE/PB"
+      ],
+      "notes": [
+        "账面资本成本基于期初权益",
+        "剩余收益永续增长率不自动等于营收增长率",
+        "一致假设下与 DDM 核对，不当作独立价格证据",
+        "显式期按净利乘派息率计算分红；亏损时可零派息，不支持以比例表示亏损期正股息。超过100%派息需说明资本来源。"
+      ],
+      "sourceIds": ["O95", "GO12", "DF09"]
+    },
+    {
+      "id": "adjusted_present_value",
+      "name": "调整现值",
+      "valueObject": "operating_assets",
+      "formulas": [
+        "V_op_levered=V_op_unlevered+PV(realizable_financing_tax_shields)-PV(financing_fees_and_distress_losses_not_in_operating_forecasts)"
+      ],
+      "requiredInputs": [
+        "无杠杆经营现金流和资本成本",
+        "债务、利息及还本路径",
+        "可实现税盾",
+        "融资效应的风险和折现假设",
+        "未计入的融资费用及困境损失",
+        "普通股桥接"
+      ],
+      "useWhen": [
+        "融资结构显著变化且有明确债务路径",
+        "杠杆交易或重组中需要分离融资效应"
+      ],
+      "invalidWhen": [
+        "税盾已经在 WACC 中计价仍单独加回",
+        "税盾不能实现仍按全额扣税",
+        "困境损失与经营预测重复扣除"
+      ],
+      "notes": [
+        "无杠杆经营价值按无杠杆资本成本折现",
+        "税率乘债务仅是特殊永续假设",
+        "税盾折现率依债务政策和风险而定"
+      ],
+      "sourceIds": ["M74", "DAPV"]
+    },
+    {
+      "id": "comparable_multiples",
+      "name": "可比倍数",
+      "valueObject": "depends_on_numerator",
+      "formulas": [
+        "P=PE_comparable*EPS_common",
+        "E_common=PCF_comparable*OperatingCashFlow_common",
+        "E_common=PB_comparable*B_common",
+        "V_op=EV_to_EBITDA_comparable*EBITDA",
+        "V_op=EV_to_Revenue_comparable*Revenue"
+      ],
+      "requiredInputs": [
+        "估值日可知的可比样本及报价",
+        "同预测期间的正且有意义的分母",
+        "增长、资本回报、风险、利润率和会计口径",
+        "倍数选择与样本剔除依据",
+        "EV 口径模型的普通股桥接"
+      ],
+      "useWhen": [
+        "有经营和风险特征可比较的公司",
+        "作为主模型或独立市场定价核对，并说明其相对价值性质"
+      ],
+      "invalidWhen": [
+        "PE 配负利润或 PB 配无意义账面权益",
+        "混用 EV 与股价/市值分子；以P/CF倍数冒充EV/Revenue或EV/EBITDA",
+        "历史与前瞻、合并与归母、收入总额与净额等关键口径未统一"
+      ],
+      "notes": [
+        "不从行业名称直接给出固定倍数",
+        "期刊样本的股价拟合表现不等于内在价值验证",
+        "收入倍数需要解释利润率、风险和再投资",
+        "退出倍数终值含相对定价假设"
+      ],
+      "sourceIds": ["LNT02", "DAPP", "DTV", "LS96"]
+    },
+    {
+      "id": "adjusted_net_assets",
+      "name": "调整净资产与清算价值",
+      "valueObject": "common_equity",
+      "formulas": [
+        "NAV_common=sum(attributable_fair_asset_values)-relevant_liabilities_and_priority_claims-disposal_taxes_and_costs_not_already_included"
+      ],
+      "requiredInputs": [
+        "资产清单、公允价值与所有权",
+        "相关负债、担保和其他索取权",
+        "处置条件与回收时间",
+        "处置税费",
+        "估值日和股数"
+      ],
+      "useWhen": ["资产可分离的地产或投资控股", "有限寿命或清算情景"],
+      "invalidWhen": [
+        "直接把会计净资产当公允净资产",
+        "混用有序处置和迫售假设",
+        "在处置时间较远时遗漏时间价值",
+        "重复加入已通过资产现金流计价的增长或品牌"
+      ],
+      "notes": ["可能遗漏未来投资机会价值", "清算普通股所得须遵循索取权顺序"],
+      "sourceIds": ["D06", "DD09"]
+    },
+    {
+      "id": "scenario_dcf_rnpv",
+      "name": "概率加权情景与研发风险调整净现值",
+      "valueObject": "explicitly_selected_project_or_claim",
+      "formulas": [
+        "V0=sum(s, p_s*V_s0) for mutually exclusive exhaustive scenarios on the same value and date basis",
+        "rNPV=sum(t, sum(s, P(state_s_at_t)*CF_s_t)/DF_t(r)) for an expected-cash-flow model"
+      ],
+      "requiredInputs": [
+        "互斥穷尽情景或阶段状态及现金流",
+        "条件和无条件概率及其依据",
+        "收入、成本和回收发生时间",
+        "剩余风险与折现率",
+        "融资、困境时的索取权分配",
+        "项目汇总时的总部费用和股权桥接"
+      ],
+      "useWhen": [
+        "早期企业、研发项目、转型或困境存在不同结果路径",
+        "能解释成功率、阶段成本和商业价值"
+      ],
+      "invalidWhen": [
+        "重叠情景直接相加或概率不完整",
+        "将全部阶段成本乘最终成功率",
+        "现实概率配无风险折现却未处理剩余风险",
+        "同一技术失败损失同时在概率和额外折现惩罚中计入"
+      ],
+      "notes": [
+        "公式为期望现金流综合表达，不声称是某篇论文的原式",
+        "当前确定投入的发生概率为 1",
+        "只有定义匹配的路径条件概率才相乘",
+        "相关项目不默认独立",
+        "先在各情景分配普通股所得再取期望"
+      ],
+      "sourceIds": ["DY09", "DD09", "WIPO", "GS20"]
+    },
+    {
+      "id": "real_options",
+      "name": "实物期权",
+      "valueObject": "project_with_executable_decision_rights",
+      "formulas": [
+        "At each decision node compare continuation, investment, waiting and abandonment values, then value the chosen policy under consistent risk pricing."
+      ],
+      "requiredInputs": [
+        "真实可执行的选择权与期限",
+        "阶段投入和终止或回收条件",
+        "状态变量、波动及转移过程",
+        "未来现金流",
+        "真实或风险中性测度的选择和风险定价依据"
+      ],
+      "useWhen": [
+        "研发、未开发资源或扩张具有信息到达后的决策权",
+        "项目状态及行动足以建模"
+      ],
+      "invalidWhen": [
+        "只有高不确定性却没有实际选择权",
+        "对未交易项目机械套 Black–Scholes",
+        "情景估值已包含最优停止决策后再加期权价值",
+        "真实概率与风险中性折现混用"
+      ],
+      "notes": [
+        "需要针对项目的树、格点或模拟，不提供统一闭式公式",
+        "Schwartz 来源实际读取为 2001 年作者稿，期刊发表于 2004 年"
+      ],
+      "sourceIds": ["S04", "DAPP"]
+    },
+    {
+      "id": "sum_of_parts",
+      "name": "分部估值汇总",
+      "valueObject": "common_equity",
+      "formulas": [
+        "E_common=sum(attributable_segment_equity_values)+unallocated_group_assets-unallocated_group_liabilities-PV(unallocated_head_office_costs)"
+      ],
+      "requiredInputs": [
+        "分部财务与所有权",
+        "各分部适用估值模型及已保存的计算编号",
+        "币种及同一估值日",
+        "分部和集团债务分配",
+        "总部原始费用预测、日期与折现率，或明确无总部费用；内部交易",
+        "集团普通股索取权及股数"
+      ],
+      "useWhen": ["集团内经营、风险和资本需求存在实质差异且分部资料可用"],
+      "invalidWhen": [
+        "将分部经营价值与分部股权价值直接混加",
+        "分部及集团重复扣债务和总部费用",
+        "未抵销内部持股或重复资产",
+        "无依据地叠加统一集团折价"
+      ],
+      "notes": [
+        "这是汇总方法，各分部仍须选择基础模型",
+        "分部若从经营价值起算，应在分部或集团层完成一次完整桥接"
+      ],
+      "sourceIds": ["DO09"]
+    }
+  ],
+  "stageGuidance": [
+    {
+      "stage": "idea_research",
+      "candidateMethodIds": ["scenario_dcf_rnpv", "real_options"],
+      "focus": "里程碑、阶段投入、技术与商业成功概率及融资。"
+    },
+    {
+      "stage": "early_revenue",
+      "candidateMethodIds": [
+        "scenario_dcf_rnpv",
+        "fcff_dcf",
+        "comparable_multiples"
+      ],
+      "focus": "单位经济性、获客留存、规模化条件；倍数仅在分母及可比性成立时使用。"
+    },
+    {
+      "stage": "scaling_growth",
+      "candidateMethodIds": ["fcff_dcf", "fcfe_dcf", "comparable_multiples"],
+      "focus": "增长衰减、利润率、再投资、风险和融资路径。"
+    },
+    {
+      "stage": "mature",
+      "candidateMethodIds": [
+        "fcff_dcf",
+        "fcfe_dcf",
+        "dividend_discount",
+        "residual_income",
+        "comparable_multiples"
+      ],
+      "focus": "可持续资本回报、再投资及分配。"
+    },
+    {
+      "stage": "declining_finite_life",
+      "candidateMethodIds": ["fcff_dcf", "adjusted_net_assets"],
+      "focus": "有限寿命、收缩、资产处置和终止成本；不默认永续正增长。"
+    }
+  ],
+  "typeOverlays": [
+    {
+      "feature": "financial_intermediation",
+      "methodIds": [
+        "dividend_discount",
+        "regulatory_capital_fcfe",
+        "residual_income"
+      ],
+      "constraint": "优先建立资本需求和可分配收益；不机械套用非金融经营负债和债务定义。",
+      "sourceIds": ["DF09"]
+    },
+    {
+      "feature": "cyclical_commodity",
+      "methodIds": ["fcff_dcf", "comparable_multiples"],
+      "constraint": "按当前规模正常化利润率和投入，并保留近期周期路径；有限储量按剩余寿命。",
+      "sourceIds": ["DC09"]
+    },
+    {
+      "feature": "intangible_intensive",
+      "methodIds": ["fcff_dcf", "comparable_multiples"],
+      "constraint": "研发等无形投入的利润与资本处理须一致，不能仅加回费用而不保留投入；账面价值可比性需要判断。",
+      "sourceIds": ["LS96", "DY09"]
+    },
+    {
+      "feature": "asset_separable",
+      "methodIds": ["adjusted_net_assets", "fcff_dcf"],
+      "constraint": "区分存货开发、持续经营与资产处置；资产和对应负债以同一范围计价。",
+      "sourceIds": ["D06"]
+    },
+    {
+      "feature": "milestone_research",
+      "methodIds": ["scenario_dcf_rnpv", "real_options"],
+      "constraint": "成本和收入按各自发生阶段加权，选择权价值不能重复计入。",
+      "sourceIds": ["WIPO", "S04"]
+    },
+    {
+      "feature": "contract_regulated_infrastructure",
+      "methodIds": ["fcff_dcf", "adjusted_present_value"],
+      "constraint": "显式处理收费、维护投入、期限与移交；这是通用 DCF 的项目应用建议，未覆盖具体监管定价规则。",
+      "sourceIds": ["D06", "DAPV"]
+    },
+    {
+      "feature": "multi_business",
+      "methodIds": ["sum_of_parts"],
+      "constraint": "各分部选择适用基础模型，统一币种与索取权，分配总部项目。",
+      "sourceIds": ["DO09"]
+    },
+    {
+      "feature": "distressed",
+      "methodIds": [
+        "scenario_dcf_rnpv",
+        "adjusted_net_assets",
+        "adjusted_present_value"
+      ],
+      "constraint": "独立于发展阶段的标签；逐情景处理存续、重组或清算，再分配普通股所得。",
+      "sourceIds": ["DD09"]
+    },
+    {
+      "feature": "multiple_share_classes",
+      "methodIds": ["scenario_dcf_rnpv"],
+      "constraint": "先估总价值，再按具体合同分配；不以最新优先股价格给全部普通股定价。",
+      "sourceIds": ["GS20"]
+    }
+  ],
+  "sources": [
+    {
+      "id": "D06",
+      "authors": "Aswath Damodaran",
+      "year": 2006,
+      "title": "Valuation Approaches and Metrics: A Survey of the Theory and Evidence",
+      "kind": "academic_author_survey",
+      "access": "full_text",
+      "url": "https://pages.stern.nyu.edu/~adamodar/pdfiles/papers/valuesurvey.pdf",
+      "locator": "PDF pp.26-29 FCFF and equity bridge; pp.50-53 asset valuation",
+      "limit": "此大学作者稿不标记为同行评审；FCFE 借还款符号以 DFCFE 独立推导为据。"
+    },
+    {
+      "id": "DFCFE",
+      "authors": "Aswath Damodaran",
+      "year": null,
+      "title": "Chapter 11 Derivations",
+      "kind": "university_teaching",
+      "access": "full_text",
+      "url": "https://pages.stern.nyu.edu/~adamodar/New_Home_Page/AppldCF/derivn/ch11deriv.html",
+      "locator": "Sections 1-2: FCFE and stable leverage",
+      "limit": "公式依据；不提供估值日参数。"
+    },
+    {
+      "id": "DAPP",
+      "authors": "Aswath Damodaran",
+      "year": null,
+      "title": "Approaches to Valuation",
+      "kind": "university_teaching",
+      "access": "full_text",
+      "url": "https://pages.stern.nyu.edu/~adamodar/New_Home_Page/lectures/approach.html",
+      "locator": "Equity vs Firm Valuation; First Law; Relative Valuation; Contingent Claims",
+      "limit": "方法和口径讲义，不是模型准确性的实证检验。"
+    },
+    {
+      "id": "DY09",
+      "authors": "Aswath Damodaran",
+      "year": 2009,
+      "title": "Valuing Young, Start-up and Growth Companies: Estimation Issues and Valuation Challenges",
+      "kind": "academic_author_method_paper",
+      "access": "full_text",
+      "url": "https://pages.stern.nyu.edu/~adamodar/pdfiles/papers/younggrowth.pdf",
+      "locator": "PDF pp.2-6 lifecycle and limitations; cash-flow forecasting and failure sections",
+      "limit": "早期企业建模方法，不提供通用失败概率或 VC 目标回报率。"
+    },
+    {
+      "id": "DD09",
+      "authors": "Aswath Damodaran",
+      "year": 2009,
+      "title": "Valuing Distressed and Declining Companies",
+      "kind": "academic_author_method_paper",
+      "access": "full_text",
+      "url": "https://pages.stern.nyu.edu/~adamodar/pdfiles/papers/NewDistress.pdf",
+      "locator": "PDF pp.38-39 going concern and distress; pp.58-64 equity option discussion",
+      "limit": "情景和股权索取权口径需一致，不能把资产不足偿债直接等同于存续股权无价值。"
+    },
+    {
+      "id": "DC09",
+      "authors": "Aswath Damodaran",
+      "year": 2009,
+      "title": "Ups and Downs: Valuing Cyclical and Commodity Companies",
+      "kind": "academic_author_method_paper",
+      "access": "full_text",
+      "url": "https://pages.stern.nyu.edu/~adamodar/pdfiles/papers/commodity.pdf",
+      "locator": "PDF pp.15-16 normalized margins and current scale",
+      "limit": "正常化需有覆盖周期的资料，不能把历史平均利润直接视为当前可持续利润。"
+    },
+    {
+      "id": "DF09",
+      "authors": "Aswath Damodaran",
+      "year": 2009,
+      "title": "Valuing Financial Service Firms",
+      "kind": "academic_author_method_paper",
+      "access": "full_text",
+      "url": "https://pages.stern.nyu.edu/~adamodar/pdfiles/papers/finfirm09.pdf",
+      "locator": "PDF pp.14-15 equity models; p.22 regulatory capital FCFE; pp.22-23 excess returns",
+      "limit": "不是所有金融企业均应自动采用同一模型；资本规则须匹配估值日和业务。"
+    },
+    {
+      "id": "DO09",
+      "authors": "Aswath Damodaran",
+      "year": 2009,
+      "title": "The Octopus: Valuing Multi-business, Multi-national Companies",
+      "kind": "academic_author_method_paper",
+      "access": "full_text",
+      "url": "https://pages.stern.nyu.edu/~adamodar/pdfiles/papers/octopus.pdf",
+      "locator": "Sum-of-parts discussion; PDF p.36 corporate expenses",
+      "limit": "分部数据、所有权、融资和总部费用须调和，不提供固定集团折价。"
+    },
+    {
+      "id": "DTV",
+      "authors": "Aswath Damodaran",
+      "year": null,
+      "title": "Estimating Terminal Value",
+      "kind": "university_teaching",
+      "access": "full_text",
+      "url": "https://pages.stern.nyu.edu/~adamodar/New_Home_Page/valquestions/termvalapproaches.htm",
+      "locator": "Liquidation Value; Multiple Approach; Stable Growth Model",
+      "limit": "市场退出倍数使终值包含相对定价假设。"
+    },
+    {
+      "id": "DTG",
+      "authors": "Aswath Damodaran",
+      "year": null,
+      "title": "Excess Returns and Terminal Value",
+      "kind": "university_teaching",
+      "access": "full_text",
+      "url": "https://pages.stern.nyu.edu/~adamodar/New_Home_Page/valquestions/termvalueexreturns.htm",
+      "locator": "Stable reinvestment and return on capital identities",
+      "limit": "g=RR*ROIC 依赖稳定资本回报及再投资增长假设，不直接用于短期效率改善。"
+    },
+    {
+      "id": "DAPV",
+      "authors": "Aswath Damodaran",
+      "year": null,
+      "title": "The Adjusted Present Value Approach",
+      "kind": "university_teaching",
+      "access": "full_text",
+      "url": "https://pages.stern.nyu.edu/~adamodar/New_Home_Page/valquestions/apv.htm",
+      "locator": "Mechanics of APV; Cost of Capital versus APV",
+      "limit": "税盾风险和债务政策假设影响折现，税率乘债务是特殊情形。"
+    },
+    {
+      "id": "M74",
+      "authors": "Stewart C. Myers",
+      "year": 1974,
+      "title": "Interactions of Corporate Financing and Investment Decisions—Implications for Capital Budgeting",
+      "kind": "peer_reviewed_theory",
+      "access": "publisher_metadata",
+      "url": "https://doi.org/10.1111/j.1540-6261.1974.tb00021.x",
+      "locator": "The Journal of Finance 29(1):1-25",
+      "limit": "用于 APV 理论出处；本目录具体计算解释以已读取的 DAPV 为据。"
+    },
+    {
+      "id": "O95",
+      "authors": "James A. Ohlson",
+      "year": 1995,
+      "title": "Earnings, Book Values, and Dividends in Equity Valuation",
+      "kind": "peer_reviewed_theory",
+      "access": "publisher_abstract",
+      "url": "https://doi.org/10.1111/j.1911-3846.1995.tb00461.x",
+      "locator": "Contemporary Accounting Research 11(2):661-687; abstract",
+      "limit": "净盈余框架；具体剩余收益展开以 GO12 为据。"
+    },
+    {
+      "id": "GO12",
+      "authors": "Dan Gode; James Ohlson",
+      "year": 2012,
+      "title": "Valuation: Dividends, Book Values, and Earnings",
+      "kind": "academic_author_teaching",
+      "access": "full_text",
+      "url": "https://www.godeohlson.com/files/VAL2-valuation.pdf",
+      "locator": "PDF p.2 DDM and residual income transformations",
+      "limit": "2012-05-20 作者讲义，代数一致不等于独立验证价格。"
+    },
+    {
+      "id": "KR95",
+      "authors": "Steven N. Kaplan; Richard S. Ruback",
+      "year": 1995,
+      "title": "The Valuation of Cash Flow Forecasts: An Empirical Analysis",
+      "kind": "peer_reviewed_empirical",
+      "access": "publisher_abstract",
+      "url": "https://doi.org/10.1111/j.1540-6261.1995.tb04050.x",
+      "locator": "The Journal of Finance 50(4):1059-1093; abstract",
+      "limit": "51 宗 1983-1989 年高杠杆交易的历史样本结果，不是估值误差保证。"
+    },
+    {
+      "id": "LNT02",
+      "authors": "Jing Liu; Doron Nissim; Jacob Thomas",
+      "year": 2002,
+      "title": "Equity Valuation Using Multiples",
+      "kind": "peer_reviewed_empirical",
+      "access": "full_text",
+      "url": "https://business.columbia.edu/sites/default/files-efs/imce-uploads/dnissim/publications/Equity%20Valuation%20Using%20Multiples.pdf",
+      "locator": "Journal of Accounting Research 40(1):135-172; pp.142-143 equations; p.155 sample limitation",
+      "limit": "对市场价格的拟合；要求正驱动量及分析师预测，不推广为亏损初创企业 PE 最优。"
+    },
+    {
+      "id": "LS96",
+      "authors": "Baruch Lev; Theodore Sougiannis",
+      "year": 1996,
+      "title": "The Capitalization, Amortization, and Value-relevance of R&D",
+      "kind": "peer_reviewed_empirical",
+      "access": "author_institution_abstract",
+      "url": "https://experts.illinois.edu/en/publications/the-capitalization-amortization-and-value-relevance-of-rampd/",
+      "locator": "Journal of Accounting and Economics 21(1):107-138; abstract",
+      "limit": "研发资本化调整的价值相关性，不提供适用所有企业的资本化比例。"
+    },
+    {
+      "id": "S04",
+      "authors": "Eduardo S. Schwartz",
+      "year": 2004,
+      "title": "Patents and R&D as Real Options",
+      "kind": "peer_reviewed_method",
+      "access": "author_manuscript_2001_11",
+      "url": "https://www.anderson.ucla.edu/documents/areas/fac/finance/1-02.pdf",
+      "publicationUrl": "https://doi.org/10.1111/j.0391-5026.2004.00124.x",
+      "locator": "Economic Notes 33(1):23-54; read 2001 manuscript pp.8,14",
+      "limit": "实际读取稿本早于期刊；参数和风险定价假设决定结果，不提供通用研发波动率。"
+    },
+    {
+      "id": "GS20",
+      "authors": "Will Gornall; Ilya A. Strebulaev",
+      "year": 2020,
+      "title": "Squaring Venture Capital Valuations with Reality",
+      "kind": "peer_reviewed_empirical_and_model",
+      "access": "author_institution_abstract_and_2017_working_paper_abstract",
+      "url": "https://www.gsb.stanford.edu/faculty-research/publications/squaring-venture-capital-valuations-reality",
+      "workingPaperUrl": "https://www.nber.org/papers/w23895",
+      "locator": "Journal of Financial Economics 135(1):120-143; abstracts",
+      "limit": "融资优先权影响股类定价；期刊与工作论文版本结果有别，不能把样本平均差异当固定普通股折价。"
+    },
+    {
+      "id": "WIPO",
+      "authors": "World Intellectual Property Organization",
+      "year": null,
+      "title": "Intellectual Property Valuation in Biotechnology and Pharmaceuticals: Chapter 3 The Income Approach",
+      "kind": "institutional_practice_guide",
+      "access": "relevant_chapter",
+      "url": "https://www.wipo.int/web-publications/intellectual-property-valuation-in-biotechnology-and-pharmaceuticals/en/3-the-income-approach.html",
+      "locator": "Risk-adjusted net present value section",
+      "limit": "实务输入规范，非同行评审估值有效性研究；成功率需匹配适应症和阶段。"
+    }
+  ],
+  "workedExamples": [
+    {
+      "id": "fcff_bridge",
+      "methodId": "fcff_dcf",
+      "assumedInputs": {
+        "fcff": [80, 90],
+        "wacc": 0.1,
+        "g": 0.02,
+        "fcffYear3": 91.8,
+        "cash": 100,
+        "debt": 300,
+        "otherBridgeItems": 0,
+        "shares": 100
+      },
+      "units": "金额为百万元；股数为百万股；每股价值为元",
+      "expected": {
+        "terminalValueYear2": 1147.5,
+        "operatingValue": 1095.4545454545455,
+        "commonEquityValue": 895.4545454545455,
+        "pricePerShare": 8.954545454545455
+      }
+    },
+    {
+      "id": "dividend_residual_consistency",
+      "methodId": "residual_income",
+      "assumedInputs": {
+        "commonBookEquity": 100,
+        "annualCommonIncome": 12,
+        "annualCommonDividend": 12,
+        "ke": 0.1,
+        "g": 0
+      },
+      "units": "百万元",
+      "expected": {
+        "annualResidualIncome": 2,
+        "commonEquityValue": 120,
+        "dividendDiscountValue": 120
+      }
+    },
+    {
+      "id": "fcfe_debt_sign",
+      "methodId": "fcfe_dcf",
+      "assumedInputs": {
+        "commonNetIncome": 50,
+        "depreciationAmortization": 10,
+        "capex": 20,
+        "deltaNwc": 5,
+        "newDebt": 12,
+        "principalRepaid": 7
+      },
+      "units": "百万元",
+      "expected": { "fcfe": 40 }
+    },
+    {
+      "id": "stage_cost_probability",
+      "methodId": "scenario_dcf_rnpv",
+      "assumedInputs": {
+        "initialCost": 10,
+        "stage2CostYear1": 5,
+        "probabilityReachStage2": 0.5,
+        "receiptYear2": 100,
+        "unconditionalProbabilityReceipt": 0.4,
+        "discountRateForRemainingRisk": 0.1
+      },
+      "units": "百万元",
+      "expected": { "projectRnpv": 20.785123966942145 },
+      "constraint": "其他现金流为零；折现率不再次惩罚已计入的技术失败风险；示例输入全部为假设。"
+    }
+  ]
+}

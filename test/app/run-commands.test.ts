@@ -1,5 +1,9 @@
 import { setImmediate } from "node:timers/promises";
-import { analysisSubmission } from "../fixtures/analysis-report.js";
+import {
+  agentAnalysisReport,
+  reportSubmission,
+} from "../fixtures/analysis-report.js";
+import { valuationRecord } from "../fixtures/valuation.js";
 import {
   ToolCallId,
   type GenerateOptions,
@@ -113,6 +117,7 @@ function seed(h: Host, modify?: (input: OpenRunInput) => void) {
   };
 }
 interface RoleInput {
+  scope: ResearchScope;
   task: { id: string; role: string; objective: string };
   context: { materials: { title: string; body?: string }[] };
 }
@@ -214,7 +219,12 @@ describe("explicit run control commands", () => {
         else {
           const input = initialInput<RoleInput>(request);
           roles.push(input);
-          yield* analysisSubmission(undefined, "save-fundamentals");
+          const report = agentAnalysisReport();
+          report.content.valuation = valuationRecord(
+            input.scope.date,
+            input.scope.security.currency,
+          );
+          yield* reportSubmission(report, "save-fundamentals");
         }
       });
       const seeded = seed(h, (input) => {
@@ -668,7 +678,13 @@ describe("run commands during real producers", () => {
           return;
         }
         attempts.push(recordedInput);
-        yield* analysisSubmission(undefined, "save");
+        const report = agentAnalysisReport();
+        if (role.task.id === "analysis.fundamentals")
+          report.content.valuation = valuationRecord(
+            role.scope.date,
+            role.scope.security.currency,
+          );
+        yield* reportSubmission(report, "save");
       });
       const startActivation = h.ctx.subagents.startActivation.bind(
         h.ctx.subagents,

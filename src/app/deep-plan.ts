@@ -12,7 +12,7 @@ import {
   SHARED_BRIEFS,
 } from "./research-plan.js";
 
-export const DEEP_MODE_VERSION = "deep/5";
+export const DEEP_MODE_VERSION = "deep/7";
 const BRIEFS = {
   ...SHARED_BRIEFS,
   "analysis.business":

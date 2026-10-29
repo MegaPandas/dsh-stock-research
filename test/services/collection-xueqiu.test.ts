@@ -166,10 +166,12 @@ describe("Xueqiu collection fallback integration", () => {
       "eastmoney-income",
       "xueqiu",
     ]).collect(scope);
-    expect(snapshot.packets).toHaveLength(10);
+    expect(snapshot.packets).toHaveLength(11);
     expect(
       snapshot.packets.every(
-        ({ envelope }) => envelope.source.provider === "eastmoney",
+        ({ id, envelope }) =>
+          envelope.source.provider ===
+          (id === "financial.metrics" ? "stock-research" : "eastmoney"),
       ),
     ).toBe(true);
     expect(xueqiuCalls(fetch)).toHaveLength(0);
@@ -194,10 +196,13 @@ describe("Xueqiu collection fallback integration", () => {
       "financial.income",
       "financial.balance",
       "financial.cashflow",
+      "financial.metrics",
     ]);
     expect(
       snapshot.packets.every(
-        ({ envelope }) => envelope.source.provider === "xueqiu",
+        ({ id, envelope }) =>
+          envelope.source.provider ===
+          (id === "financial.metrics" ? "stock-research" : "xueqiu"),
       ),
     ).toBe(true);
     expect(snapshot.packets[0]!.envelope.data.rows[0]!.values.volume).toBe(

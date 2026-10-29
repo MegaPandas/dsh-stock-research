@@ -45,6 +45,7 @@ export function createReportDraft<Kind extends AgentReportKind, Result>(
   seed?: AgentReport<Kind>,
   legacy = false,
   handoffOptions?: { seed?: StageHandoff },
+  requiredContentSections: readonly string[] = [],
 ): {
   tools: ToolDefinition[];
   result(): Result;
@@ -153,7 +154,11 @@ export function createReportDraft<Kind extends AgentReportKind, Result>(
         validate(emptySchema, value);
         return {
           draft: draft(),
-          missingSections: Object.keys(sections).filter((section) =>
+          missingSections: [
+            "summary",
+            ...schema.properties.content.required,
+            ...requiredContentSections,
+          ].filter((section) =>
             section === "summary"
               ? stored.summary === undefined
               : !Object.hasOwn(stored.content, section),

@@ -371,7 +371,12 @@ const claim: Check = (value, path) => {
       : kind === "calculated"
         ? ["operation", "inputs"]
         : ["method", "assumptions", "evidence"];
-  const item = object(value, path, ["id", "kind", "value", "unit", ...fields]);
+  const item = object(
+    value,
+    path,
+    ["id", "kind", "value", "unit", ...fields],
+    kind === "estimated" ? ["calculationId"] : [],
+  );
   text(item.id, `${path}/id`);
   if (/[{}]/.test(item.id as string))
     invalid(`${path}/id`, "braces cannot appear in claim identifiers");
@@ -382,6 +387,8 @@ const claim: Check = (value, path) => {
     choice(item.operation, `${path}/operation`, ["simple_return"]);
     list(item.inputs, `${path}/inputs`, numberInput);
   } else {
+    if (item.calculationId !== undefined)
+      text(item.calculationId, `${path}/calculationId`);
     string(item.method, `${path}/method`);
     list(item.assumptions, `${path}/assumptions`, string);
     list(item.evidence, `${path}/evidence`, sourceRef);

@@ -14,6 +14,7 @@ import {
 } from "./quick-host.js";
 import { gate, textResponse } from "./runtime-host.js";
 import { agentAnalysisReport, reportSubmission } from "./analysis-report.js";
+import { calculationRequest, valuationRecord } from "./valuation.js";
 
 interface AgentContext {
   materials: unknown[];
@@ -85,6 +86,7 @@ export function workflowModel(
   } = {},
 ) {
   const calls = new Map<string, number>();
+  const calculations = new Map<string, string>();
   const state: {
     runId?: string;
     marketRef?: ArtifactRef;
@@ -338,14 +340,43 @@ export function workflowModel(
     }
     const repairManager =
       options.repairManager && role.task.id === "manager.decision";
-    if (repairManager && call === 2)
+    const calculates =
+      request.tools?.some(({ name }) => name === "stock_calculate_valuation") &&
+      ["analysis.fundamentals", "manager.decision"].includes(role.task.id);
+    if (calculates && !calculations.has(session)) {
+      if (call === 1) {
+        yield* toolCall(
+          "stock_calculate_valuation",
+          calculationRequest(
+            role.task.id === "manager.decision" ? "target_price" : "valuation",
+          ),
+          "calculate",
+        );
+        return;
+      }
+      calculations.set(
+        session,
+        lastToolResult<{ calculationId: string }>(request).calculationId,
+      );
+    }
+    const reportCall = call - (calculates ? 1 : 0);
+    if (repairManager && reportCall === 2)
       state.managerFeedback = lastToolText(request);
-    if (call > 1 && !(repairManager && call === 2)) {
+    if (reportCall > 1 && !(repairManager && reportCall === 2)) {
       yield* textResponse("产物已提交。");
       return;
     }
     if (role.task.id.startsWith("analysis.")) {
       const report = agentAnalysisReport();
+      if (role.task.id === "analysis.fundamentals")
+        report.content.valuation = valuationRecord(
+          role.scope.date,
+          role.scope.security.currency,
+        );
+      if (calculates)
+        report.content.valuation!.methods[0]!.calculationIds = [
+          calculations.get(session)!,
+        ];
       if (request.tools?.some(({ name }) => name === "stock_write_report"))
         yield* reportSubmission(
           report,
@@ -412,8 +443,16 @@ export function workflowModel(
         summary: "产品组合改善支持买入判断。",
         content: {
           thesis: ["产品组合改善带动盈利。"],
+          valuation: valuationRecord(
+            role.scope.date,
+            role.scope.security.currency,
+            true,
+          ),
           targetPrice: {
-            value: repairManager && call === 1 ? -1 : 230.4,
+            value: 230.4,
+            ...(calculates
+              ? { calculationId: calculations.get(session)! }
+              : {}),
             method: "盈利增长情景估值。",
             assumptions: ["新产品组合改善支持目标市值。"],
           },
@@ -427,7 +466,25 @@ export function workflowModel(
           limitations: [],
         },
       };
+      if (calculates) {
+        const context = role.context as unknown as {
+          valuationCalculations: { calculationId: string; purpose: string }[];
+        };
+        (
+          report as AgentReport<"decision_draft">
+        ).content.valuation!.methods[0]!.calculationIds = [
+          context.valuationCalculations.find(
+            ({ purpose }) => purpose === "valuation",
+          )!.calculationId,
+        ];
+      }
     } else throw new Error(`Unexpected role task ${role.task.id}`);
+    if (repairManager && reportCall === 1) {
+      yield* toolCall("stock_write_report", {
+        targetPrice: { calculationId: calculations.get(session), value: -1 },
+      });
+      return;
+    }
     if (request.tools?.some(({ name }) => name === "stock_write_report"))
       yield* reportSubmission(
         report,

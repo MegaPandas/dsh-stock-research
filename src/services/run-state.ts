@@ -204,6 +204,7 @@ function receipt(value: unknown): void {
       "recover_attempts",
       "record_evidence",
       "record_memory_input",
+      "record_valuation_calculation",
       "replay_evidence",
       "replay_memory_input",
       "review_stage",
@@ -258,6 +259,8 @@ function receipt(value: unknown): void {
   ) {
     string(result.evidenceId, "receipt.result.evidenceId");
     string(result.selector, "receipt.result.selector");
+  } else if (receipt.action === "record_valuation_calculation") {
+    string(result.calculationId, "receipt.result.calculationId");
   } else if (
     receipt.action === "record_memory_input" ||
     receipt.action === "replay_memory_input"
@@ -306,6 +309,17 @@ export function assertStoredRun(value: unknown): asserts value is ResearchRun {
       positive(memory.attempt, "input.memory.attempt");
       string(memory.callId, "input.memory.callId");
       inputRef(input.ref, "memory input.ref");
+    }
+    if (input.calculation !== undefined) {
+      const calculation = object(input.calculation, "input.calculation");
+      string(calculation.taskId, "input.calculation.taskId");
+      positive(calculation.attempt, "input.calculation.attempt");
+      for (const dependency of array(
+        calculation.dependencies,
+        "input.calculation.dependencies",
+      ))
+        string(dependency, "input.calculation.dependencies[]");
+      inputRef(input.ref, "calculation input.ref");
     }
   }
   oneOf(run.status, ["active", "blocked", "completed", "cancelled"], "status");

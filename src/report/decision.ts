@@ -3,6 +3,7 @@ import type { ArtifactVersion, NumericClaim } from "../contracts/artifacts.js";
 import type { ArtifactRef, ISOTime } from "../contracts/data.js";
 import { inline, numberText, valueText } from "./render.js";
 import { PRICE_RATING_POLICY } from "../contracts/rating-policy.js";
+import { renderValuation } from "./valuation.js";
 
 const RATINGS: Record<Rating, string> = {
   strong_buy: "强烈买入",
@@ -126,7 +127,13 @@ export function renderDecisionReport(
         ]
       : [],
   );
-  lines.push(...appendix("估值假设", estimates));
+  const valuation =
+    result.report !== undefined && "valuation" in result.report.content
+      ? result.report.content.valuation
+      : undefined;
+  lines.push(
+    ...appendix("估值假设", [...estimates, ...renderValuation(valuation)]),
+  );
   lines.push(
     ...appendix("研究过程与数据依据", [
       ...sections.map(

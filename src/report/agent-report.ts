@@ -4,6 +4,7 @@ import type {
   AgentReportKind,
 } from "../contracts/agent-reports.js";
 import { inline } from "./render.js";
+import { renderValuation } from "./valuation.js";
 
 function list(title: string, items: readonly string[]): string[] {
   return items.length === 0
@@ -69,6 +70,7 @@ const renderers: {
       ...list("关键驱动", content.analysisModel.drivers),
       ...list("主要假设", content.analysisModel.assumptions),
       ...list("其他可能解释", content.analysisModel.alternativeExplanations),
+      ...renderValuation(content.valuation),
       ...outlook(content.outlook),
       ...risks(content.risks),
       ...list("对后续研究的含义", content.handoff.implications),
@@ -146,6 +148,7 @@ const renderers: {
   decision_draft({ content }) {
     return [
       ...list("投资逻辑", content.thesis),
+      ...renderValuation(content.valuation),
       ...list("关键风险", content.risks),
       ...list("改变判断的条件", content.invalidationConditions),
       ...list("影响决策的材料缺口", content.limitations),

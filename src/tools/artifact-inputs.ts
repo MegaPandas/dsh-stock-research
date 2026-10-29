@@ -67,13 +67,17 @@ const claims = list({
       operation: literal("simple_return"),
       inputs: list(numberInput),
     }),
-    objectSchema({
-      ...claimBase,
-      kind: literal("estimated"),
-      method: stringSchema,
-      assumptions: strings,
-      evidence: list(sourceRefSchema),
-    }),
+    objectSchema(
+      {
+        ...claimBase,
+        kind: literal("estimated"),
+        method: stringSchema,
+        assumptions: strings,
+        evidence: list(sourceRefSchema),
+        calculationId: stringSchema,
+      },
+      ["id", "value", "unit", "kind", "method", "assumptions", "evidence"],
+    ),
   ],
 });
 const payloads: Record<RoleArtifactKind, JsonSchemaNode> = {

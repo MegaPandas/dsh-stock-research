@@ -90,7 +90,7 @@ describe("quick application plan", () => {
         ?.instruction,
     ).toContain("最新已完成日线");
     expect(input.versions.mode).toBe(QUICK_MODE_VERSION);
-    expect(QUICK_MODE_VERSION).toBe("quick/7");
+    expect(QUICK_MODE_VERSION).toBe("quick/9");
     expect(
       input.definition.tasks
         .filter((task) => task.id.startsWith("digest."))

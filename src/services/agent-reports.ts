@@ -9,6 +9,7 @@ import {
 } from "../contracts/agent-reports.js";
 import { ResearchError } from "../contracts/errors.js";
 import { parseLocalDate } from "../contracts/time.js";
+import { validateValuationRecord } from "./valuation.js";
 
 function invalid(path: string, reason: string): never {
   throw new ResearchError("INVALID_INPUT", `${path}: ${reason}`);
@@ -56,6 +57,8 @@ function readReport<Kind extends AgentReportKind>(
       `expected at most ${AGENT_SUMMARY_MAX_CHARACTERS} Unicode characters`,
     );
   }
+  if ("valuation" in report.content && report.content.valuation != null)
+    validateValuationRecord(report.content.valuation);
   if (kind === "analysis") {
     const { content } = report as AgentReport<"analysis">;
     atLeastOne(content.currentState, "analysis/content/currentState");

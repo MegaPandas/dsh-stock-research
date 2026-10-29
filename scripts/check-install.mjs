@@ -220,7 +220,7 @@ async function probe(directory, targetVersion) {
     );
     ctx.jobs.remove(jobId, outside.agent.id);
     unlisten();
-    assert.equal(ctx.stockResearch.tools.length, 20);
+    assert.equal(ctx.stockResearch.tools.length, 23);
     const health = ctx.stockResearch.queries.health({
       security: {
         id: "CN:002594.SZ",

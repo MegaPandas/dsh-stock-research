@@ -14,7 +14,12 @@ import { parseArtifactInput } from "./artifact-schema.js";
 import { invalid, list, object, text } from "./artifact-shape.js";
 
 type BusinessRisk = Omit<RiskIssue, "issueId" | "evidence" | "numbers">;
-type TargetPrice = { value: number; method: string; assumptions: string[] };
+type TargetPrice = {
+  value: number;
+  method: string;
+  assumptions: string[];
+  calculationId?: string;
+};
 type BusinessDecision = Omit<
   DecisionProposal,
   "thesis" | "basePrice" | "targetPrice"
@@ -121,11 +126,12 @@ export function assembleBusinessReport(
     const item = object(value, "decision", decisionKeys);
     list(item.thesis, "decision/thesis", text);
     if (item.targetPrice !== null) {
-      const target = object(item.targetPrice, "decision/targetPrice", [
-        "value",
-        "method",
-        "assumptions",
-      ]);
+      const target = object(
+        item.targetPrice,
+        "decision/targetPrice",
+        ["value", "method", "assumptions"],
+        ["calculationId"],
+      );
       text(target.method, "decision/targetPrice/method");
       list(target.assumptions, "decision/targetPrice/assumptions", text, 1);
       claims.push({
@@ -136,6 +142,9 @@ export function assembleBusinessReport(
         method: target.method as string,
         assumptions: target.assumptions as string[],
         evidence: [],
+        ...(target.calculationId === undefined
+          ? {}
+          : { calculationId: target.calculationId as string }),
       });
     }
     const decision = item as BusinessDecision;
@@ -205,7 +214,11 @@ export function assembleAgentArtifact(
         }
       : kind === "decision_draft"
         ? {
-            ...report.content,
+            ...Object.fromEntries(
+              Object.entries(report.content).filter(
+                ([key]) => key !== "valuation",
+              ),
+            ),
             rating: priceRating(
               context.referencePrice?.claim.value ?? null,
               (report as AgentReport<"decision_draft">).content.targetPrice

@@ -1,6 +1,7 @@
 import { ToolCallId, type StreamChunk } from "@deepseek-ai/dsh-llm";
 import type { AnalysisReport } from "../../src/contracts/artifact-payloads.js";
 import type { AgentReport } from "../../src/contracts/agent-reports.js";
+import { valuationSelection } from "./valuation.js";
 
 export function analysisReport(): AnalysisReport {
   return {
@@ -92,7 +93,21 @@ export async function* reportSubmission(
       },
       ...Object.entries(report.content).map(([section, value]) => ({
         name: "stock_write_report",
-        arguments: { [section]: value },
+        arguments: {
+          [section]:
+            section === "valuation" && value !== null
+              ? valuationSelection(
+                  value as NonNullable<
+                    AgentReport<"analysis">["content"]["valuation"]
+                  >,
+                )
+              : section === "targetPrice" &&
+                  value !== null &&
+                  typeof value === "object" &&
+                  "calculationId" in value
+                ? { calculationId: value.calculationId }
+                : value,
+        },
       })),
       ...(includeHandoff
         ? [{ name: "stock_write_handoff", arguments: reportHandoff(report) }]

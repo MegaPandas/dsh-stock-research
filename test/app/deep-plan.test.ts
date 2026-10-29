@@ -87,7 +87,7 @@ describe("deep application plan", () => {
       input.instructions?.every((item) => item.instruction.trim().length > 0),
     ).toBe(true);
     expect(input.versions.mode).toBe(DEEP_MODE_VERSION);
-    expect(DEEP_MODE_VERSION).toBe("deep/5");
+    expect(DEEP_MODE_VERSION).toBe("deep/7");
     validateRunDefinition(input.definition);
   });
 

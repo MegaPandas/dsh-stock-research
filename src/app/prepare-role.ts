@@ -104,6 +104,8 @@ export function prepareResearchRole(
     roleVersion !== "20" &&
     roleVersion !== "21" &&
     roleVersion !== "22" &&
+    roleVersion !== "23" &&
+    roleVersion !== "24" &&
     roleVersion !== ROLE_PROMPT_VERSION
   )
     throw new ResearchError(
@@ -121,6 +123,8 @@ export function prepareResearchRole(
   ).instruction;
   if (
     roleVersion === ROLE_PROMPT_VERSION ||
+    roleVersion === "23" ||
+    roleVersion === "24" ||
     roleVersion === "22" ||
     roleVersion === "21" ||
     roleVersion === "20" ||

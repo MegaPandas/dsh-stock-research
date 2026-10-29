@@ -1,4 +1,7 @@
 import { isDeepStrictEqual } from "node:util";
+import { valuationDependencyIds } from "../valuation/dependencies.js";
+import type { ValuationCalculation } from "../contracts/valuation.js";
+import type { ValuationCalculationRegistration } from "../contracts/runs.js";
 import type {
   ArtifactInput,
   ArtifactVersion,
@@ -886,6 +889,75 @@ export class RunService {
         );
       },
     );
+  }
+
+  recordValuationCalculation(
+    operation: TaskOperation,
+    calculation: Omit<
+      ValuationCalculation,
+      "kind" | "calculationId" | "runId" | "taskId" | "attempt" | "createdAt"
+    >,
+    callId: string,
+  ): ValuationCalculationRegistration {
+    return this.mutate<ValuationCalculationRegistration>(
+      operation,
+      taskScope(operation),
+      "record_valuation_calculation",
+      callId,
+      calculation,
+      (run, writer) => {
+        currentAttempt(run, operation);
+        const ref = writer.input((calculationId): ValuationCalculation => ({
+          ...calculation,
+          kind: "valuation-calculation",
+          calculationId,
+          runId: run.runId,
+          taskId: operation.taskId,
+          attempt: operation.attempt,
+          createdAt: run.updatedAt,
+        }));
+        run.inputs.push({
+          name: "valuation-calculation",
+          ref,
+          calculation: {
+            taskId: operation.taskId,
+            attempt: operation.attempt,
+            dependencies: valuationDependencyIds(calculation.request),
+          },
+        });
+        return { runId: run.runId, calculationId: ref.id };
+      },
+    );
+  }
+
+  valuationCalculationForCall(
+    operation: TaskOperation,
+    request: ValuationCalculation["request"],
+    callId: string,
+  ): ValuationCalculation | null {
+    const run = this.read(operation.runId);
+    const receipt = findReceipt(
+      run,
+      taskScope(operation),
+      "record_valuation_calculation",
+      callId,
+    );
+    if (receipt === undefined) {
+      currentAttempt(run, operation);
+      return null;
+    }
+    const saved = this.store.readContent<{
+      request: ValuationCalculation["request"];
+    }>(operation.runId, receipt.request);
+    if (!isDeepStrictEqual(saved.request, request))
+      throw new ResearchError(
+        "REQUEST_CONFLICT",
+        `Request ${callId} has different content.`,
+      );
+    return this.store.readContent(operation.runId, {
+      kind: "input",
+      id: (receipt.result as ValuationCalculationRegistration).calculationId,
+    });
   }
 
   replayEvidence(

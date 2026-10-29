@@ -49,6 +49,7 @@ export interface RunInputReference {
   ref: ContentRef;
   instruction?: { taskId: string; version: number };
   memory?: { taskId: string; attempt: number; callId: string };
+  calculation?: { taskId: string; attempt: number; dependencies: string[] };
 }
 export interface TaskInstructionUpdate {
   taskId: string;
@@ -179,7 +180,12 @@ export type RunWriteResult =
   | RecoverAttemptsResult
   | StageReviewResult
   | SourceRef
-  | MemoryInputRegistration;
+  | MemoryInputRegistration
+  | ValuationCalculationRegistration;
+export interface ValuationCalculationRegistration {
+  runId: string;
+  calculationId: string;
+}
 export type ReceiptAction =
   | "open"
   | "claim"
@@ -194,6 +200,7 @@ export type ReceiptAction =
   | "recover_attempts"
   | "record_evidence"
   | "record_memory_input"
+  | "record_valuation_calculation"
   | "replay_evidence"
   | "replay_memory_input"
   | "review_stage";

@@ -229,8 +229,11 @@ describe("stock-quick real command boundary", () => {
       const context = input.context as Record<string, unknown>;
       expect(context.referencePrice).toEqual({ value: 192, unit: "CNY/share" });
       expect(request.tools!.map((tool) => tool.name).sort()).toEqual([
+        "stock_calculate_valuation",
         "stock_read_report",
         "stock_read_report_draft",
+        "stock_read_valuation_calculation",
+        "stock_read_valuation_method",
         "stock_submit",
         "stock_write_handoff",
         "stock_write_report",
@@ -256,6 +259,9 @@ describe("stock-quick real command boundary", () => {
       .find((task) => task.taskId === "finalize")!
       .outputRefs.map((ref) => h.runtime.runs.readArtifact(ref).content)
       .find((content) => content.kind === "report")!;
+    expect(report.body).toContain("## 估值依据");
+    expect(report.body).toContain("研究日价值区间：192 至 240 CNY/share");
+    expect(report.body).toContain("六个月目标价依据");
     expect(report).toMatchObject({
       payload: {
         gaps: expect.arrayContaining([
@@ -309,9 +315,7 @@ describe("stock-quick real command boundary", () => {
     const h = await host(model.respond);
     const result = await h.executeAndWait();
     expect(result?.result.kind, result?.result.text).toBe("success");
-    expect(model.state.managerFeedback).toContain(
-      "decision_draft/content/targetPrice/value",
-    );
+    expect(model.state.managerFeedback).toContain("reportDraft.targetPrice");
     const view = h.runtime.runs.view({ runId: model.state.runId! });
     expect(view.status).toBe("completed");
     expect(

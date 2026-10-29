@@ -7,12 +7,18 @@ import {
 import { afterEach, describe, expect, it } from "vitest";
 import { createQuickInput } from "../../src/app/quick-plan.js";
 import { createDeepInput } from "../../src/app/deep-plan.js";
+import { createReplayInput } from "../../src/app/replay-input.js";
 import { attachCollection } from "../../src/app/collection-input.js";
 import type { CollectionSnapshot } from "../../src/contracts/collection.js";
 import type { ResearchScope } from "../../src/contracts/data.js";
 import { agentReportSchemas } from "../../src/contracts/agent-reports.js";
 import { prepareResearchRole } from "../../src/app/prepare-role.js";
 import { ROLE_PROMPTS } from "../../src/app/research-prompts.js";
+import {
+  VALUATION_METHODS_INPUT,
+  type ValuationMethods,
+} from "../../src/app/valuation-methods.js";
+import { valuationRecord } from "../fixtures/valuation.js";
 import { createResearchPlugin } from "../../src/runtime.js";
 import { ArtifactService } from "../../src/services/artifacts.js";
 import { NumberService } from "../../src/services/numbers.js";
@@ -27,6 +33,7 @@ import {
   legacyAnalysisSubmission,
   analysisSubmission,
   reportHandoff,
+  reportSubmission,
 } from "../fixtures/analysis-report.js";
 
 const cleanups: (() => Promise<void>)[] = [];
@@ -154,6 +161,129 @@ afterEach(async () => {
 });
 
 describe("persisted research role preparation", () => {
+  it("reads and replays the saved method catalogue without substituting the installed copy", async () => {
+    const h = await host();
+    const captured = h.input.inputs.find(
+      ({ name }) => name === VALUATION_METHODS_INPUT,
+    )!.content as ValuationMethods;
+    captured.version = "saved-methods";
+    captured.methods[0]!.name = "Saved FCFF method";
+    h.input.versions.prompts.valuationMethods = captured.version;
+    const { runId } = h.runtime.runs.open("owner", h.input, "open-methods");
+    captured.methods[0]!.name = "Caller mutation";
+    const prepare = (id: string, taskId: string) =>
+      prepareResearchRole(
+        h.runtime,
+        h.runtime.runs.dispatchForCall(
+          { runId: id, identity: "owner" },
+          taskId,
+          `claim-${taskId}`,
+        ),
+      );
+    const first = prepare(runId, "analysis.fundamentals");
+    expect(prompt(first).context.valuationMethods).toMatchObject({
+      version: "saved-methods",
+      methods: expect.arrayContaining([
+        expect.objectContaining({ name: "Saved FCFF method" }),
+      ]),
+    });
+    const exec = { signal: new AbortController().signal } as ToolRunContext;
+    const read = (provision: typeof first) =>
+      provision.tools
+        .find(({ name }) => name === "stock_read_valuation_method")!
+        .execute({ methodId: "fcff_dcf" }, exec);
+    const result = await read(first);
+    expect(result).toMatchObject({
+      version: "saved-methods",
+      method: { name: "Saved FCFF method", requiredInputs: expect.any(Array) },
+      sources: expect.arrayContaining([expect.objectContaining({ id: "D06" })]),
+    });
+    expect(
+      prepare(runId, "analysis.market").tools.some(
+        ({ name }) => name === "stock_read_valuation_method",
+      ),
+    ).toBe(false);
+    const replay = h.runtime.runs.open(
+      "owner",
+      createReplayInput(h.runtime.runs, runId),
+      "replay-methods",
+    );
+    expect(await read(prepare(replay.runId, "analysis.fundamentals"))).toEqual(
+      result,
+    );
+  });
+
+  it("returns a missing valuation section to the original fundamental role for correction", async () => {
+    let calls = 0;
+    const h = await host(async function* (request) {
+      const report = agentAnalysisReport();
+      const input = initialInput<{ scope: ResearchScope }>(request);
+      if (++calls > 1)
+        report.content.valuation = valuationRecord(
+          input.scope.date,
+          input.scope.security.currency,
+        );
+      yield* reportSubmission(report, `valuation-${calls}`);
+    });
+    const { runId } = h.runtime.runs.open("owner", h.input, "open-valuation");
+    const parent = await h.runtime.createAgent(
+      h.agentOptions("valuation-coordinator"),
+      { kind: "coordinator", runIds: [runId] },
+      [],
+    );
+    const result = await h.runtime.dispatch.dispatch(
+      parent.agent,
+      runId,
+      "analysis.fundamentals",
+      "dispatch-valuation",
+      new AbortController().signal,
+    );
+    expect(result).toMatchObject({ status: "succeeded", failure: null });
+    expect(calls).toBe(2);
+    expect(
+      h.runtime.runs.readArtifact(result.refs[0]!).content.payload,
+    ).toMatchObject({
+      report: {
+        content: {
+          valuation: {
+            methods: [{ methodId: "comparable_multiples", valueRange: null }],
+          },
+        },
+      },
+    });
+    await parent.dispose();
+  });
+
+  it("continues protocol 23 fundamentals without a method catalogue or new mandatory section", async () => {
+    const h = await host();
+    h.input.versions.prompts.roles = "23";
+    delete h.input.versions.prompts.valuationMethods;
+    h.input.inputs = h.input.inputs.filter(
+      ({ name }) => name !== VALUATION_METHODS_INPUT,
+    );
+    const { runId } = h.runtime.runs.open("owner", h.input, "open-v23");
+    const context = h.runtime.runs.dispatchForCall(
+      { runId, identity: "owner" },
+      "analysis.fundamentals",
+      "claim-v23",
+    );
+    const provision = prepareResearchRole(h.runtime, context);
+    expect(prompt(provision).context).not.toHaveProperty("valuationMethods");
+    expect(
+      provision.tools.some(
+        ({ name }) => name === "stock_read_valuation_method",
+      ),
+    ).toBe(false);
+    expect(
+      await provision.tools
+        .find(({ name }) => name === "stock_read_report_draft")!
+        .execute({}, {
+          signal: new AbortController().signal,
+        } as ToolRunContext),
+    ).toMatchObject({
+      missingSections: expect.not.arrayContaining(["valuation"]),
+    });
+  });
   it("provides direct input once and omits it from the lookup catalog", async () => {
     const h = await host();
     const debate = h.input.definition.tasks.find(
@@ -329,6 +459,65 @@ describe("persisted research role preparation", () => {
     }
   });
 
+  it("provides latest derived financial observations directly while retaining history in the snapshot", async () => {
+    const h = await host();
+    const snapshot = collection(h.scope);
+    const packet = structuredClone(snapshot.packets[1]!);
+    packet.id = "financial.metrics";
+    packet.envelope.source.provider = "stock-research";
+    const data = packet.envelope.data;
+    data.table = packet.id;
+    data.currency = h.scope.security.currency;
+    data.columns = {
+      NET_INCOME_TTM: { label: "Synthetic TTM net income", unit: "USD" },
+      HISTORY_PE_TTM_MEDIAN: { label: "Synthetic median PE", unit: "multiple" },
+    };
+    const row = data.rows[0]!;
+    data.rows = [
+      {
+        ...row,
+        date: "2023-09-30",
+        periodStart: "2023-01-01",
+        values: { NET_INCOME_TTM: 20, HISTORY_PE_TTM_MEDIAN: null },
+      },
+      {
+        ...row,
+        date: "2023-12-31",
+        periodStart: "2023-01-01",
+        values: { NET_INCOME_TTM: 30, HISTORY_PE_TTM_MEDIAN: null },
+      },
+      {
+        ...row,
+        date: h.scope.date,
+        periodStart: h.scope.date,
+        values: { NET_INCOME_TTM: null, HISTORY_PE_TTM_MEDIAN: 15 },
+      },
+    ];
+    snapshot.packets.push(packet);
+    attachCollection(h.input, snapshot);
+    const { runId } = h.runtime.runs.open("owner", h.input, "derived");
+    const context = h.runtime.runs.dispatchForCall(
+      { runId, identity: "owner" },
+      "analysis.fundamentals",
+      "fundamentals",
+    );
+    const prepared = prompt(prepareResearchRole(h.runtime, context));
+    expect(prepared.context.financialMetrics).toMatchObject({
+      table: "financial.metrics",
+      currency: "USD",
+      amountUnit: "unit",
+      sharesUnit: "unit",
+      columns: data.columns,
+      observations: [
+        { date: "2023-12-31", index: 1, values: { NET_INCOME_TTM: 30 } },
+        { date: h.scope.date, index: 2, values: { HISTORY_PE_TTM_MEDIAN: 15 } },
+      ],
+    });
+    expect(prepared.context.dataCatalog).toContainEqual(
+      expect.objectContaining({ id: "financial.metrics", recordCount: 3 }),
+    );
+  });
+
   it("registers only the current task's fixed datasets without duplicating history in the prompt", async () => {
     const h = await host();
     attachCollection(h.input, collection(h.scope));
@@ -440,7 +629,7 @@ describe("persisted research role preparation", () => {
     expect(prepared).not.toHaveProperty("secIssuerConfigured");
     expect(provision.agentPreset).toBeUndefined();
     expect(provision.systemPrompt).toBe(ROLE_PROMPTS.analyst);
-    expect(provision.tools).toHaveLength(7);
+    expect(provision.tools).toHaveLength(10);
     expect(provision.tools.map(({ name }) => name)).toEqual(
       expect.arrayContaining([
         "stock_describe_collection",

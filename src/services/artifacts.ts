@@ -26,6 +26,12 @@ import {
   selectDecisionInputs,
 } from "./decision-basics.js";
 import { checkDecisionRequirements } from "./decision-requirements.js";
+import {
+  readValuationCalculation,
+  validateCalculatedReport,
+  validateCalculatedTarget,
+} from "./valuation-calculations.js";
+import { DETERMINISTIC_VALUATION_PROTOCOL } from "../contracts/valuation.js";
 
 function invalid(detail: string): never {
   throw new ResearchError("INVALID_ARTIFACT", detail);
@@ -73,6 +79,46 @@ export class ArtifactService {
     if (!Array.isArray(contents) || contents.length === 0)
       invalid("A submission requires the complete artifact array.");
     const captured = structuredClone(contents.map(parseArtifactInput));
+    const computedValuation =
+      this.runs.inputCatalog(operation.runId).versions.prompts.roles ===
+      DETERMINISTIC_VALUATION_PROTOCOL;
+    for (const content of captured) {
+      if (
+        computedValuation &&
+        ["analysis.fundamentals", "manager.decision"].includes(
+          operation.taskId,
+        ) &&
+        !("report" in content.payload)
+      )
+        invalid(
+          "The current valuation protocol requires a report referencing saved calculation results.",
+        );
+      if (content.kind === "analysis" && "report" in content.payload)
+        validateCalculatedReport(this.runs, operation, content.payload.report);
+      if (
+        content.kind === "decision_draft" &&
+        content.payload.report !== undefined
+      ) {
+        if ("rating" in content.payload.report.content) {
+          if (computedValuation)
+            invalid(
+              "A current valuation report cannot use the legacy decision protocol.",
+            );
+        } else {
+          validateCalculatedReport(
+            this.runs,
+            operation,
+            content.payload.report,
+          );
+          if (computedValuation)
+            validateCalculatedTarget(
+              content.payload,
+              content.claims,
+              this.runs.view(operation).scope.security.currency,
+            );
+        }
+      }
+    }
     this.checkReferences(operation, captured);
     const checks = captured.flatMap((content, index) =>
       isStageReport(content) && content.claims.length === 0
@@ -204,6 +250,8 @@ export class ArtifactService {
       )
         invalid("Malformed body number placeholder.");
       const refs = artifactReferences(content);
+      for (const id of refs.calculations)
+        readValuationCalculation(this.runs, operation.runId, id);
       for (const ref of refs.artifacts) allowArtifact(ref);
       if (content.kind === "digest") {
         const upstream = new Set(content.payload.upstreamRefs.map(artifactKey));

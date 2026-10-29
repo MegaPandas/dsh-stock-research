@@ -1,4 +1,5 @@
 import type { ArtifactInput, ArtifactVersion } from "../contracts/artifacts.js";
+import type { ResearchArtifactInput } from "../contracts/artifact-payloads.js";
 import type { ArtifactRef } from "../contracts/data.js";
 import { ResearchError } from "../contracts/errors.js";
 import type {
@@ -6,6 +7,7 @@ import type {
   RedoTaskResult,
   ResearchRun,
 } from "../contracts/runs.js";
+import { artifactCalculationIds } from "./artifact-references.js";
 
 export function artifactKey(ref: ArtifactRef): string {
   return JSON.stringify([ref.runId, ref.artifactId, ref.revision]);
@@ -31,11 +33,29 @@ export function affectedTaskIds(
       owners.set(artifactKey(ref), task.taskId);
   for (const task of run.definition.tasks)
     for (const dependency of task.dependsOn) edge(dependency, task.id);
+  const calculations = new Map(
+    run.inputs
+      .filter((input) => input.calculation !== undefined)
+      .map((input) => [input.ref.id, input.calculation!]),
+  );
+  const adoptCalculations = (ids: string[], taskId: string) => {
+    for (const id of ids) edge(calculations.get(id)!.taskId, taskId);
+  };
+  for (const calculation of calculations.values()) {
+    const task = run.tasks.find(({ taskId }) => taskId === calculation.taskId)!;
+    if (task.attempts.at(-1)?.number === calculation.attempt)
+      adoptCalculations(calculation.dependencies, calculation.taskId);
+  }
   for (const task of run.tasks) {
     if (task.status === "pending" || task.status === "cancelled") continue;
+    const outputs = task.outputRefs.map(
+      (ref) => readArtifact(ref).content as ResearchArtifactInput,
+    );
+    for (const content of outputs)
+      adoptCalculations(artifactCalculationIds(content), task.taskId);
     const inputs = [
       ...task.attempts.at(-1)!.inputRefs,
-      ...task.outputRefs.flatMap((ref) => readArtifact(ref).content.inputRefs),
+      ...outputs.flatMap((content) => content.inputRefs),
     ];
     for (const ref of inputs) {
       const owner = owners.get(artifactKey(ref));

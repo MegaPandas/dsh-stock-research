@@ -25,7 +25,7 @@ export interface CollectionRow {
   values: Record<string, number | null>;
 }
 
-/** Source-reported quantities; collection never derives financial or technical indicators. */
+/** Source tables and explicitly labeled financial metrics derived from collected inputs. */
 export interface CollectedTableData {
   table: string;
   title: string;

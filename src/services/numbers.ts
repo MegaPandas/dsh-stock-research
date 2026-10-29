@@ -26,6 +26,7 @@ import {
   type NumberField,
 } from "./number-fields.js";
 import type { RunService } from "./runs.js";
+import { readValuationCalculation } from "./valuation-calculations.js";
 
 export const NUMBER_CHECK_VERSION = "1";
 // Division and subtraction admit binary rounding; this is not a business/display tolerance.
@@ -213,6 +214,22 @@ export class NumberService {
             source: claim.source,
           };
         } else if (claim.kind === "estimated") {
+          if (claim.calculationId !== undefined) {
+            const calculation = readValuationCalculation(
+              this.runs,
+              operation.runId,
+              claim.calculationId,
+            );
+            if (
+              calculation.result.perShareValues.length !== 1 ||
+              calculation.result.perShareValues[0] !== claim.value ||
+              claim.unit !== `${calculation.currency}/share`
+            )
+              fail(
+                "calculation",
+                "The numeric claim must equal its immutable valuation calculation.",
+              );
+          }
           if (
             claim.method.trim() === "" ||
             claim.assumptions.length === 0 ||
