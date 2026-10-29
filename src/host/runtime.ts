@@ -40,7 +40,7 @@ import { DataRoot } from "../storage/data-root.js";
 import { createControlTools } from "../tools/control.js";
 import { createDataTools, type DataToolServices } from "../tools/data.js";
 import type { QueryToolPolicy } from "../tools/query-inputs.js";
-import { createReadTools } from "../tools/read.js";
+import { createReadTools, createRoleReadTools } from "../tools/read.js";
 import { createWriteTools } from "../tools/write.js";
 import { SessionBindings, type ResearchBinding } from "./bindings.js";
 import {
@@ -74,6 +74,7 @@ export interface ResearchRuntime {
   readonly policy: QueryToolPolicy;
   readonly submitReport: SubmitReport;
   readonly valuations: ValuationOperations;
+  createRoleReadTools(replay: boolean): ToolDefinition[];
   bindCoordinator(agent: Agent): () => void;
   authorizeCoordinatorRun(agent: Agent, runId: string): void;
   createDraftFile(
@@ -181,6 +182,14 @@ class Runtime implements ResearchRuntime {
     );
     this.tools = this.createTools(capturedPolicy);
     this.valuations = createValuationOperations(this.runs, components.bindings);
+  }
+
+  createRoleReadTools(replay: boolean): ToolDefinition[] {
+    return createRoleReadTools(
+      { runs: this.runs, queries: this.queries, memory: this.memory },
+      this.components.bindings,
+      replay,
+    );
   }
 
   get policy(): QueryToolPolicy {

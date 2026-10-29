@@ -14,7 +14,7 @@ afterEach(async () => {
   for (const cleanup of cleanups.splice(0).reverse()) await cleanup();
 });
 
-async function fixture() {
+async function fixture(format: "markdown" | "json" = "markdown") {
   const directory = await mkdtemp(join(tmpdir(), "stock-draft-"));
   const ctx = new Context();
   cleanups.push(async () => {
@@ -27,7 +27,7 @@ async function fixture() {
   await ctx.plugin(LocalFileSystem, { cwd: directory });
   const file = new DraftFile(ctx.fs, join(directory, "drafts", "task.md"));
   const signal = new AbortController().signal;
-  const tools = draftFileTools(file);
+  const tools = draftFileTools(file, format);
   const call = (name: string, args: unknown) =>
     tools
       .find((tool) => tool.name === name)!
@@ -36,6 +36,23 @@ async function fixture() {
 }
 
 describe("fixed draft file", () => {
+  it("exposes JSON draft content and save receipts without a filesystem path", async () => {
+    const { call, file, signal } = await fixture("json");
+    await expect(
+      call("stock_write_draft", { content: '{"thesis":"Original"}' }),
+    ).resolves.toEqual({ status: "saved" });
+    await expect(call("stock_read_draft", {})).resolves.toEqual({
+      content: '{"thesis":"Original"}',
+    });
+    await expect(
+      call("stock_edit_draft", { oldText: "Original", newText: "Updated" }),
+    ).resolves.toEqual({ status: "saved" });
+    expect(await file.read(signal)).toBe('{"thesis":"Updated"}');
+    await expect(
+      call("stock_edit_draft", { oldText: "", newText: "invalid" }),
+    ).rejects.toMatchObject({ code: "INVALID_INPUT" });
+    expect(await file.read(signal)).toBe('{"thesis":"Updated"}');
+  });
   it("retains the task document across attempts and keeps task identifiers in one filename", async () => {
     const { fs, signal, directory } = await fixture();
     const first = { runId: "run", taskId: "../analysis.market", attempt: 1 };

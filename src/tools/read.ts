@@ -76,11 +76,13 @@ const numberCheckOutput = objectSchema({
   passed: { type: "boolean" },
   claims: { type: "array", items: opaqueObject },
 });
-export function createReadTools(
-  services: ReadToolServices,
+function commonReadTools(
+  services: Omit<ReadToolServices, "numbers">,
   bindings: SessionBindings,
+  scope: "explicit" | "bound",
+  replay: boolean,
 ): ToolDefinition[] {
-  const { runs, queries, memory, numbers } = services;
+  const { runs, queries, memory } = services;
   const tools: ToolDefinition[] = [
     {
       name: "stock_read_run",
@@ -160,13 +162,15 @@ export function createReadTools(
       description:
         "Read configured source capabilities, gaps and call counts without fetching data.",
       parameters: objectSchema(
-        {
-          runId: {
-            ...stringSchema,
-            description:
-              "Coordinators supply an authorized runId; other roles inherit their bound scope.",
-          },
-        },
+        scope === "bound"
+          ? {}
+          : {
+              runId: {
+                ...stringSchema,
+                description:
+                  "Coordinators supply an authorized runId; other roles inherit their bound scope.",
+              },
+            },
         [],
       ),
       output: output(
@@ -194,13 +198,21 @@ export function createReadTools(
             description:
               "Positive safe integer limiting the number of results.",
           },
-          source: {
-            ...objectSchema({
-              runId: stringSchema,
-              inputRef: objectSchema({ kind: kind("input"), id: stringSchema }),
-            }),
-            description: "Saved memory snapshot selected for task replay.",
-          },
+          ...(replay
+            ? {
+                source: {
+                  ...objectSchema({
+                    runId: stringSchema,
+                    inputRef: objectSchema({
+                      kind: kind("input"),
+                      id: stringSchema,
+                    }),
+                  }),
+                  description:
+                    "Saved memory snapshot selected for task replay.",
+                },
+              }
+            : {}),
         },
         ["relatedRunId", "text", "limit"],
       ),
@@ -263,6 +275,24 @@ export function createReadTools(
         };
       },
     },
+  ];
+  return tools.map(researchTool);
+}
+
+export function createRoleReadTools(
+  services: Omit<ReadToolServices, "numbers">,
+  bindings: SessionBindings,
+  replay: boolean,
+): ToolDefinition[] {
+  return commonReadTools(services, bindings, "bound", replay);
+}
+
+export function createReadTools(
+  services: ReadToolServices,
+  bindings: SessionBindings,
+): ToolDefinition[] {
+  const { runs, numbers } = services;
+  const checks: ToolDefinition[] = [
     {
       name: "stock_check_numbers",
       description:
@@ -303,5 +333,8 @@ export function createReadTools(
       },
     },
   ];
-  return tools.map(researchTool);
+  return [
+    ...commonReadTools(services, bindings, "explicit", true),
+    ...checks.map(researchTool),
+  ];
 }

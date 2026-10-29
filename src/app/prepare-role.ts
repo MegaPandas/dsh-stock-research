@@ -8,7 +8,7 @@ import type {
   TaskOperation,
 } from "../contracts/runs.js";
 import { ResearchError } from "../contracts/errors.js";
-import type { EvidenceData, QuerySnapshot } from "../contracts/query.js";
+import type { EvidenceData } from "../contracts/query.js";
 import type { ResearchData } from "../contracts/research.js";
 import type { DataEnvelope } from "../contracts/data.js";
 import {
@@ -19,15 +19,12 @@ import type { RoleProvision } from "../host/dispatch.js";
 import type { SubmitReport } from "../host/report-submission.js";
 import type { ValuationOperations } from "../host/valuation-operations.js";
 import type { RunService } from "../services/runs.js";
-import type { QueryToolPolicy } from "../tools/query-inputs.js";
 import { readApplicationInput } from "./research-input.js";
 import {
   ROLE_PROMPT_VERSION,
   type RoleArtifactKind,
 } from "./research-prompts.js";
-import { scopedQueryParameters } from "./query-scope.js";
 import { prepareBusinessRole } from "./business-role.js";
-import { businessDraftTools } from "../host/business-draft.js";
 import {
   readCollection,
   registerCollectionSources,
@@ -54,15 +51,6 @@ import {
   artifactRefSchema,
 } from "../tools/parameters.js";
 
-const ROLE_TOOLS = new Set([
-  "stock_read_run",
-  "stock_read_artifact",
-  "stock_read_evidence",
-  "stock_data_health",
-  "stock_recall",
-]);
-const SCOPED_QUERIES = new Set(["stock_data_health", "stock_recall"]);
-
 export interface RoleServices {
   runs: RunService;
   submitReport: SubmitReport;
@@ -81,10 +69,7 @@ export interface RoleServices {
   createDraftFile(
     operation: Pick<TaskOperation, "runId" | "taskId">,
   ): DraftFile;
-  createTools(
-    policy: QueryToolPolicy,
-    snapshots?: readonly QuerySnapshot[],
-  ): ToolDefinition[];
+  createRoleReadTools(replay: boolean): ToolDefinition[];
 }
 
 export function prepareResearchRole(
@@ -232,7 +217,7 @@ export function prepareResearchRole(
       systemPrompt,
       tools: [
         ...dataTools,
-        ...businessDraftTools(file),
+        ...draftFileTools(file, "json"),
         researchTool({
           name: "stock_save_report",
           description:
@@ -316,20 +301,10 @@ export function prepareResearchRole(
       ],
     };
   }
-  const tools = services
-    .createTools(profile.policy)
-    .filter((tool) => ROLE_TOOLS.has(tool.name))
-    .map((tool) => {
-      if (!SCOPED_QUERIES.has(tool.name)) return tool;
-      return {
-        ...tool,
-        parameters: scopedQueryParameters(tool.parameters, snapshot !== null),
-      };
-    });
   return {
     systemPrompt: profile.prompts[definition.executor.role],
     tools: [
-      ...tools,
+      ...services.createRoleReadTools(snapshot !== null),
       researchTool({
         name: "stock_save_report",
         description:

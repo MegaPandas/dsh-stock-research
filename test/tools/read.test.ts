@@ -1,6 +1,10 @@
 import { Context } from "@deepseek-ai/cordis";
 import type { Agent } from "@deepseek-ai/dsh-agent";
-import { ToolRuntime, type ToolRunContext } from "@deepseek-ai/dsh-tools";
+import {
+  ToolRuntime,
+  validateJsonSchemaValue,
+  type ToolRunContext,
+} from "@deepseek-ai/dsh-tools";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { SqliteCache } from "../../src/cache/index.js";
 import type { CollectedTableData } from "../../src/contracts/collection.js";
@@ -13,12 +17,12 @@ import {
 import { MemoryStore } from "../../src/memory/store.js";
 import { MemoryService } from "../../src/services/memory.js";
 import { QueryService } from "../../src/services/query.js";
-import { createReadTools } from "../../src/tools/read.js";
+import { createReadTools, createRoleReadTools } from "../../src/tools/read.js";
 import { decisionFixture } from "../fixtures/decision.js";
 
 const cleanups: (() => void | Promise<void>)[] = [];
 const recall = { relatedRunId: null, text: null, limit: 10 };
-function setup() {
+function setup(replay?: boolean) {
   const f = decisionFixture({
     additionalTasks: [
       {
@@ -52,10 +56,17 @@ function setup() {
     research: 0,
   });
   const bindings = new SessionBindings();
-  const tools = createReadTools(
-    { runs: f.runs, numbers: f.numbers, memory, queries },
-    bindings,
-  );
+  const tools =
+    replay === undefined
+      ? createReadTools(
+          { runs: f.runs, numbers: f.numbers, memory, queries },
+          bindings,
+        )
+      : createRoleReadTools(
+          { runs: f.runs, memory, queries },
+          bindings,
+          replay,
+        );
   function agent(binding?: ResearchBinding, id = "worker") {
     const value = { id } as Agent;
     if (binding) bindings.bind(value, binding);
@@ -130,6 +141,45 @@ afterEach(async () => {
 });
 
 describe("read tools", () => {
+  it.each([false, true])(
+    "declares bound role reads with replay=%s without changing fixed references",
+    async (replay) => {
+      const f = setup(replay);
+      const health = f.tools.find(({ name }) => name === "stock_data_health")!;
+      const memory = f.tools.find(({ name }) => name === "stock_recall")!;
+      const artifact = f.tools.find(
+        ({ name }) => name === "stock_read_artifact",
+      )!;
+      expect(validateJsonSchemaValue(health.parameters, {})).toEqual([]);
+      expect(
+        validateJsonSchemaValue(health.parameters, {
+          runId: f.operation.runId,
+        }),
+      ).not.toEqual([]);
+      const withSource = {
+        ...recall,
+        source: {
+          runId: "original-run",
+          inputRef: { kind: "input", id: "saved" },
+        },
+      };
+      expect(
+        validateJsonSchemaValue(memory.parameters, withSource).length === 0,
+      ).toBe(replay);
+      expect(
+        validateJsonSchemaValue(artifact.parameters, { ref: f.analysisRef }),
+      ).toEqual([]);
+      expect(await f.call("stock_data_health", {})).toMatchObject({
+        scope: f.scope,
+      });
+      await expect(
+        f.call("stock_data_health", { runId: f.operation.runId }),
+      ).rejects.toMatchObject({ code: "INVALID_INPUT" });
+      expect(
+        await f.call("stock_read_artifact", { ref: f.analysisRef }),
+      ).toMatchObject({ kind: "artifact", artifact: { ref: f.analysisRef } });
+    },
+  );
   it("registers and executes all read tools through the SDK runtime and output schemas", async () => {
     const f = setup();
     const ctx = new Context();
@@ -470,43 +520,49 @@ describe("read tools", () => {
     });
     expect(f.store.read(f.operation.runId).inputs).toHaveLength(2);
   });
-  it("replays an explicitly selected saved memory input", async () => {
-    const f = setup();
-    const original = await f.call("stock_recall", recall, f.task, "original");
-    const state = f.store.read(f.operation.runId);
-    const input = state.inputs.find(
-      (entry) => entry.memory?.callId === "original",
-    )!;
-    const replay = f.runs.open(
-      "owner",
-      { replay: { runId: f.operation.runId }, versions: state.versions },
-      "replay",
-    );
-    const claim = f.runs.claim(
-      { runId: replay.runId, identity: "owner" },
-      "reader",
-      "claim-replay",
-    );
-    const caller = f.agent({
-      kind: "task",
-      runId: replay.runId,
-      taskId: "reader",
-      attempt: claim.attempt,
-    });
-    const result = await f.call(
-      "stock_recall",
-      { ...recall, source: { runId: f.operation.runId, inputRef: input.ref } },
-      caller,
-      "replay-call",
-    );
-    expect(result).toMatchObject({
-      kind: "task",
-      snapshot: {
-        entries: (original as { snapshot: { entries: unknown[] } }).snapshot
-          .entries,
-      },
-    });
-  });
+  it.each([undefined, true])(
+    "replays an explicitly selected saved memory input with scoped=%s",
+    async (scoped) => {
+      const f = setup(scoped);
+      const original = await f.call("stock_recall", recall, f.task, "original");
+      const state = f.store.read(f.operation.runId);
+      const input = state.inputs.find(
+        (entry) => entry.memory?.callId === "original",
+      )!;
+      const replay = f.runs.open(
+        "owner",
+        { replay: { runId: f.operation.runId }, versions: state.versions },
+        "replay",
+      );
+      const claim = f.runs.claim(
+        { runId: replay.runId, identity: "owner" },
+        "reader",
+        "claim-replay",
+      );
+      const caller = f.agent({
+        kind: "task",
+        runId: replay.runId,
+        taskId: "reader",
+        attempt: claim.attempt,
+      });
+      const result = await f.call(
+        "stock_recall",
+        {
+          ...recall,
+          source: { runId: f.operation.runId, inputRef: input.ref },
+        },
+        caller,
+        "replay-call",
+      );
+      expect(result).toMatchObject({
+        kind: "task",
+        snapshot: {
+          entries: (original as { snapshot: { entries: unknown[] } }).snapshot
+            .entries,
+        },
+      });
+    },
+  );
   it("checks a fully parsed pending artifact without submitting it", async () => {
     const f = setup();
     const before = f.store.read(f.operation.runId).artifacts;

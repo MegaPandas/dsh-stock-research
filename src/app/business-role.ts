@@ -1,10 +1,8 @@
 import type { RoleDispatchContext } from "../contracts/runs.js";
 import { ResearchError } from "../contracts/errors.js";
 import type { RoleProvision } from "../host/dispatch.js";
-import {
-  businessDraftTools,
-  parseBusinessJson,
-} from "../host/business-draft.js";
+import { parseBusinessJson } from "../host/business-draft.js";
+import { draftFileTools } from "../tools/draft-file.js";
 import { renderArtifactBody } from "../report/render.js";
 import { ArtifactInputs } from "../services/artifact-inputs.js";
 import { digestRisks } from "../services/digest-inputs.js";
@@ -66,7 +64,7 @@ export function prepareBusinessRole(
     systemPrompt: profile.prompts[definition.executor.role],
     tools: [
       reader.tool,
-      ...businessDraftTools(file),
+      ...draftFileTools(file, "json"),
       researchTool({
         name: "stock_save_report",
         description:
