@@ -198,10 +198,6 @@ npm run collect:data -- SH.600519 2026-10-27 /tmp/stock-collection
 
 项目基于 [deepseek-harness](https://github.com/deepseek-ai/deepseek-harness) 开发，研究思路参考了 [TradingAgents](https://github.com/TauricResearch/TradingAgents)。
 
-## 免责声明
-
-本项目仅供研究和学习使用，生成的内容不构成投资建议或交易依据。
-
 ## 许可证
 
 [MIT](LICENSE)
