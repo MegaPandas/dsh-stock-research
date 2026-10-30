@@ -10,6 +10,7 @@ import {
   DataRoot,
   HostResearchAdapter,
   QueryService,
+  TaskQueryService,
   RunService,
   RunStore,
   SqliteCache,
@@ -63,6 +64,7 @@ function stats(values) {
 let root;
 let cache;
 let queries;
+let taskQueries;
 try {
   root = new DataRoot(directory);
   cache = new SqliteCache({
@@ -113,18 +115,19 @@ try {
     attempt: claimed.attempt,
     sessionId: null,
   };
-  queries = new QueryService({ research }, cache, runs, {
+  queries = new QueryService({ research }, cache, {
     market: 60_000,
     fundamentals: 60_000,
     macro: 60_000,
     research: 60_000,
   });
+  taskQueries = new TaskQueryService(queries, runs);
   const begin = performance.now();
   const ordinary = Array.from({ length: count }, () =>
     queries.query(scope, request),
   );
   const tasks = Array.from({ length: count }, () =>
-    queries.queryForTask(operation, request, "data"),
+    taskQueries.queryForTask(operation, request, "data"),
   );
   await started.promise;
   gate.resolve();
@@ -150,7 +153,7 @@ try {
   }
   for (let i = 0; i < count; i++) {
     const start = performance.now();
-    await queries.queryForTask(operation, request, "data");
+    await taskQueries.queryForTask(operation, request, "data");
     saved.push(performance.now() - start);
   }
   assert.equal(sourceCalls, 1);
@@ -184,7 +187,7 @@ try {
 } finally {
   gate.resolve();
   try {
-    await queries?.close();
+    await Promise.all([taskQueries?.close(), queries?.close()]);
   } finally {
     try {
       cache?.close();

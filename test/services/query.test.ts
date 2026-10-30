@@ -19,6 +19,7 @@ import { HttpClient } from "../../src/data/http.js";
 import { YahooMarketAdapter } from "../../src/data/yahoo-market.js";
 import { ResearchError } from "../../src/contracts/errors.js";
 import { QueryService } from "../../src/services/query.js";
+import { TaskQueryService } from "../../src/services/task-query.js";
 import type { QuerySources } from "../../src/services/query-sources.js";
 import { RunService } from "../../src/services/runs.js";
 import { RunStore } from "../../src/runs/store.js";
@@ -28,7 +29,7 @@ import { MARKET_FIXTURE, US_SECURITY } from "../fixtures/market.js";
 const paths: string[] = [];
 const roots: DataRoot[] = [];
 const caches: SqliteCache[] = [];
-const services: QueryService[] = [];
+const services: (QueryService | TaskQueryService)[] = [];
 const releases: (() => void)[] = [];
 const scope: ResearchScope = {
   security: US_SECURITY,
@@ -101,11 +102,13 @@ function setup() {
   });
   const sources: QuerySources = { yahoo: { capability, query } };
   function create(configured: QuerySources = sources) {
-    const service = new QueryService(configured, cache, runs, policy);
+    const service = new QueryService(configured, cache, policy);
     services.push(service);
     return service;
   }
   const service = create();
+  const taskQueries = new TaskQueryService(service, runs);
+  services.push(taskQueries);
   const input: OpenRunInput = {
     definition: {
       scope,
@@ -146,6 +149,7 @@ function setup() {
     sources,
     create,
     service,
+    taskQueries,
     runId,
     op: claim("a"),
     claim,
@@ -189,12 +193,30 @@ afterEach(async () => {
 });
 
 describe("query service composition", () => {
+  it("queries and caches without constructing a research run store", async () => {
+    const cache = new SqliteCache({ path: ":memory:", maxEntries: 10 });
+    caches.push(cache);
+    const query = vi.fn(async () => result());
+    const service = new QueryService(
+      { yahoo: { capability, query } },
+      cache,
+      policy,
+    );
+    services.push(service);
+    const first = await service.query(scope, request);
+    first.data.bars[0]!.close = 999;
+    const second = await service.query(scope, request);
+    expect(second).toEqual(result());
+    expect(second).not.toHaveProperty("candidateClaims");
+    expect(query).toHaveBeenCalledTimes(1);
+  });
+
   it("rejects invalid cache durations at configuration", () => {
     const context = setup();
     for (const ttl of [-1, Number.NaN])
       expect(
         () =>
-          new QueryService(context.sources, context.cache, context.runs, {
+          new QueryService(context.sources, context.cache, {
             ...policy,
             market: ttl,
           }),
@@ -249,15 +271,38 @@ describe("query service composition", () => {
     const pending = gate(context);
     const a = context.service.query(scope, request);
     const b = context.service.query(scope, request);
+    const task = context.taskQueries.queryForTask(context.op, request, "data");
     await pending.started;
     expect(context.query).toHaveBeenCalledTimes(1);
     pending.resolve(result());
-    const [left, right] = await Promise.all([a, b]);
+    const [left, right, registered] = await Promise.all([a, b, task]);
     left.data.bars[0]!.close = 999;
     expect(right.data.bars[0]!.close).toBe(10);
+    expect(registered.envelope.data.bars[0]!.close).toBe(10);
+    expect(context.store.read(context.runId).evidence).toHaveLength(1);
     expect(
       (await context.service.query(scope, request)).data.bars[0]!.close,
     ).toBe(10);
+  });
+
+  it("closes task queries without cancelling a shared ordinary query or closing its kernel", async () => {
+    const context = setup();
+    const pending = gate(context);
+    const ordinary = context.service.query(scope, request);
+    const task = context.taskQueries.queryForTask(context.op, request, "data");
+    const producer = await pending.started;
+    const rejected = expect(task).rejects.toMatchObject({ name: "AbortError" });
+    await context.taskQueries.close();
+    await rejected;
+    expect(producer!.aborted).toBe(false);
+    pending.resolve(result());
+    expect(await ordinary).toEqual(result());
+    expect(await context.service.query(scope, request)).toEqual(result());
+    expect(context.store.read(context.runId).evidence).toEqual([]);
+    expect(context.query).toHaveBeenCalledTimes(1);
+    await expect(
+      context.taskQueries.queryForTask(context.op, request, "new"),
+    ).rejects.toMatchObject({ name: "AbortError" });
   });
 
   it("captures mutable scope and parameters before asynchronous loading", async () => {
@@ -281,11 +326,15 @@ describe("query service composition", () => {
   it("deduplicates the same task call, conflicts on changed parameters, and registers once", async () => {
     const context = setup();
     const pending = gate(context);
-    const first = context.service.queryForTask(context.op, request, "data");
-    const second = context.service.queryForTask(context.op, request, "data");
+    const first = context.taskQueries.queryForTask(context.op, request, "data");
+    const second = context.taskQueries.queryForTask(
+      context.op,
+      request,
+      "data",
+    );
     await pending.started;
     await expect(
-      context.service.queryForTask(
+      context.taskQueries.queryForTask(
         context.op,
         { ...request, parameters: { ...request.parameters, maxAgeMs: 1 } },
         "data",
@@ -307,8 +356,12 @@ describe("query service composition", () => {
     const context = setup();
     const pending = gate(context);
     const other = context.claim("b");
-    const first = context.service.queryForTask(context.op, request, "first");
-    const second = context.service.queryForTask(other, request, "second");
+    const first = context.taskQueries.queryForTask(
+      context.op,
+      request,
+      "first",
+    );
+    const second = context.taskQueries.queryForTask(other, request, "second");
     await pending.started;
     pending.resolve(result());
     const [a, b] = await Promise.all([first, second]);
@@ -322,13 +375,17 @@ describe("query service composition", () => {
     const pending = gate(context);
     const controller = new AbortController();
     const reason = new Error("caller cancelled");
-    const cancelled = context.service.queryForTask(
+    const cancelled = context.taskQueries.queryForTask(
       context.op,
       request,
       "data",
       controller.signal,
     );
-    const surviving = context.service.queryForTask(context.op, request, "data");
+    const surviving = context.taskQueries.queryForTask(
+      context.op,
+      request,
+      "data",
+    );
     const producerSignal = await pending.started;
     controller.abort(reason);
     await expect(cancelled).rejects.toBe(reason);
@@ -344,14 +401,14 @@ describe("query service composition", () => {
     const pending = gate(context);
     const controller = new AbortController();
     const reason = new Error("first task query stopped");
-    const first = context.service.queryForTask(
+    const first = context.taskQueries.queryForTask(
       context.op,
       request,
       "first",
       controller.signal,
     );
     const other = context.claim("b");
-    const second = context.service.queryForTask(other, request, "second");
+    const second = context.taskQueries.queryForTask(other, request, "second");
     const producer = await pending.started;
     const rejected = expect(first).rejects.toBe(reason);
     controller.abort(reason);
@@ -377,7 +434,7 @@ describe("query service composition", () => {
     });
     context.query.mockRejectedValue(failure);
     await expect(
-      context.service.queryForTask(context.op, request, "data"),
+      context.taskQueries.queryForTask(context.op, request, "data"),
     ).rejects.toBe(failure);
     expect(failure.cause).toBe(underlying);
     expect(context.query).toHaveBeenCalledTimes(1);
@@ -399,7 +456,7 @@ describe("query service composition", () => {
         throw failure;
       });
       await expect(
-        context.service.queryForTask(context.op, request, "data"),
+        context.taskQueries.queryForTask(context.op, request, "data"),
       ).rejects.toBe(failure);
       expect(context.store.read(context.runId).evidence).toEqual([]);
       expect(
@@ -413,12 +470,13 @@ describe("query service composition", () => {
 
   it("replays saved calls without a configured source while new calls fail explicitly", async () => {
     const context = setup();
-    const saved = await context.service.queryForTask(
+    const saved = await context.taskQueries.queryForTask(
       context.op,
       request,
       "data",
     );
-    const unconfigured = context.create({});
+    const unconfigured = new TaskQueryService(context.create({}), context.runs);
+    services.push(unconfigured);
     expect(
       await unconfigured.queryForTask(context.op, request, "data"),
     ).toEqual(saved);
@@ -434,7 +492,7 @@ describe("query service composition", () => {
     async (transition) => {
       const context = setup();
       const pending = gate(context);
-      const operation = context.service.queryForTask(
+      const operation = context.taskQueries.queryForTask(
         context.op,
         request,
         "data",
@@ -447,7 +505,7 @@ describe("query service composition", () => {
       await expect(operation).rejects.toMatchObject({ code: "STALE_ATTEMPT" });
       expect(context.store.read(context.runId).evidence).toEqual([]);
       await expect(
-        context.service.queryForTask(context.op, request, "new"),
+        context.taskQueries.queryForTask(context.op, request, "new"),
       ).rejects.toMatchObject({ code: "STALE_ATTEMPT" });
       expect(context.query).toHaveBeenCalledTimes(1);
     },
@@ -457,7 +515,11 @@ describe("query service composition", () => {
     const context = setup();
     const pending = gate(context);
     const operation = { ...context.op };
-    const oldQuery = context.service.queryForTask(operation, request, "data");
+    const oldQuery = context.taskQueries.queryForTask(
+      operation,
+      request,
+      "data",
+    );
     await pending.started;
     const control = { runId: context.runId, identity: "owner" };
     context.runs.redo(control, "a", "redo");
@@ -484,13 +546,20 @@ describe("query service composition", () => {
   it("waits for its aborted loader to settle on close and never caches or registers a late result", async () => {
     const context = setup();
     const pending = gate(context);
-    const operation = context.service.queryForTask(context.op, request, "data");
+    const operation = context.taskQueries.queryForTask(
+      context.op,
+      request,
+      "data",
+    );
     const signal = await pending.started;
     const rejected = expect(operation).rejects.toMatchObject({
       name: "AbortError",
     });
     let closed = false;
-    const closing = context.service.close().then(() => {
+    const closing = Promise.all([
+      context.taskQueries.close(),
+      context.service.close(),
+    ]).then(() => {
       closed = true;
     });
     expect(signal!.aborted).toBe(true);
@@ -504,7 +573,7 @@ describe("query service composition", () => {
       name: "AbortError",
     });
     await expect(
-      context.service.queryForTask(context.op, request, "new"),
+      context.taskQueries.queryForTask(context.op, request, "new"),
     ).rejects.toMatchObject({ name: "AbortError" });
     context.cache.set(cacheKey(), result(), 60000);
     expect(context.cache.get(cacheKey())).toEqual(result());

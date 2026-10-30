@@ -18,6 +18,7 @@ import type { RunState } from "../../src/contracts/runs.js";
 import { HttpClient } from "../../src/data/http.js";
 import { YahooMarketAdapter } from "../../src/data/yahoo-market.js";
 import { QueryService } from "../../src/services/query.js";
+import { TaskQueryService } from "../../src/services/task-query.js";
 import { DataRoot } from "../../src/storage/data-root.js";
 import { RunStore } from "../../src/runs/store.js";
 import { RunService } from "../../src/services/runs.js";
@@ -140,8 +141,9 @@ function setup() {
     research: 60_000,
   };
   const sources = { yahoo: { capability, query } };
-  const service = new QueryService(sources, cache, runs, policy);
-  const services = [service];
+  const service = new QueryService(sources, cache, policy);
+  const taskQueries = new TaskQueryService(service, runs);
+  const services: { close(): Promise<void> }[] = [taskQueries, service];
   const releases: (() => void)[] = [];
   cleanups.push(async () => {
     for (const release of releases) release();
@@ -208,6 +210,7 @@ function setup() {
   }
   return {
     service,
+    taskQueries,
     services,
     cache,
     runs,
@@ -324,7 +327,7 @@ describe("derived market queries", () => {
       { kind: "macd", fastPeriod: 1, slowPeriod: 2, signalPeriod: 2 },
       { kind: "rsi", period: 2 },
     ]);
-    const result = await context.service.queryForTask(
+    const result = await context.taskQueries.queryForTask(
       context.operation,
       request,
       "indicators",
@@ -422,7 +425,7 @@ describe("derived market queries", () => {
     async (condition) => {
       const context = setup();
       if (condition === "latest missing") context.market.bars[3]!.close = null;
-      const result = await context.service.queryForTask(
+      const result = await context.taskQueries.queryForTask(
         context.operation,
         indicators([{ kind: "sma", period: condition === "warmup" ? 5 : 2 }]),
         "indicators",
@@ -441,7 +444,7 @@ describe("derived market queries", () => {
   it("keeps the available MACD component while its signal and histogram are warming up", async () => {
     const context = setup();
     context.market.bars = context.market.bars.slice(0, 2);
-    const result = await context.service.queryForTask(
+    const result = await context.taskQueries.queryForTask(
       context.operation,
       indicators([
         { kind: "macd", fastPeriod: 1, slowPeriod: 2, signalPeriod: 3 },
@@ -458,30 +461,26 @@ describe("derived market queries", () => {
   it("keeps task request identity separate from the shared raw cache and replays saved calculations", async () => {
     const context = setup();
     const request = indicators([{ kind: "sma", period: 2 }]);
-    const saved = await context.service.queryForTask(
+    const saved = await context.taskQueries.queryForTask(
       context.operation,
       request,
       "indicators",
     );
     await expect(
-      context.service.queryForTask(
+      context.taskQueries.queryForTask(
         context.operation,
         indicators([{ kind: "sma", period: 3 }]),
         "indicators",
       ),
     ).rejects.toMatchObject({ code: "REQUEST_CONFLICT" });
-    await context.service.queryForTask(
+    await context.taskQueries.queryForTask(
       context.operation,
       indicators([{ kind: "sma", period: 3 }]),
       "other",
     );
-    const offline = new QueryService(
-      {},
-      context.cache,
-      context.runs,
-      context.policy,
-    );
-    context.services.push(offline);
+    const offlineQueries = new QueryService({}, context.cache, context.policy);
+    const offline = new TaskQueryService(offlineQueries, context.runs);
+    context.services.push(offline, offlineQueries);
     expect(
       await offline.queryForTask(context.operation, request, "indicators"),
     ).toEqual(saved);
@@ -493,7 +492,7 @@ describe("derived market queries", () => {
     const context = setup();
     const gate = context.pause();
     const request = indicators([{ kind: "sma", period: 2 }]);
-    const pending = context.service.queryForTask(
+    const pending = context.taskQueries.queryForTask(
       context.operation,
       request,
       "indicators",
@@ -515,7 +514,7 @@ describe("derived market queries", () => {
 describe("price-return query composition", () => {
   it("uses bounded prior sessions and preserves actual dates, prices, raw inputs and remapped gaps", async () => {
     const context = setup();
-    const result = await context.service.queryForTask(
+    const result = await context.taskQueries.queryForTask(
       context.operation,
       returns,
       "returns",
@@ -597,7 +596,7 @@ describe("price-return query composition", () => {
           comparable: condition !== "unconfirmed basis",
         },
       };
-      const result = await context.service.queryForTask(
+      const result = await context.taskQueries.queryForTask(
         context.operation,
         request,
         "returns",
@@ -647,7 +646,7 @@ describe("price-return query composition", () => {
     async (change) => {
       const context = setup();
       await expect(
-        context.service.queryForTask(
+        context.taskQueries.queryForTask(
           context.operation,
           { ...returns, parameters: { ...returns.parameters, ...change } },
           "returns",
@@ -661,7 +660,7 @@ describe("price-return query composition", () => {
   it("rejects late derived evidence after redo and preserves the raw cache for a new attempt", async () => {
     const context = setup();
     const gate = context.pause();
-    const pending = context.service.queryForTask(
+    const pending = context.taskQueries.queryForTask(
       context.operation,
       returns,
       "returns",
@@ -684,7 +683,7 @@ describe("price-return query composition", () => {
       identity: "worker",
       sessionId: null,
     };
-    await context.service.queryForTask(next, returns, "returns");
+    await context.taskQueries.queryForTask(next, returns, "returns");
     expect(context.query).toHaveBeenCalledTimes(1);
     expect(context.store.read(context.runId).evidence).toHaveLength(1);
   });

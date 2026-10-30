@@ -16,6 +16,7 @@ import type {
 import { HostResearchAdapter } from "../../src/data/host-research.js";
 import { RunStore } from "../../src/runs/store.js";
 import { QueryService } from "../../src/services/query.js";
+import { TaskQueryService } from "../../src/services/task-query.js";
 import { RunService } from "../../src/services/runs.js";
 import { DataRoot } from "../../src/storage/data-root.js";
 import { US_SECURITY } from "../fixtures/market.js";
@@ -536,12 +537,12 @@ describe("pinned replay run inputs", () => {
     const queries = new QueryService(
       { research: new HostResearchAdapter(search) },
       cache,
-      context.runs,
       { market: 60_000, fundamentals: 60_000, macro: 60_000, research: 60_000 },
     );
+    const taskQueries = new TaskQueryService(queries, context.runs);
     try {
       await expect(
-        queries.queryForTask(
+        taskQueries.queryForTask(
           operation,
           {
             dataset: "research",
@@ -563,7 +564,7 @@ describe("pinned replay run inputs", () => {
       ).toEqual(context.store.read(runId).lineage);
     } finally {
       try {
-        await queries.close();
+        await Promise.all([taskQueries.close(), queries.close()]);
       } finally {
         cache.close();
       }

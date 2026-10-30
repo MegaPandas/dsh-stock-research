@@ -7,6 +7,7 @@ import {
   type SessionBindings,
 } from "../host/bindings.js";
 import type { QueryService } from "../services/query.js";
+import type { TaskQueryService } from "../services/task-query.js";
 import type { RunService } from "../services/runs.js";
 import { researchTool } from "./errors.js";
 import {
@@ -26,7 +27,8 @@ import {
 
 export interface DataToolServices {
   runs: RunService;
-  queries: Pick<QueryService, "query" | "queryForTask" | "replayForTask">;
+  queries: Pick<QueryService, "query">;
+  taskQueries: Pick<TaskQueryService, "queryForTask" | "replayForTask">;
 }
 function dataScope(caller: BoundCaller, runs: RunService): ResearchScope {
   const binding = caller.binding;
@@ -107,13 +109,13 @@ export function createDataTools(
           const operation = taskOperation(caller);
           const result =
             source === null
-              ? await services.queries.queryForTask(
+              ? await services.taskQueries.queryForTask(
                   operation,
                   request,
                   exec.callId,
                   exec.signal,
                 )
-              : await services.queries.replayForTask(
+              : await services.taskQueries.replayForTask(
                   operation,
                   request,
                   exec.callId,

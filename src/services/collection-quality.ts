@@ -1,9 +1,9 @@
 import type { CollectedTableData } from "../contracts/collection.js";
 import type { DataEnvelope } from "../contracts/data.js";
 
-// Fields needed by the existing financial metrics and valuation inputs. Each
-// inner group permits source-reported alternatives, without mixing source tables.
-const FINANCIAL_FIELDS: Record<string, readonly (readonly string[])[]> = {
+// Each inner group permits source-reported alternatives within one table.
+const CORE_FIELDS: Record<string, readonly (readonly string[])[]> = {
+  "benchmark.bondYields": [["china10y", "us10y"]],
   "financial.indicators": [["TOTALOPERATEREVE"], ["PARENTNETPROFIT"], ["BPS"]],
   "financial.quarter": [["TOTALOPERATEREVE"], ["PARENTNETPROFIT"]],
   "financial.income": [
@@ -20,7 +20,7 @@ const FINANCIAL_FIELDS: Record<string, readonly (readonly string[])[]> = {
 
 function coreFields(data: CollectedTableData): readonly (readonly string[])[] {
   return (
-    FINANCIAL_FIELDS[data.table] ??
+    CORE_FIELDS[data.table] ??
     (data.table === "market.daily" ||
     data.table === "market.weekly" ||
     data.table === "market.monthly"

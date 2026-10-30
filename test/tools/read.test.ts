@@ -45,7 +45,7 @@ function setup() {
     () => f.clock.value,
   );
   const cache = new SqliteCache({ path: ":memory:", maxEntries: 10 });
-  const queries = new QueryService({}, cache, f.runs, {
+  const queries = new QueryService({}, cache, {
     market: 0,
     fundamentals: 0,
     macro: 0,

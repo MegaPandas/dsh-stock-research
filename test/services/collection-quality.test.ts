@@ -56,6 +56,18 @@ function envelope(
   };
 }
 
+function bondEnvelope(values: {
+  china10y: number | null;
+  us10y: number | null;
+}): DataEnvelope<CollectedTableData> {
+  const result = envelope("benchmark.bondYields", values);
+  result.dataset = "macro";
+  result.data.basis = "source_reported_daily_yield";
+  for (const column of Object.values(result.data.columns))
+    column.unit = "percent";
+  return result;
+}
+
 describe("collection source coverage", () => {
   it.each(["TOTAL_OPERATE_INCOME", "OPERATE_INCOME"])(
     "accepts reported income using %s with parent profit",
@@ -85,7 +97,58 @@ describe("collection source coverage", () => {
     expect(
       collectionCoverageIssue(envelope("benchmark.dxy.daily", { close: 100 })),
     ).toBeUndefined();
+    expect(
+      collectionCoverageIssue(envelope("benchmark.dxy.daily", { close: null })),
+    ).toContain("close");
   });
+
+  it.each([
+    { china10y: 1.6233, us10y: 4.98 },
+    { china10y: null, us10y: 4.98 },
+    { china10y: 1.6233, us10y: null },
+  ])(
+    "accepts bond yields with country-specific missing values: %j",
+    (values) => {
+      const data = bondEnvelope(values);
+      for (const [field, value] of Object.entries(values))
+        if (value === null)
+          data.gaps.push({
+            code: "missing",
+            field: `/data/rows/0/values/${field}`,
+            detail: "The source has no yield for this country and date.",
+          });
+      const original = structuredClone(data);
+      expect(collectionCoverageIssue(data)).toBeUndefined();
+      expect(data).toEqual(original);
+    },
+  );
+
+  it("identifies bond observations with neither country's yield", () => {
+    expect(
+      collectionCoverageIssue(bondEnvelope({ china10y: null, us10y: null })),
+    ).toContain("china10y or us10y");
+  });
+
+  it.each(["empty", "stale", "short"] as const)(
+    "keeps %s bond history insufficient",
+    (problem) => {
+      const data = bondEnvelope({ china10y: 1.6233, us10y: 4.98 });
+      if (problem === "empty") data.data.rows = [];
+      else if (problem === "stale") data.stale = true;
+      else
+        data.gaps.push({
+          code: "missing",
+          field: "/data/rows",
+          detail: "Only 10 of the requested 60 observations are available.",
+        });
+      const expected = {
+        empty: "The source returned no observations.",
+        stale: "The source observations exceed the freshness budget.",
+        short: "Only 10 of the requested 60 observations are available.",
+      };
+      expect(collectionCoverageIssue(data)).toBe(expected[problem]);
+    },
+  );
 
   it("does not reject missing optional stock quantities or unverified publication times", () => {
     const data = envelope("market.daily", {

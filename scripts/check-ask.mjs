@@ -52,6 +52,7 @@ const allowedTools = new Set([
   "stock_recall",
 ]);
 let tencentRequests = 0;
+const tencentRequestsByPeriod = {};
 let stage = "profile";
 let runtime;
 let caller;
@@ -119,8 +120,13 @@ try {
     if (
       url.origin === "https://web.ifzq.gtimg.cn" &&
       url.pathname === "/appstock/app/fqkline/get"
-    )
+    ) {
+      const [symbol, period] = url.searchParams.get("param").split(",");
+      assert.equal(symbol, "sz002594");
       tencentRequests++;
+      tencentRequestsByPeriod[period] =
+        (tencentRequestsByPeriod[period] ?? 0) + 1;
+    }
     return nativeFetch(input, options);
   };
   const collect = runtime.collection.collect.bind(runtime.collection);
@@ -219,7 +225,11 @@ try {
     answer.includes(observations[0].latest.date),
     "The answer must identify the captured trading date",
   );
-  assert.equal(tencentRequests, 1, "Exactly one Tencent HTTP source request");
+  assert.deepEqual(
+    tencentRequestsByPeriod,
+    { day: 1, week: 1, month: 1 },
+    "Each configured Tencent K-line period must be requested exactly once",
+  );
   assert.ok(
     [...calls.values()].every(
       (call) => call.provider === "magpie" && call.model === model,
@@ -236,7 +246,10 @@ try {
         calls: [...calls.values()],
         toolCalls: [...toolCalls.values()],
         observations,
-        sourceRequests: { tencent: tencentRequests },
+        sourceRequests: {
+          tencent: tencentRequests,
+          tencentByPeriod: tencentRequestsByPeriod,
+        },
         collectionFailures,
         answer: execution.result.text,
       },
@@ -259,7 +272,10 @@ try {
       calls: [...calls.values()],
       toolCalls: [...toolCalls.values()],
       observations,
-      sourceRequests: { tencent: tencentRequests },
+      sourceRequests: {
+        tencent: tencentRequests,
+        tencentByPeriod: tencentRequestsByPeriod,
+      },
       collectionFailures,
       answer,
       durationMs: performance.now() - startedAt,

@@ -13,6 +13,7 @@ import {
   MemoryStore,
   NumberService,
   QueryService,
+  TaskQueryService,
   RunService,
   RunStore,
   SqliteCache,
@@ -30,6 +31,7 @@ const directory = mkdtempSync(join(tmpdir(), "dsh-stock-tools-package-"));
 let root;
 let cache;
 let queries;
+let taskQueries;
 let memory;
 try {
   root = new DataRoot(directory);
@@ -75,7 +77,6 @@ try {
       },
     },
     cache,
-    runs,
     {
       market: 60_000,
       fundamentals: 0,
@@ -83,6 +84,7 @@ try {
       research: 0,
     },
   );
+  taskQueries = new TaskQueryService(queries, runs);
   memory = new MemoryService(
     new MemoryStore(root, () => ({ stateVersion: 1, receipts: [] })),
     runs,
@@ -108,7 +110,7 @@ try {
   };
   const tools = [
     ...createReadTools({ runs, queries, memory, numbers }, bindings),
-    ...createDataTools({ runs, queries }, bindings, policy),
+    ...createDataTools({ runs, queries, taskQueries }, bindings, policy),
     ...createWriteTools(
       { artifacts, memory, digests, decisions },
       bindings,
@@ -295,7 +297,7 @@ try {
     await memory?.close();
   } finally {
     try {
-      await queries?.close();
+      await Promise.all([taskQueries?.close(), queries?.close()]);
     } finally {
       try {
         cache?.close();

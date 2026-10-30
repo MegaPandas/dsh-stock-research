@@ -4,6 +4,7 @@ dist/
 coverage/
 *.tsbuildinfo
 *.tgz
+/.codegraph/
 
 # Local environment and credentials
 .env

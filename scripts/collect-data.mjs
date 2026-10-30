@@ -8,8 +8,6 @@ import {
   DataRoot,
   HttpClient,
   QueryService,
-  RunService,
-  RunStore,
   SqliteCache,
   parseLocalDate,
 } from "@megapandas/dsh-stock-research/core";
@@ -63,8 +61,7 @@ const ttl = {
   macro: 86400000,
   research: 0,
 };
-const runs = new RunService(new RunStore(root), () => new Date().toISOString());
-const queries = new QueryService({}, cache, runs, ttl);
+const queries = new QueryService({}, cache, ttl);
 const collector = new CollectionService(http, cache, queries, {
   enabledSources: [
     "eastmoney-market",

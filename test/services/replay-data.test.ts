@@ -21,6 +21,7 @@ import { HttpClient } from "../../src/data/http.js";
 import { YahooMarketAdapter } from "../../src/data/yahoo-market.js";
 import { RunStore } from "../../src/runs/store.js";
 import { QueryService } from "../../src/services/query.js";
+import { TaskQueryService } from "../../src/services/task-query.js";
 import { RunService } from "../../src/services/runs.js";
 import { DataRoot } from "../../src/storage/data-root.js";
 import { US_SECURITY } from "../fixtures/market.js";
@@ -184,17 +185,17 @@ function setup() {
     const queryService = new QueryService(
       { yahoo: { capability, query: fetch } },
       cache,
-      service,
       { market: 60_000, fundamentals: 60_000, macro: 60_000, research: 60_000 },
     );
+    const taskQueries = new TaskQueryService(queryService, service);
     cleanups.push(async () => {
       try {
-        await queryService.close();
+        await Promise.all([taskQueries.close(), queryService.close()]);
       } finally {
         cache.close();
       }
     });
-    return { service: queryService, get, set, fetch };
+    return { service: taskQueries, get, set, fetch };
   }
   const runDirectory = (target: string) =>
     join(directory, "runs", "2024-01-03", `US_NVDA-quick-${target}`);

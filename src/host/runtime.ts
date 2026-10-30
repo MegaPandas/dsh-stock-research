@@ -26,6 +26,7 @@ import { DigestService } from "../services/digests.js";
 import { MemoryService } from "../services/memory.js";
 import { NumberService } from "../services/numbers.js";
 import { QueryService } from "../services/query.js";
+import { TaskQueryService } from "../services/task-query.js";
 import { CollectionService } from "../services/collection.js";
 import { CollectionSnapshotStore } from "../storage/collection-snapshots.js";
 import { selectQuerySnapshot } from "../services/query-snapshot.js";
@@ -108,6 +109,7 @@ interface Components {
   http: HttpClient;
   runs: RunService;
   queries: QueryService;
+  taskQueries: TaskQueryService;
   collection: CollectionService;
   memory: MemoryService;
   numbers: NumberService;
@@ -260,11 +262,11 @@ class Runtime implements ResearchRuntime {
     snapshots: readonly QuerySnapshot[] = [],
   ): ToolDefinition[] {
     const { bindings, numbers, artifacts, decisions } = this.components;
-    const queries: DataToolServices["queries"] = {
-      query: (...args) => this.queries.query(...args),
-      replayForTask: (...args) => this.queries.replayForTask(...args),
+    const taskQueries: DataToolServices["taskQueries"] = {
+      replayForTask: (...args) =>
+        this.components.taskQueries.replayForTask(...args),
       queryForTask: (operation, request, callId, signal) =>
-        this.queries.queryForTask(
+        this.components.taskQueries.queryForTask(
           operation,
           request,
           callId,
@@ -283,7 +285,11 @@ class Runtime implements ResearchRuntime {
         bindings,
       ),
       ...createValuationTools(this.runs, bindings),
-      ...createDataTools({ runs: this.runs, queries }, bindings, policy),
+      ...createDataTools(
+        { runs: this.runs, queries: this.queries, taskQueries },
+        bindings,
+        policy,
+      ),
       ...createWriteTools(
         { artifacts, decisions, memory: this.memory, digests: this.dispatch },
         bindings,
@@ -397,6 +403,7 @@ class Runtime implements ResearchRuntime {
       ...(await settle([
         () => this.dispatch.close(),
         () => this.queries.close(),
+        () => this.components.taskQueries.close(),
         () => this.collection.close(),
         () => this.memory.close(),
         () => http.close(),
@@ -452,13 +459,10 @@ export function createResearchPlugin(prepareRole: PrepareRole) {
         const sources = createSources(ctx, http, config);
         const now = () => new Date().toISOString();
         const runs = new RunService(new RunStore<RunState>(root), now);
-        const queries = new QueryService(
-          sources,
-          cache,
-          runs,
-          config.cache.ttl,
-        );
+        const queries = new QueryService(sources, cache, config.cache.ttl);
         acquired.push(() => queries.close());
+        const taskQueries = new TaskQueryService(queries, runs);
+        acquired.push(() => taskQueries.close());
         const collection = new CollectionService(
           http,
           cache,
@@ -514,6 +518,7 @@ export function createResearchPlugin(prepareRole: PrepareRole) {
             http,
             runs,
             queries,
+            taskQueries,
             collection,
             memory,
             numbers,

@@ -192,6 +192,14 @@ export interface ValuationInputs {
   };
 }
 export type ValuationMethodId = keyof ValuationInputs;
+/**
+ * Provenance records the analyst's basis, not machine-verified facts. The program
+ * validates input structure, computes deterministically and checks output consistency;
+ * source selection, normalization and forecasts remain analytical judgments.
+ * Keep the basis narrative: mandatory evidence selectors add model bookkeeping
+ * without proving that the selected field is appropriate for the valuation input.
+ * An `observed` label does not certify factual accuracy; saved inputs enable replay.
+ */
 export interface ValuationProvenance {
   path: string;
   kind: "observed" | "normalized" | "assumed";

@@ -22,6 +22,7 @@ import {
   type ResearchBinding,
 } from "../../src/host/bindings.js";
 import { QueryService } from "../../src/services/query.js";
+import { TaskQueryService } from "../../src/services/task-query.js";
 import { createDataTools } from "../../src/tools/data.js";
 import {
   dataSchemas,
@@ -157,12 +158,13 @@ function setup(mapped = true) {
     ),
   };
   const cache = new SqliteCache({ path: ":memory:", maxEntries: 100 });
-  const queries = new QueryService(sources, cache, f.runs, {
+  const queries = new QueryService(sources, cache, {
     market: 60000,
     fundamentals: 60000,
     macro: 60000,
     research: 60000,
   });
+  const taskQueries = new TaskQueryService(queries, f.runs);
   const bindings = new SessionBindings();
   const secCiks: Record<string, string> = mapped
     ? { "US:NVDA": "0001045810" }
@@ -171,7 +173,11 @@ function setup(mapped = true) {
     freshness: { market: 11, fundamentals: 22, macro: 33 },
     secCiks,
   } satisfies QueryToolPolicy;
-  const tools = createDataTools({ runs: f.runs, queries }, bindings, policy);
+  const tools = createDataTools(
+    { runs: f.runs, queries, taskQueries },
+    bindings,
+    policy,
+  );
   let agentSequence = 0;
   function agent(binding: ResearchBinding) {
     const caller = { id: `data-agent-${++agentSequence}` } as Agent;
@@ -201,7 +207,7 @@ function setup(mapped = true) {
       .find((tool) => tool.name === name)!
       .execute(args, { agent: caller, callId, signal } as ToolRunContext);
   cleanups.push(async () => {
-    await queries.close();
+    await Promise.all([taskQueries.close(), queries.close()]);
     cache.close();
     await http.close();
     f.close();

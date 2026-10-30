@@ -12,6 +12,7 @@ import type {
 import type { RunState } from "../../src/contracts/runs.js";
 import { marketCapability } from "../../src/data/market.js";
 import { QueryService } from "../../src/services/query.js";
+import { TaskQueryService } from "../../src/services/task-query.js";
 import { selectQuerySnapshot } from "../../src/services/query-snapshot.js";
 import { RunService } from "../../src/services/runs.js";
 import { RunStore } from "../../src/runs/store.js";
@@ -59,7 +60,8 @@ const contexts: {
   directory: string;
   root: DataRoot;
   cache: SqliteCache;
-  service: QueryService;
+  service: TaskQueryService;
+  queries: QueryService;
 }[] = [];
 function setup(cutoff = scope.cutoff, date = scope.date) {
   const directory = fs.mkdtempSync(join(tmpdir(), "dsh-query-snapshots-"));
@@ -71,7 +73,7 @@ function setup(cutoff = scope.cutoff, date = scope.date) {
     maxEntries: 10,
   });
   let sourceCalls = 0;
-  const service = new QueryService(
+  const queries = new QueryService(
     {
       yahoo: {
         capability: { ...marketCapability("yahoo", "US"), adapterVersion: "2" },
@@ -82,9 +84,9 @@ function setup(cutoff = scope.cutoff, date = scope.date) {
       },
     },
     cache,
-    runs,
     { market: 60_000, fundamentals: 60_000, macro: 60_000, research: 60_000 },
   );
+  const service = new TaskQueryService(queries, runs);
   const { runId } = runs.open(
     "owner",
     {
@@ -127,6 +129,7 @@ function setup(cutoff = scope.cutoff, date = scope.date) {
     runs,
     cache,
     service,
+    queries,
     operation,
     sourceCalls: () => sourceCalls,
   };
@@ -136,6 +139,7 @@ function setup(cutoff = scope.cutoff, date = scope.date) {
 afterEach(async () => {
   for (const c of contexts.splice(0)) {
     await c.service.close();
+    await c.queries.close();
     c.cache.close();
     c.root.close();
     fs.rmSync(c.directory, { recursive: true, force: true });

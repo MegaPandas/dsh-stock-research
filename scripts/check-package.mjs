@@ -28,6 +28,7 @@ import {
   validateRunDefinition,
   RunService,
   QueryService,
+  TaskQueryService,
   NumberService,
   ArtifactService,
   DecisionService,
@@ -390,9 +391,9 @@ try {
       }),
     },
     queryCache,
-    service,
     { market: 60_000, fundamentals: 60_000, macro: 60_000, research: 60_000 },
   );
+  const taskQueries = new TaskQueryService(queries, service);
   try {
     const request = {
       dataset: "research",
@@ -400,7 +401,7 @@ try {
       parameters: { query: "NVDA earnings", maxResults: 1 },
     };
     const ordinary = await queries.query(definition.scope, request);
-    const registered = await queries.queryForTask(
+    const registered = await taskQueries.queryForTask(
       taskOperation,
       request,
       "search",
@@ -410,7 +411,7 @@ try {
     assert.equal(registered.envelope.retrievedAt, ordinary.retrievedAt);
     assert.deepEqual(registered.envelope.candidateClaims, []);
     assert.deepEqual(
-      await queries.queryForTask(taskOperation, request, "search"),
+      await taskQueries.queryForTask(taskOperation, request, "search"),
       registered,
     );
     assert.equal(queries.health(definition.scope).sources.length, 8);
@@ -422,7 +423,7 @@ try {
       INDICATORS_ALGORITHM_VERSION,
     );
     assert.deepEqual(market.data.indicators.series[0].values, [7]);
-    const priceReturn = await queries.queryForTask(
+    const priceReturn = await taskQueries.queryForTask(
       taskOperation,
       {
         dataset: "returns",
@@ -449,7 +450,7 @@ try {
     assert.equal(marketCalls, 1);
   } finally {
     try {
-      await queries.close();
+      await Promise.all([taskQueries.close(), queries.close()]);
     } finally {
       queryCache.close();
     }
@@ -630,12 +631,13 @@ try {
     sessionId: null,
   };
   const offlineCache = new SqliteCache({ path: ":memory:", maxEntries: 8 });
-  const offline = new QueryService({}, offlineCache, service, {
+  const offlineQueries = new QueryService({}, offlineCache, {
     market: 60_000,
     fundamentals: 60_000,
     macro: 60_000,
     research: 60_000,
   });
+  const offline = new TaskQueryService(offlineQueries, service);
   try {
     const result = await offline.replayForTask(
       replayOperation,
@@ -658,7 +660,7 @@ try {
     assert.deepEqual(snapshot.replayedFrom, originalMemory);
   } finally {
     try {
-      await offline.close();
+      await Promise.all([offline.close(), offlineQueries.close()]);
     } finally {
       offlineCache.close();
     }
