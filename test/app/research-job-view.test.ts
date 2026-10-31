@@ -2,7 +2,7 @@ import { expect, it } from "vitest";
 import {
   collectionJobRecords,
   researchJobView,
-} from "../../src/app/research-job-view.js";
+} from "../../src/app/research-execution/view.js";
 import type { CollectionProgress } from "../../src/contracts/collection.js";
 import type { RunView } from "../../src/contracts/runs.js";
 import { CN_SECURITY } from "../fixtures/market.js";

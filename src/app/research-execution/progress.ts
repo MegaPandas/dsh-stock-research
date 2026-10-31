@@ -1,6 +1,6 @@
-import type { CollectionProgress } from "../contracts/collection.js";
-import type { RunView } from "../contracts/runs.js";
-import { ResearchError } from "../contracts/errors.js";
+import type { CollectionProgress } from "../../contracts/collection.js";
+import type { RunView } from "../../contracts/runs.js";
+import { ResearchError } from "../../contracts/errors.js";
 
 export function collectionProgress(progress: CollectionProgress): string {
   const current = progress.current;

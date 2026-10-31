@@ -46,7 +46,7 @@ describe("research control boundaries", () => {
     ["src/app/quick.ts", "./research-control/index.js"],
     ["src/app/research-control/index.ts", "./open.js"],
     ["src/app/research-control/index.ts", "../research-actions.js"],
-    ["src/app/research-control/index.ts", "../research-executions.js"],
+    ["src/app/research-control/index.ts", "../research-execution/index.js"],
     ["src/app/research-control/open.ts", "../plan/quick.js"],
     ["src/app/research-control/open.ts", "../research-stages.js"],
     ["src/app/role-preparation/role.ts", "../research-stages.js"],

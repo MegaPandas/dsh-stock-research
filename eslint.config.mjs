@@ -116,6 +116,10 @@ export default defineConfig(
             publicEntries: ["input.js", "submission.js"],
           },
           {
+            directory: "src/app/research-execution",
+            publicEntries: ["index.js", "labels.js"],
+          },
+          {
             directory: "src/evidence",
             publicEntries: ["fields.js", "checks.js", "price-basis.js"],
           },
@@ -379,7 +383,7 @@ export default defineConfig(
     },
   },
   {
-    files: ["src/app/research-executions.ts"],
+    files: ["src/app/research-execution/**/*.ts"],
     rules: {
       "no-restricted-imports": [
         "error",
@@ -390,13 +394,13 @@ export default defineConfig(
                 "**/tools/**",
                 "**/host/**",
                 "@deepseek-ai/dsh-commands",
-                "./quick.js",
-                "./research-control/**",
-                "./research-commands.js",
-                "./research-tools.js",
-                "./research-read-tools.js",
-                "./plan/**",
-                "./research-models.js",
+                "**/quick.js",
+                "**/research-control/**",
+                "**/research-commands.js",
+                "**/research-tools.js",
+                "**/research-read-tools.js",
+                "**/plan/**",
+                "**/research-models.js",
               ],
               message:
                 "Execution ownership must not depend on commands, tool adapters, research policy, or runtime composition.",
@@ -475,7 +479,7 @@ export default defineConfig(
             {
               group: [
                 "./research-control/**",
-                "./research-executions.js",
+                "./research-execution/**",
                 "**/services/**",
                 "**/storage/**",
                 "**/runs/**",
@@ -489,7 +493,7 @@ export default defineConfig(
     },
   },
   {
-    files: ["src/app/research-job-view.ts"],
+    files: ["src/app/research-execution/{view,progress,labels}.ts"],
     rules: {
       "no-restricted-imports": [
         "error",
@@ -506,6 +510,11 @@ export default defineConfig(
                 "**/runs/**",
                 "**/cache/**",
                 "**/memory/**",
+                "./index.js",
+                "./output.js",
+                "../research-control/**",
+                "../plan/**",
+                "../quick.js",
               ],
               allowTypeImports: true,
               message:

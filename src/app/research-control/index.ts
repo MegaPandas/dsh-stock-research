@@ -26,12 +26,12 @@ import type { ModelConfig } from "../../contracts/settings.js";
 import {
   ResearchExecutions,
   type ResearchExecutionPorts,
-} from "../research-executions.js";
+} from "../research-execution/index.js";
 import { createReplayInput } from "../replay-input.js";
 import {
   researchStartLabel,
   researchContinueLabel,
-} from "../research-job-view.js";
+} from "../research-execution/labels.js";
 import { PUBLIC_SEARCH_LIMITS } from "../public-research.js";
 import type {
   ResearchActions,

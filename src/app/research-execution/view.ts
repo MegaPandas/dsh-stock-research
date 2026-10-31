@@ -1,29 +1,16 @@
 import type { JobOutcome } from "@deepseek-ai/dsh-jobs";
-import type { CollectionProgress } from "../contracts/collection.js";
-import type { ResearchScope } from "../contracts/data.js";
-import type { RunView } from "../contracts/runs.js";
-import type { RunDefinition } from "../contracts/workflow.js";
+import type { CollectionProgress } from "../../contracts/collection.js";
+import type { RunView } from "../../contracts/runs.js";
 import type {
   CollectionCounts,
   ResearchIdentity,
   ResearchJobRecord,
   ResearchProgress,
   ResearchState,
-} from "../contracts/research-progress.js";
-import { collectionProgress, researchProgress } from "./research-progress.js";
+} from "../../contracts/research-progress.js";
+import { collectionProgress, researchProgress } from "./progress.js";
 
 export type ResearchPreparationStatus = "preparing" | "failed" | "cancelled";
-
-export function researchStartLabel(
-  scope: ResearchScope,
-  mode: RunDefinition["mode"],
-): string {
-  return `${scope.security.symbol} · ${mode === "quick" ? "快速研究" : "深度研究"} · ${scope.date}`;
-}
-
-export function researchContinueLabel(runId: string): string {
-  return `继续研究 ${runId}`;
-}
 
 export function collectionJobRecords(
   progress: CollectionProgress,

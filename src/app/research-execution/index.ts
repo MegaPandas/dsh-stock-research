@@ -5,27 +5,27 @@ import type {
   JobOutcome,
   JobRegistry,
 } from "@deepseek-ai/dsh-jobs";
-import type { RunReader } from "../contracts/run-access.js";
-import type { CollectionProgress } from "../contracts/collection.js";
+import type { RunReader } from "../../contracts/run-access.js";
+import type { CollectionProgress } from "../../contracts/collection.js";
 import type {
   CollectionCounts,
   ResearchIdentity,
-} from "../contracts/research-progress.js";
-import type { CancelRunResult, RunOperation } from "../contracts/runs.js";
-import { serializeJson } from "../json/serialize.js";
-import { failureDetail } from "./research-progress.js";
+} from "../../contracts/research-progress.js";
+import type { CancelRunResult, RunOperation } from "../../contracts/runs.js";
+import { serializeJson } from "../../json/serialize.js";
+import { failureDetail } from "./progress.js";
 import {
   RESEARCH_JOB_KIND,
   RESEARCH_STEP_JOB_KIND,
-} from "../contracts/research-progress.js";
-import type {} from "./research-job.js";
-import { appendResearchRecord } from "./research-job-output.js";
+} from "../../contracts/research-progress.js";
+import type {} from "./job.js";
+import { appendResearchRecord } from "./output.js";
 import {
   collectionJobRecords,
   researchJobOutcome,
   researchJobView,
   type ResearchPreparationStatus,
-} from "./research-job-view.js";
+} from "./view.js";
 
 const JOB_WAIT_MS = 60_000;
 

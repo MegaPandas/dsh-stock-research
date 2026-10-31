@@ -32,23 +32,23 @@ it.each([
 );
 it.each([
   'import type { RunReader, RunLifecycle } from "../../contracts/run-access.js";',
-  'import type { ResearchExecutionPorts } from "../research-executions.js";',
+  'import type { ResearchExecutionPorts } from "../research-execution/index.js";',
   'import type { ResearchCaller } from "../../host/bindings.js";',
 ])("allows an explicit research capability", async (source) => {
   expect(await boundaryErrors(source)).toEqual([]);
 });
 
 it.each([
-  "./plan/quick.js",
-  "./plan/deep.js",
-  "./plan/versions.js",
-  "./research-control/index.js",
+  "../plan/quick.js",
+  "../plan/deep.js",
+  "../plan/versions.js",
+  "../research-control/index.js",
 ])(
   "keeps execution ownership independent of research policy or control %s",
   async (dependency) => {
     const errors = await boundaryErrors(
       `import type { Value } from "${dependency}";`,
-      "src/app/research-executions.ts",
+      "src/app/research-execution/index.ts",
     );
     expect(errors).toHaveLength(1);
     expect(errors[0]!.message).toContain("Execution ownership");
