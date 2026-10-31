@@ -2,6 +2,7 @@ import type {
   CollectedTableData,
   CollectionReadRequest,
   CollectionReadSource,
+  CollectionRow,
   CollectionSummary,
 } from "../../contracts/collection.js";
 import type {
@@ -112,17 +113,19 @@ export function readCollectionTable(
     };
   }
 
-  const matching = data.rows
-    .map((row, index) => ({ row, index }))
-    .filter(
-      ({ row }) =>
-        (request.dateFrom === undefined || row.date >= request.dateFrom) &&
-        (request.dateTo === undefined || row.date <= request.dateTo),
-    );
-  const selected = matching.slice(
-    request.offset,
-    request.offset + request.limit,
-  );
+  const selected: { row: CollectionRow; index: number }[] = [];
+  let totalRows = 0;
+  for (let index = 0; index < data.rows.length; index++) {
+    const row = data.rows[index]!;
+    if (
+      (request.dateFrom !== undefined && row.date < request.dateFrom) ||
+      (request.dateTo !== undefined && row.date > request.dateTo)
+    )
+      continue;
+    if (totalRows >= request.offset && selected.length < request.limit)
+      selected.push({ row, index });
+    totalRows++;
+  }
   const selectors = selected.flatMap(({ index }) => [
     ...collectionRowSelectors(index),
     ...request.fields.map((field) => valueSelector(index, field)),
@@ -158,7 +161,7 @@ export function readCollectionTable(
         ),
       })),
     },
-    totalRows: matching.length,
+    totalRows,
     offset: request.offset,
     limit: request.limit,
     gaps: collectionGaps(envelope.gaps, selectors),
