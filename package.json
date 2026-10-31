@@ -105,6 +105,7 @@
     "bench:query": "node scripts/benchmark-query.mjs",
     "bench:collection-freshness": "node scripts/benchmark-collection-freshness.mjs",
     "bench:collection-views": "node --expose-gc scripts/benchmark-collection-views.mjs",
+    "bench:collection-quality": "node --expose-gc scripts/benchmark-collection-quality.mjs",
     "bench:replay": "node scripts/benchmark-replay.mjs",
     "bench:numbers": "node scripts/benchmark-numbers.mjs",
     "bench:number-references": "node scripts/benchmark-number-references.mjs",

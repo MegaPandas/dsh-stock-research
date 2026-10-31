@@ -1,5 +1,5 @@
 import type { CollectedTableData } from "../../contracts/collection.js";
-import type { DataEnvelope } from "../../contracts/data.js";
+import type { DataEnvelope, ISOTime } from "../../contracts/data.js";
 import { FINANCIAL_CORE_FIELDS } from "../../contracts/financial-tables.js";
 
 // Each inner group permits source-reported alternatives within one table.
@@ -21,53 +21,69 @@ function coreFields(data: CollectedTableData): readonly (readonly string[])[] {
   );
 }
 
-function missingCoreValues(data: CollectedTableData): number {
-  return coreFields(data).reduce(
-    (count, fields) =>
-      count +
-      data.rows.filter(
-        (row) => !fields.some((field) => row.values[field] != null),
-      ).length,
-    0,
-  );
+export interface CollectionCoverage {
+  asOf: ISOTime;
+  stale: boolean;
+  rowCount: number;
+  missingCoreValues: number;
+  issue: string | undefined;
 }
 
 /** Replace a partial table only when coverage improves without a trade-off. */
 export function improvesCollectionCoverage(
-  current: DataEnvelope<CollectedTableData>,
-  candidate: DataEnvelope<CollectedTableData>,
+  current: CollectionCoverage,
+  candidate: CollectionCoverage,
 ): boolean {
-  const currentMissing = missingCoreValues(current.data);
-  const candidateMissing = missingCoreValues(candidate.data);
   if (
     (!current.stale && candidate.stale) ||
     candidate.asOf < current.asOf ||
-    candidate.data.rows.length < current.data.rows.length ||
-    candidateMissing > currentMissing
+    candidate.rowCount < current.rowCount ||
+    candidate.missingCoreValues > current.missingCoreValues
   )
     return false;
   return (
     (current.stale && !candidate.stale) ||
     candidate.asOf > current.asOf ||
-    candidate.data.rows.length > current.data.rows.length ||
-    candidateMissing < currentMissing
+    candidate.rowCount > current.rowCount ||
+    candidate.missingCoreValues < current.missingCoreValues
   );
 }
 
-export function collectionCoverageIssue(
+export function assessCollectionCoverage(
   envelope: DataEnvelope<CollectedTableData>,
-): string | undefined {
+): CollectionCoverage {
   const { data } = envelope;
-  if (data.rows.length === 0) return "The source returned no observations.";
-  const groups = coreFields(data);
-  const missing = groups.filter((fields) =>
-    data.rows.some((row) => !fields.some((field) => row.values[field] != null)),
-  );
-  if (missing.length > 0)
-    return `Core fields are missing in one or more observations: ${missing.map((fields) => fields.join(" or ")).join(", ")}.`;
-  if (envelope.stale)
-    return "The source observations exceed the freshness budget.";
-  return envelope.gaps.find(
-    (gap) => gap.code === "missing" && gap.field === "/data/rows",
-  )?.detail;
+  const missingGroups: string[] = [];
+  let missingCoreValues = 0;
+  for (const fields of coreFields(data)) {
+    let missing = 0;
+    for (const row of data.rows) {
+      let present = false;
+      for (const field of fields)
+        if (row.values[field] != null) {
+          present = true;
+          break;
+        }
+      if (!present) missing++;
+    }
+    missingCoreValues += missing;
+    if (missing > 0) missingGroups.push(fields.join(" or "));
+  }
+  let issue: string | undefined;
+  if (data.rows.length === 0) issue = "The source returned no observations.";
+  else if (missingGroups.length > 0)
+    issue = `Core fields are missing in one or more observations: ${missingGroups.join(", ")}.`;
+  else if (envelope.stale)
+    issue = "The source observations exceed the freshness budget.";
+  else
+    issue = envelope.gaps.find(
+      (gap) => gap.code === "missing" && gap.field === "/data/rows",
+    )?.detail;
+  return {
+    asOf: envelope.asOf,
+    stale: envelope.stale,
+    rowCount: data.rows.length,
+    missingCoreValues,
+    issue,
+  };
 }
