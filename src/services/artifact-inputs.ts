@@ -15,9 +15,9 @@ import type { RegisteredEvidenceRecord } from "../contracts/task-data.js";
 import { artifactReferences } from "../artifacts/references.js";
 import { isStageReport } from "./analysis-report.js";
 import { aggregateArtifactGaps } from "../artifacts/gaps.js";
-import { numberField, referenceField } from "./number-fields.js";
+import { numberField, referenceField } from "../evidence/fields.js";
 import { artifactKey } from "../contracts/artifact-identity.js";
-import { verifyEvidence } from "./evidence-checks.js";
+import { verifyEvidence } from "../evidence/checks.js";
 import type { RunReader } from "../contracts/run-access.js";
 
 export interface ArtifactNumber {

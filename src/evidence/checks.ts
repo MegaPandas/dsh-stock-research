@@ -1,7 +1,7 @@
 import type { ResearchScope, SourceRef } from "../contracts/data.js";
 import type { NumberWarning } from "../contracts/numbers.js";
 import type { EvidenceEnvelope } from "../contracts/query.js";
-import type { NumberField } from "./number-fields.js";
+import type { NumberField } from "./fields.js";
 
 export class EvidenceTimeError extends Error {}
 function intersects(path: string, dependency: string): boolean {

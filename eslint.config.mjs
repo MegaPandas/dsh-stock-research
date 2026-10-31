@@ -59,13 +59,17 @@ export default defineConfig(
             directory: "src/services/run",
             publicEntries: ["index.js"],
           },
+          {
+            directory: "src/evidence",
+            publicEntries: ["fields.js", "checks.js", "price-basis.js"],
+          },
         ],
       ],
     },
   },
   {
     files: [
-      "src/{artifacts,cache,data,indicators,json,memory,report,runs,storage,valuation}/**/*.ts",
+      "src/{artifacts,cache,data,evidence,indicators,json,memory,report,runs,storage,valuation}/**/*.ts",
     ],
     rules: {
       "no-restricted-imports": [
@@ -123,7 +127,7 @@ export default defineConfig(
   },
   {
     files: [
-      "src/{indicators,json,report,valuation}/**/*.ts",
+      "src/{evidence,indicators,json,report,valuation}/**/*.ts",
       "src/services/collection/{plan,quality,view,errors}.ts",
       "src/services/query/calculations.ts",
     ],

@@ -6,7 +6,7 @@ import type { NumericClaim } from "../contracts/artifacts.js";
 import type { ResearchScope } from "../contracts/data.js";
 import { ResearchError } from "../contracts/errors.js";
 import { ArtifactInputs } from "./artifact-inputs.js";
-import { PriceBasisError, verifyPriceBasis } from "./price-basis.js";
+import { PriceBasisError, verifyPriceBasis } from "../evidence/price-basis.js";
 import {
   decisionPolicy,
   priceRating,

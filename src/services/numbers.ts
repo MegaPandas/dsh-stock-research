@@ -18,13 +18,13 @@ import type { RunOperation } from "../contracts/runs.js";
 import type { RegisteredEvidenceRecord } from "../contracts/task-data.js";
 import { artifactKey } from "../contracts/artifact-identity.js";
 import { SelectorError } from "../json/pointer.js";
-import { EvidenceTimeError, verifyEvidence } from "./evidence-checks.js";
-import { PriceBasisError, verifyPriceBasis } from "./price-basis.js";
+import { EvidenceTimeError, verifyEvidence } from "../evidence/checks.js";
+import { PriceBasisError, verifyPriceBasis } from "../evidence/price-basis.js";
 import {
   numberField,
   referenceField,
   type NumberField,
-} from "./number-fields.js";
+} from "../evidence/fields.js";
 import type { RunReader } from "../contracts/run-access.js";
 import { createValuationReader } from "./valuation-records.js";
 

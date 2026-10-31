@@ -4,8 +4,8 @@ import type { TaskDefinition, DataRequirement } from "../contracts/workflow.js";
 import type { ResearchArtifactVersion } from "../contracts/artifact-payloads.js";
 import { ArtifactInputs } from "./artifact-inputs.js";
 import { ResearchError } from "../contracts/errors.js";
-import { numberField } from "./number-fields.js";
-import { EvidenceTimeError } from "./evidence-checks.js";
+import { numberField } from "../evidence/fields.js";
+import { EvidenceTimeError } from "../evidence/checks.js";
 import { isStageReport } from "./analysis-report.js";
 
 interface Observation {

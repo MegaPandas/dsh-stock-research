@@ -15,10 +15,7 @@ import {
 } from "../../src/indicators/index.js";
 import { PRICE_RETURN_ALGORITHM_VERSION } from "../../src/indicators/returns.js";
 import { SelectorError } from "../../src/json/pointer.js";
-import {
-  numberField,
-  referenceField,
-} from "../../src/services/number-fields.js";
+import { numberField, referenceField } from "../../src/evidence/fields.js";
 
 // Artificial observations with explicit dates; no provider data is used.
 function envelope<T extends QueryEnvelope["data"]>(

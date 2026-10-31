@@ -1,11 +1,8 @@
 import type { CollectionReadSource } from "../contracts/collection.js";
 import type { NumericClaim } from "../contracts/artifacts.js";
 import type { ResearchScope, SourceRef } from "../contracts/data.js";
-import { numberField } from "../services/number-fields.js";
-import {
-  EvidenceTimeError,
-  verifyEvidence,
-} from "../services/evidence-checks.js";
+import { numberField } from "../evidence/fields.js";
+import { EvidenceTimeError, verifyEvidence } from "../evidence/checks.js";
 export type RegisteredTable = CollectionReadSource & { sourceRef: SourceRef };
 export function referencePrice(
   tables: readonly RegisteredTable[],

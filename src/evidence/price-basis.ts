@@ -1,6 +1,6 @@
 import type { SourceRef } from "../contracts/data.js";
 import type { EvidenceEnvelope } from "../contracts/query.js";
-import { numberField } from "./number-fields.js";
+import { numberField } from "./fields.js";
 
 export class PriceBasisError extends Error {}
 export interface PriceBasisInput {

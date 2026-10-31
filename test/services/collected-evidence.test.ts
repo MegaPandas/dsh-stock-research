@@ -2,11 +2,8 @@ import { describe, expect, it } from "vitest";
 import type { CollectedTableData } from "../../src/contracts/collection.js";
 import type { DataEnvelope } from "../../src/contracts/data.js";
 import { extractCandidates } from "../../src/services/candidates.js";
-import {
-  numberField,
-  referenceField,
-} from "../../src/services/number-fields.js";
-import { verifyEvidence } from "../../src/services/evidence-checks.js";
+import { numberField, referenceField } from "../../src/evidence/fields.js";
+import { verifyEvidence } from "../../src/evidence/checks.js";
 import { CN_SECURITY } from "../fixtures/market.js";
 
 function envelope(): DataEnvelope<CollectedTableData> {
