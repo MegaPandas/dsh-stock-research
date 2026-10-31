@@ -1,6 +1,7 @@
 import js from "@eslint/js";
 import { defineConfig, globalIgnores } from "eslint/config";
 import tseslint from "typescript-eslint";
+import moduleEntryPoints from "./scripts/eslint/module-entry-points.mjs";
 
 const integrationImports = [
   "**/tools/**",
@@ -30,12 +31,6 @@ const runConsumerRestriction = {
   message:
     "Consumers must select run capabilities instead of depending on the RunService implementation.",
 };
-const queryPrivateRestriction = {
-  selector:
-    ":matches(ImportDeclaration, ExportNamedDeclaration, ExportAllDeclaration)[source.value=/query\\u002F(source-queries|source-selection)\\.js$/]",
-  message:
-    "Query consumers must use the public query or calculation entry instead of source execution internals.",
-};
 const digestPrivateRestriction = {
   selector:
     ":matches(ImportDeclaration, ExportNamedDeclaration, ExportAllDeclaration)[source.value=/(^|\\u002F)digest-(inputs|draft)\\.js$/]",
@@ -51,8 +46,19 @@ export default defineConfig(
   },
   {
     files: ["src/**/*.{ts,tsx}"],
+    plugins: {
+      architecture: { rules: { "module-entry-points": moduleEntryPoints } },
+    },
     rules: {
-      "no-restricted-syntax": ["error", queryPrivateRestriction],
+      "architecture/module-entry-points": [
+        "error",
+        [
+          {
+            directory: "src/services/query",
+            publicEntries: ["index.js", "calculations.js"],
+          },
+        ],
+      ],
     },
   },
   {
@@ -172,11 +178,7 @@ export default defineConfig(
     files: ["src/{app,services,tools,host}/**/*.ts", "src/*.ts"],
     ignores: ["src/services/create-run-service.ts"],
     rules: {
-      "no-restricted-syntax": [
-        "error",
-        runConsumerRestriction,
-        queryPrivateRestriction,
-      ],
+      "no-restricted-syntax": ["error", runConsumerRestriction],
     },
   },
   {
@@ -191,7 +193,6 @@ export default defineConfig(
       "no-restricted-syntax": [
         "error",
         runConsumerRestriction,
-        queryPrivateRestriction,
         digestPrivateRestriction,
       ],
     },
@@ -202,7 +203,6 @@ export default defineConfig(
       "no-restricted-syntax": [
         "error",
         runConsumerRestriction,
-        queryPrivateRestriction,
         digestPrivateRestriction,
         {
           selector:
