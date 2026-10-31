@@ -4,7 +4,7 @@ export {
   taskOperation,
 } from "../host/bindings.js";
 export type { ResearchBinding, BoundCaller } from "../host/bindings.js";
-export { ResearchSessions } from "../host/sessions.js";
+export { ResearchSessions } from "../host/sessions/index.js";
 export { DispatchBridge } from "../host/dispatch/index.js";
 export type {
   DispatchResult,

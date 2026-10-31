@@ -2,9 +2,9 @@ import type { Context } from "@deepseek-ai/cordis";
 import type { Agent, AgentSetup } from "@deepseek-ai/dsh-agent";
 import type { SessionId } from "@deepseek-ai/dsh-session";
 import type { ToolDefinition } from "@deepseek-ai/dsh-tools";
-import { ResearchError } from "../contracts/errors.js";
-import { SessionBindings, type ResearchBinding } from "./bindings.js";
-import { setupResearchTools } from "./agent-execution.js";
+import { ResearchError } from "../../contracts/errors.js";
+import { SessionBindings, type ResearchBinding } from "../bindings.js";
+import { setupResearchTools } from "./tool-policy.js";
 
 interface SessionPolicy {
   release: () => void;

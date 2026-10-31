@@ -60,7 +60,7 @@ import { Config } from "./config.js";
 import type { ResearchConfig } from "../contracts/settings.js";
 import { generateHandoffDigest } from "../services/digest/handoff.js";
 import { DispatchBridge, type PrepareRole } from "./dispatch/index.js";
-import { ResearchSessions } from "./sessions.js";
+import { ResearchSessions } from "./sessions/index.js";
 import { createSources } from "./sources.js";
 import { searchPublic, approvePublicSearch } from "./public-search.js";
 import type { DataEnvelope } from "../contracts/data.js";

@@ -38,7 +38,7 @@ import {
 } from "../../src/host/bindings.js";
 import { DispatchBridge } from "../../src/host/dispatch/index.js";
 import type { RunReader } from "../../src/contracts/run-access.js";
-import { ResearchSessions } from "../../src/host/sessions.js";
+import { ResearchSessions } from "../../src/host/sessions/index.js";
 import { MemoryStore } from "../../src/memory/store.js";
 import { RunStore } from "../../src/runs/store.js";
 import { ArtifactService } from "../../src/services/artifact-submission/index.js";

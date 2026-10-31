@@ -23,7 +23,7 @@ import {
   taskOperation,
   type ResearchBinding,
 } from "../../src/host/bindings.js";
-import { ResearchSessions } from "../../src/host/sessions.js";
+import { ResearchSessions } from "../../src/host/sessions/index.js";
 
 const cleanups: (() => Promise<void>)[] = [];
 const binding: ResearchBinding = {

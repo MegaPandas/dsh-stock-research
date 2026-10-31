@@ -11,7 +11,7 @@ import {
   type RoleProvision,
 } from "../../src/host/dispatch/index.js";
 import { SessionBindings, taskOperation } from "../../src/host/bindings.js";
-import { ResearchSessions } from "../../src/host/sessions.js";
+import { ResearchSessions } from "../../src/host/sessions/index.js";
 import { DigestService } from "../../src/services/digest/index.js";
 import {
   analysis,

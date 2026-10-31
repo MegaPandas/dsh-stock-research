@@ -33,7 +33,7 @@ import {
   dispatchClaimRequestId,
   RunDispatchPlanner,
 } from "../../services/run-dispatch.js";
-import type { ResearchSessions } from "../sessions.js";
+import type { ResearchSessions } from "../sessions/index.js";
 import { observeModelCalls } from "../model-events.js";
 
 export interface RoleProvision {

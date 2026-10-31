@@ -21,8 +21,8 @@ describe("dispatch execution boundaries", () => {
       'export * from "../host/dispatch/child-continuation.js";',
     ],
     [
-      "src/host/sessions.ts",
-      'const helper = import("./dispatch/nested/new-internal.js");',
+      "src/host/sessions/index.ts",
+      'const helper = import("../dispatch/nested/new-internal.js");',
     ],
   ])(
     "keeps dispatch continuation implementation private from %s",
@@ -40,7 +40,7 @@ describe("dispatch execution boundaries", () => {
     ["src/app/role.ts", "../host/dispatch/index.js"],
     ["src/app/role-preparation/index.ts", "../../host/dispatch/index.js"],
     ["src/host/dispatch/index.ts", "./child-continuation.js"],
-    ["src/host/dispatch/index.ts", "../sessions.js"],
+    ["src/host/dispatch/index.ts", "../sessions/index.js"],
     ["src/host/dispatch/index.ts", "../../services/run-dispatch.js"],
   ])(
     "allows the public dispatch or shared capability from %s",

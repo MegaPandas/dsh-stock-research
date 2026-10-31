@@ -108,6 +108,10 @@ export default defineConfig(
             publicEntries: ["index.js"],
           },
           {
+            directory: "src/host/sessions",
+            publicEntries: ["index.js"],
+          },
+          {
             directory: "src/evidence",
             publicEntries: ["fields.js", "checks.js", "price-basis.js"],
           },
