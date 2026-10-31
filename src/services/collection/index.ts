@@ -2,6 +2,7 @@ import { deriveFinancialMetrics } from "../../data/financial-metrics.js";
 import type { SqliteCache } from "../../cache/index.js";
 import { serializeJson } from "../../json/serialize.js";
 import type {
+  CollectionAccess,
   CollectionDiagnostics,
   CollectionOptions,
   CollectionPlan,
@@ -31,7 +32,7 @@ interface ProgressObservers {
 }
 
 /** Own a collection's lifecycle, progress and durable snapshot. */
-export class CollectionService {
+export class CollectionService implements CollectionAccess {
   readonly #flights = new SharedQueries<CollectionSnapshot>();
   readonly #options: CollectionOptions;
   readonly #progress = new Map<string, ProgressObservers>();

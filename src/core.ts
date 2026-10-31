@@ -262,6 +262,7 @@ export { TaskQueryService } from "./services/task-query.js";
 export { CollectionService } from "./services/collection/index.js";
 export { createCollectionTaskFactory } from "./data/collection-tasks.js";
 export type {
+  CollectionAccess,
   CollectionOptions,
   CollectionSourceConfig,
   CollectionTaskFactory,

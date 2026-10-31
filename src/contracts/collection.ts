@@ -9,6 +9,15 @@ import type {
 } from "./data.js";
 import type { QueryCachePolicy } from "./query.js";
 
+export interface CollectionAccess {
+  collect(
+    scope: ResearchScope,
+    signal?: AbortSignal,
+    onProgress?: (progress: CollectionProgress) => void,
+  ): Promise<CollectionSnapshot>;
+  finalizeScope(snapshot: CollectionSnapshot, scope: ResearchScope): void;
+}
+
 export interface CollectionColumn {
   label: string;
   unit: string;

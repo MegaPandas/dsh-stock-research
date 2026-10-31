@@ -64,6 +64,7 @@ import { ResearchSessions } from "./sessions/index.js";
 import { createSources } from "./sources.js";
 import { searchPublic, approvePublicSearch } from "./public-search.js";
 import type { DataEnvelope } from "../contracts/data.js";
+import type { CollectionAccess } from "../contracts/collection.js";
 import type { ResearchData } from "../contracts/research.js";
 
 declare module "@deepseek-ai/cordis" {
@@ -77,7 +78,7 @@ export interface ResearchRuntime {
   readonly runs: RunAccess;
   readonly reads: RunReadOperations;
   readonly queries: QueryService;
-  readonly collection: CollectionService;
+  readonly collection: CollectionAccess;
   readonly memory: MemoryAccess;
   readonly dispatch: DispatchBridge;
   readonly operations: ResearchOperations;

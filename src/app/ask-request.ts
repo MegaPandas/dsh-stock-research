@@ -3,7 +3,7 @@ import type { ResearchScope } from "../contracts/data.js";
 import { agentInput } from "../host/agent-protocol/input.js";
 import { createSubmission } from "../host/agent-protocol/submission.js";
 import { renderAgentReport } from "../report/agent-report.js";
-import type { CollectionService } from "../services/collection/index.js";
+import type { CollectionAccess } from "../contracts/collection.js";
 import type { AskInput } from "./ask-input.js";
 import { researchCutoff } from "./research-scope.js";
 import { collectionReadTools } from "./collection-tools.js";
@@ -11,7 +11,7 @@ import { collectionDirectory } from "./collection-input.js";
 import { requireCollectionData } from "./collection-snapshot.js";
 
 export interface AskRequestPorts {
-  collection: Pick<CollectionService, "collect" | "finalizeScope">;
+  collection: CollectionAccess;
   recallTool(): ToolDefinition;
 }
 export interface PreparedAsk {
