@@ -16,6 +16,7 @@ import { SqliteCache } from "../cache/index.js";
 import { ResearchError } from "../contracts/errors.js";
 import type { MemoryAccess, MemoryState } from "../contracts/memory-service.js";
 import type { QuerySnapshot } from "../contracts/query.js";
+import type { QueryAccess } from "../contracts/query-service.js";
 import type { OpenRunInput, RunState, RunView } from "../contracts/runs.js";
 import { HttpClient } from "../data/http.js";
 import { createCollectionTaskFactory } from "../data/collection-tasks.js";
@@ -77,7 +78,7 @@ export interface ResearchRuntime {
   isBusy(): boolean;
   readonly runs: RunAccess;
   readonly reads: RunReadOperations;
-  readonly queries: QueryService;
+  readonly queries: QueryAccess;
   readonly collection: CollectionAccess;
   readonly memory: MemoryAccess;
   readonly dispatch: DispatchBridge;

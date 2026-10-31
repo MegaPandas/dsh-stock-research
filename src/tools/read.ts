@@ -14,7 +14,7 @@ import {
 import type { MemoryAccess } from "../contracts/memory-service.js";
 import type { NumberChecker } from "../contracts/numbers.js";
 import { readPointer, SelectorError } from "../json/pointer.js";
-import type { QueryService } from "../services/query/index.js";
+import type { QueryAccess } from "../contracts/query-service.js";
 import type { RunReader } from "../contracts/run-access.js";
 import type { RunReadOperations } from "../host/run-reading.js";
 import {
@@ -39,7 +39,7 @@ import {
 export interface ReadToolServices {
   runs: Pick<RunReader, "view" | "readEvidence">;
   reads: RunReadOperations;
-  queries: Pick<QueryService, "health">;
+  queries: Pick<QueryAccess, "health">;
   memory: Pick<MemoryAccess, "recall" | "recallForTask">;
   numbers: NumberChecker;
 }

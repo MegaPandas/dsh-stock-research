@@ -10,12 +10,13 @@ import type {
   SourceResponse,
 } from "../../contracts/query.js";
 import type { QueryHealth, QuerySources } from "../../contracts/sources.js";
+import type { QueryAccess } from "../../contracts/query-service.js";
 import { serializeJson } from "../../json/serialize.js";
 import { withIndicators, withPriceReturn } from "./calculations.js";
 import { SourceQueries } from "./source-queries.js";
 
 /** Captures ordinary queries and composes derived results from raw source data. */
-export class QueryService {
+export class QueryService implements QueryAccess {
   readonly #sources: SourceQueries;
 
   constructor(

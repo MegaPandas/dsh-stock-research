@@ -5,7 +5,7 @@ import {
   type BoundCaller,
   type SessionBindings,
 } from "../host/bindings.js";
-import type { QueryService } from "../services/query/index.js";
+import type { QueryAccess } from "../contracts/query-service.js";
 import type { RunReader } from "../contracts/run-access.js";
 import { researchTool } from "./errors.js";
 import {
@@ -36,7 +36,7 @@ function scopeFor(
   return binding.kind === "task" ? runs.view(binding).scope : binding.scope;
 }
 export function createDataHealthTool(
-  queries: Pick<QueryService, "health">,
+  queries: Pick<QueryAccess, "health">,
   runs: Pick<RunReader, "view">,
   bindings: SessionBindings,
   includeRunId = true,

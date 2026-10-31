@@ -6,7 +6,7 @@ import {
   type BoundCaller,
   type SessionBindings,
 } from "../host/bindings.js";
-import type { QueryService } from "../services/query/index.js";
+import type { QueryAccess } from "../contracts/query-service.js";
 import type { TaskQueryService } from "../services/task-query.js";
 import type { RunReader } from "../contracts/run-access.js";
 import { researchTool } from "./errors.js";
@@ -27,7 +27,7 @@ import type { QueryPolicy } from "../contracts/query.js";
 
 export interface DataToolServices {
   runs: Pick<RunReader, "view">;
-  queries: Pick<QueryService, "query">;
+  queries: Pick<QueryAccess, "query">;
   taskQueries: Pick<TaskQueryService, "queryForTask" | "replayForTask">;
 }
 function dataScope(
