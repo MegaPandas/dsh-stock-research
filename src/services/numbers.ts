@@ -9,6 +9,7 @@ import { ResearchError } from "../contracts/errors.js";
 import type {
   ClaimCheck,
   NumberCheck,
+  NumberChecker,
   NumberIssueCode,
   NumberTarget,
   NumberWarning,
@@ -49,7 +50,7 @@ interface ResolvedNumber {
   source?: SourceRef;
 }
 
-export class NumberService {
+export class NumberService implements NumberChecker {
   constructor(
     private readonly runs: Pick<
       RunReader,

@@ -8,7 +8,7 @@ import type {
 } from "../../contracts/artifact-payloads.js";
 import type { ArtifactRef, SourceRef } from "../../contracts/data.js";
 import { ResearchError } from "../../contracts/errors.js";
-import type { NumberCheck } from "../../contracts/numbers.js";
+import type { NumberCheck, NumberChecker } from "../../contracts/numbers.js";
 import type { EvidenceData } from "../../contracts/query.js";
 import type {
   ArtifactCommitResult,
@@ -21,7 +21,6 @@ import { artifactReferences } from "../../artifacts/references.js";
 import { EvidenceTimeError, verifyEvidence } from "../../evidence/checks.js";
 import { readPointer, SelectorError } from "../../json/pointer.js";
 import { referenceField } from "../../evidence/fields.js";
-import type { NumberService } from "../numbers.js";
 import { artifactKey } from "../../contracts/artifact-identity.js";
 import type { RunCommands, RunReader } from "../../contracts/run-access.js";
 import { ArtifactInputs } from "../artifact-inputs.js";
@@ -60,7 +59,7 @@ export class ArtifactService {
       | "readInput"
     > &
       Pick<RunCommands, "artifactForCall" | "commitArtifact">,
-    private readonly numbers: Pick<NumberService, "checkNumbers">,
+    private readonly numbers: NumberChecker,
   ) {}
 
   submitArtifact(

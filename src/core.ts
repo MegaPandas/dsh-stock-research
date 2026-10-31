@@ -279,6 +279,7 @@ export type {
 export type {
   ClaimCheck,
   NumberCheck,
+  NumberChecker,
   NumberContext,
   NumberIssue,
   NumberIssueCode,

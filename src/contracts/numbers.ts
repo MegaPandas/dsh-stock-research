@@ -1,6 +1,10 @@
 import type { ArtifactInput, NumericClaim } from "./artifacts.js";
 import type { ArtifactRef, DataGap, ResearchScope, SourceRef } from "./data.js";
-import type { ResearchRun } from "./runs.js";
+import type { ResearchRun, RunOperation } from "./runs.js";
+
+export interface NumberChecker {
+  checkNumbers(operation: RunOperation, target: NumberTarget): NumberCheck;
+}
 
 export type NumberTarget =
   | { kind: "pending"; contentId: string; content: ArtifactInput }
