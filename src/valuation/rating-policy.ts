@@ -36,11 +36,11 @@ export function decisionPolicy(date: LocalDate) {
   horizon.setUTCDate(Math.min(day, lastDay));
   return {
     version: PRICE_RATING_POLICY,
-    basis: "absolute_price" as const,
+    basis: "absolute_price",
     horizonEndDate: horizon.toISOString().slice(0, 10),
     formula: "targetPrice / referencePrice - 1",
     bands: PRICE_RATING_BANDS,
-  };
+  } as const;
 }
 
 /** Prices arrive with the positive-base/nonnegative-target contract established. */

@@ -250,7 +250,7 @@ export default defineConfig(
         {
           patterns: [
             {
-              group: [...pureImports, "./*.js", "../*.js", "**/artifacts/**"],
+              group: [...pureImports, "./**", "../*.js", "**/artifacts/**"],
               message:
                 "Report assembly must consume validated contracts and pure rules instead of parsing, stateful services, or I/O.",
             },
