@@ -1,7 +1,7 @@
 import { ToolCallId } from "@deepseek-ai/dsh-llm";
 import type { ToolRunContext } from "@deepseek-ai/dsh-tools";
 import { describe, expect, it, vi } from "vitest";
-import { createSubmission } from "../../src/host/agent-execution.js";
+import { createSubmission } from "../../src/host/agent-protocol/submission.js";
 import { ResearchError } from "../../src/contracts/errors.js";
 import { ROLE_PROMPTS } from "../../src/app/research-prompts.js";
 import { PUBLIC_ANALYST_PROMPT } from "../../src/app/public-research.js";

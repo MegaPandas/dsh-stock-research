@@ -14,7 +14,7 @@ import { ResearchError } from "../contracts/errors.js";
 import { parseAgentReport } from "../artifacts/agent-reports.js";
 import { researchTool } from "../tools/errors.js";
 import { objectSchema, resultOutput } from "../tools/parameters.js";
-import { createSubmissionSession } from "./agent-execution.js";
+import { createSubmissionSession } from "./agent-protocol/submission.js";
 import {
   stageHandoffSchema,
   STAGE_HANDOFF_MAX_CHARACTERS,

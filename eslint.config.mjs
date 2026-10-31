@@ -112,6 +112,10 @@ export default defineConfig(
             publicEntries: ["index.js"],
           },
           {
+            directory: "src/host/agent-protocol",
+            publicEntries: ["input.js", "submission.js"],
+          },
+          {
             directory: "src/evidence",
             publicEntries: ["fields.js", "checks.js", "price-basis.js"],
           },

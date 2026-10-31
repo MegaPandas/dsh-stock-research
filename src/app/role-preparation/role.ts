@@ -7,7 +7,7 @@ import type {
 import type { EvidenceData } from "../../contracts/query.js";
 import type { ResearchData } from "../../contracts/research.js";
 import { ResearchError } from "../../contracts/errors.js";
-import { agentInput } from "../../host/agent-execution.js";
+import { agentInput } from "../../host/agent-protocol/input.js";
 import { createReportDraft } from "../../host/report-draft.js";
 import type { AgentReport } from "../../contracts/agent-reports.js";
 import type { StageHandoff } from "../../contracts/stage-handoff.js";

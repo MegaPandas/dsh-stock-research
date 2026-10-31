@@ -2,7 +2,7 @@ import * as PiAi from "@deepseek-ai/dsh-llm-pi-ai";
 import { afterEach, expect, it, vi } from "vitest";
 import { createUserMessage } from "@deepseek-ai/dsh-llm";
 import { SessionId } from "@deepseek-ai/dsh-session";
-import { createSubmission } from "../../src/host/agent-execution.js";
+import { createSubmission } from "../../src/host/agent-protocol/submission.js";
 import { setupResearchTools } from "../../src/host/sessions/tool-policy.js";
 import { observeModelCalls } from "../../src/host/model-events.js";
 import { agentAnalysisReport } from "../fixtures/analysis-report.js";

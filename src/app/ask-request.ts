@@ -1,6 +1,7 @@
 import type { ToolDefinition } from "@deepseek-ai/dsh-tools";
 import type { ResearchScope } from "../contracts/data.js";
-import { agentInput, createSubmission } from "../host/agent-execution.js";
+import { agentInput } from "../host/agent-protocol/input.js";
+import { createSubmission } from "../host/agent-protocol/submission.js";
 import { renderAgentReport } from "../report/agent-report.js";
 import type { CollectionService } from "../services/collection/index.js";
 import type { AskInput } from "./ask-input.js";

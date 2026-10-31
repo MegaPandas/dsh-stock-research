@@ -1,38 +1,14 @@
-import { HarnessError, type ContentBlock } from "@deepseek-ai/dsh-llm";
+import { HarnessError } from "@deepseek-ai/dsh-llm";
 import type { ToolDefinition, ToolRunContext } from "@deepseek-ai/dsh-tools";
 import {
   agentReportSchemas,
   type AgentReport,
   type AgentReportKind,
-} from "../contracts/agent-reports.js";
-import type { ResearchScope } from "../contracts/data.js";
-import { ResearchError } from "../contracts/errors.js";
-import { parseAgentReport } from "../artifacts/agent-reports.js";
-import { researchTool } from "../tools/errors.js";
-import { objectSchema, resultOutput } from "../tools/parameters.js";
-
-export function agentInput(input: {
-  scope: ResearchScope;
-  task: { role: string; objective: string; id?: string };
-  context: Record<string, unknown>;
-}): ContentBlock[] {
-  return [
-    {
-      type: "text",
-      text: JSON.stringify({
-        ...input,
-        context: {
-          materials: [],
-          dataCatalog: [],
-          reportCatalog: [],
-          requiredRisks: [],
-          referencePrice: null,
-          ...input.context,
-        },
-      }),
-    },
-  ];
-}
+} from "../../contracts/agent-reports.js";
+import { ResearchError } from "../../contracts/errors.js";
+import { parseAgentReport } from "../../artifacts/agent-reports.js";
+import { researchTool } from "../../tools/errors.js";
+import { objectSchema, resultOutput } from "../../tools/parameters.js";
 
 /** All research roles complete through a validated, successful business commit. */
 export function createSubmissionSession<Kind extends AgentReportKind, Result>(
