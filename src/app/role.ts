@@ -2,7 +2,7 @@ import type { Context } from "@deepseek-ai/cordis";
 import type {} from "@deepseek-ai/dsh-system-prompt";
 import z from "@deepseek-ai/schemastery";
 import { ResearchError } from "../contracts/errors.js";
-import { ROLE_PROMPT_SECTION } from "../host/dispatch.js";
+import { ROLE_PROMPT_SECTION } from "../host/dispatch/index.js";
 import { ROLE_PROMPTS, type ResearchRole } from "./research-prompts.js";
 
 export interface RoleConfig {

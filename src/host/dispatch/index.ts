@@ -13,8 +13,8 @@ import type {
   SubagentResult,
 } from "@deepseek-ai/dsh-subagent";
 import type { ToolDefinition } from "@deepseek-ai/dsh-tools";
-import type { ArtifactRef } from "../contracts/data.js";
-import { ResearchError } from "../contracts/errors.js";
+import type { ArtifactRef } from "../../contracts/data.js";
+import { ResearchError } from "../../contracts/errors.js";
 import type {
   ArtifactCommitResult,
   AttemptTarget,
@@ -26,15 +26,15 @@ import type {
   TaskAttempt,
   TaskFailure,
   TaskOperation,
-} from "../contracts/runs.js";
-import type { RunAccess } from "../contracts/run-access.js";
-import type { DigestService } from "../services/digest/index.js";
+} from "../../contracts/runs.js";
+import type { RunAccess } from "../../contracts/run-access.js";
+import type { DigestService } from "../../services/digest/index.js";
 import {
   dispatchClaimRequestId,
   RunDispatchPlanner,
-} from "../services/run-dispatch.js";
-import type { ResearchSessions } from "./sessions.js";
-import { observeModelCalls } from "./model-events.js";
+} from "../../services/run-dispatch.js";
+import type { ResearchSessions } from "../sessions.js";
+import { observeModelCalls } from "../model-events.js";
 
 export interface RoleProvision {
   followup?(

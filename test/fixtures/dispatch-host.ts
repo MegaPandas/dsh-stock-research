@@ -36,7 +36,7 @@ import {
   SessionBindings,
   type ResearchBinding,
 } from "../../src/host/bindings.js";
-import { DispatchBridge } from "../../src/host/dispatch.js";
+import { DispatchBridge } from "../../src/host/dispatch/index.js";
 import type { RunReader } from "../../src/contracts/run-access.js";
 import { ResearchSessions } from "../../src/host/sessions.js";
 import { MemoryStore } from "../../src/memory/store.js";

@@ -6,7 +6,10 @@ import {
 import { SessionId } from "@deepseek-ai/dsh-session";
 import type { ToolDefinition } from "@deepseek-ai/dsh-tools";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { DispatchBridge, type RoleProvision } from "../../src/host/dispatch.js";
+import {
+  DispatchBridge,
+  type RoleProvision,
+} from "../../src/host/dispatch/index.js";
 import { SessionBindings, taskOperation } from "../../src/host/bindings.js";
 import { ResearchSessions } from "../../src/host/sessions.js";
 import { DigestService } from "../../src/services/digest/index.js";

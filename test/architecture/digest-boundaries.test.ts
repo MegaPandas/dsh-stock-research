@@ -38,7 +38,7 @@ describe("digest boundaries", () => {
     ["src/core.ts", "./services/digest/index.js"],
     ["src/core.ts", "./services/digest/handoff.js"],
     ["src/host/runtime.ts", "../services/digest/handoff.js"],
-    ["src/host/dispatch.ts", "../services/digest/index.js"],
+    ["src/host/dispatch/index.ts", "../../services/digest/index.js"],
     ["src/services/digest/index.ts", "./inputs.js"],
     ["src/services/digest/index.ts", "./draft.js"],
     ["src/services/digest/inputs.ts", "../artifact-inputs.js"],

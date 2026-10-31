@@ -11,7 +11,7 @@ import { agentInput } from "../../host/agent-execution.js";
 import { createReportDraft } from "../../host/report-draft.js";
 import type { AgentReport } from "../../contracts/agent-reports.js";
 import type { StageHandoff } from "../../contracts/stage-handoff.js";
-import type { RoleProvision } from "../../host/dispatch.js";
+import type { RoleProvision } from "../../host/dispatch/index.js";
 import { reportMaterial } from "../../report/material.js";
 import { ArtifactInputs } from "../../services/artifact-inputs.js";
 import { assembleAgentArtifact } from "../../artifacts/assembly.js";

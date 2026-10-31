@@ -1,6 +1,6 @@
 import { SessionId } from "@deepseek-ai/dsh-session";
 import { afterEach, describe, expect, it } from "vitest";
-import { DispatchBridge } from "../../src/host/dispatch.js";
+import { DispatchBridge } from "../../src/host/dispatch/index.js";
 import type { ResearchArtifactInput } from "../../src/contracts/artifact-payloads.js";
 import {
   dispatchHost,

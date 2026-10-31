@@ -5,12 +5,12 @@ export {
 } from "../host/bindings.js";
 export type { ResearchBinding, BoundCaller } from "../host/bindings.js";
 export { ResearchSessions } from "../host/sessions.js";
-export { DispatchBridge } from "../host/dispatch.js";
+export { DispatchBridge } from "../host/dispatch/index.js";
 export type {
   DispatchResult,
   PrepareRole,
   RoleProvision,
-} from "../host/dispatch.js";
+} from "../host/dispatch/index.js";
 export { createControlTools } from "./control.js";
 export { createReadTools } from "./read.js";
 export type { ReadToolServices } from "./read.js";

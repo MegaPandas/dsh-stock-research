@@ -18,7 +18,7 @@ describe("run capability boundaries", () => {
     ["src/tools/read.ts", "../services/run/service.js"],
     ["src/services/numbers.ts", "./run/service.js"],
     ["src/host/runtime.ts", "../services/run/service.js"],
-    ["src/host/dispatch.ts", "../services/run/service.js"],
+    ["src/host/dispatch/index.ts", "../../services/run/service.js"],
     ["src/client/index.ts", "../services/run/service.js"],
   ])(
     "rejects a concrete run implementation import from %s",
@@ -58,8 +58,8 @@ describe("run capability boundaries", () => {
 
   it.each([
     [
-      "src/host/dispatch.ts",
-      'import type { RunAccess } from "../contracts/run-access.js";',
+      "src/host/dispatch/index.ts",
+      'import type { RunAccess } from "../../contracts/run-access.js";',
     ],
     [
       "src/services/numbers.ts",

@@ -7,7 +7,7 @@ import type {
   TaskInstructionSnapshot,
 } from "../../contracts/runs.js";
 import { ResearchError } from "../../contracts/errors.js";
-import type { RoleProvision } from "../../host/dispatch.js";
+import type { RoleProvision } from "../../host/dispatch/index.js";
 import type { SubmitReport } from "../../host/report-submission.js";
 import type { ValuationOperations } from "../../host/valuation-operations.js";
 import type { RunCommands, RunReader } from "../../contracts/run-access.js";

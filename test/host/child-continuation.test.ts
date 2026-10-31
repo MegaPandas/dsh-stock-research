@@ -1,6 +1,6 @@
 import { SessionId } from "@deepseek-ai/dsh-session";
 import { afterEach, describe, expect, it } from "vitest";
-import { continueChild } from "../../src/host/child-continuation.js";
+import { continueChild } from "../../src/host/dispatch/child-continuation.js";
 import { continuationHost } from "../fixtures/continuation-host.js";
 import { deferred, textResponse } from "../fixtures/runtime-host.js";
 

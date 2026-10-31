@@ -9,7 +9,7 @@ import type {
   DispatchBridge,
   DispatchResult,
   StageDispatchResult,
-} from "./dispatch.js";
+} from "./dispatch/index.js";
 
 export interface ResearchTaskRequest {
   runId: string;

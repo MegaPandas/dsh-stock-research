@@ -104,6 +104,10 @@ export default defineConfig(
             ],
           },
           {
+            directory: "src/host/dispatch",
+            publicEntries: ["index.js"],
+          },
+          {
             directory: "src/evidence",
             publicEntries: ["fields.js", "checks.js", "price-basis.js"],
           },
