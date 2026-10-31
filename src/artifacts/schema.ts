@@ -115,9 +115,6 @@ function gapEntry(
   gap(entry.gap, `${location}/gap`);
   return entry;
 }
-const reportedGap: Check = (value, location) => {
-  gapEntry(value, location);
-};
 const gapSummary: Check = (value, location) => {
   const entry = gapEntry(value, location, ["fieldPattern", "count"]);
   text(entry.fieldPattern, `${location}/fieldPattern`);
@@ -339,7 +336,7 @@ function payload(kind: unknown, value: unknown, path: string): void {
       texts(item.disagreements, `${path}/disagreements`);
       list(item.risks, `${path}/risks`, risk);
       uniqueIssues(item.risks, `${path}/risks`);
-      list(item.gaps, `${path}/gaps`, reportedGap);
+      list(item.gaps, `${path}/gaps`, gapSummary);
       list(item.upstreamRefs, `${path}/upstreamRefs`, artifactRef);
       list(item.numbers, `${path}/numbers`, (value, location) => {
         numberInput(value, location);
@@ -366,13 +363,11 @@ function payload(kind: unknown, value: unknown, path: string): void {
         "digests",
         "decision",
         "limitations",
-        "gaps",
       ]);
       list(item.sections, `${path}/sections`, artifactRef);
       list(item.digests, `${path}/digests`, artifactRef);
       result(item.decision, `${path}/decision`);
       texts(item.limitations, `${path}/limitations`);
-      list(item.gaps, `${path}/gaps`, reportedGap);
       return;
     }
     default:

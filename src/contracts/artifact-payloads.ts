@@ -96,7 +96,7 @@ export type DigestPayload = {
   facts: SupportedStatement[];
   disagreements: string[];
   risks: RiskIssue[];
-  gaps: ReportedGap[];
+  gaps: GapSummary[];
   numbers: Extract<NumberInput, { kind: "artifact" }>[];
   upstreamRefs: ArtifactRef[];
   report?: AgentReport<"digest">;
@@ -154,7 +154,6 @@ export type ReportPayload = {
   digests: ArtifactRef[];
   decision: DecisionResult;
   limitations: string[];
-  gaps: ReportedGap[];
 };
 export type ArtifactPayloads = {
   analysis: AnalysisPayload | AnalysisNotePayload | AnalysisAgentPayload;

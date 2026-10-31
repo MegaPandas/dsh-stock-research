@@ -36,7 +36,7 @@ describe("decision use of captured snapshots", () => {
     expect(c.runs.view(c.operation).status).toBe("completed");
     const report = c.runs.readArtifact(result.refs[1]!).content
       .payload as ReportPayload;
-    expect(report.gaps).toContainEqual({
+    expect(report.decision.validation.dataQuality).toContainEqual({
       kind: "source",
       source: {
         runId: c.source.runId,
@@ -44,6 +44,8 @@ describe("decision use of captured snapshots", () => {
         selector: "",
       },
       gap,
+      fieldPattern: "/data/bars",
+      count: 1,
     });
     expect(c.runs.readEvidence(c.source)).toEqual(evidence);
     expect(evidence.envelope).toMatchObject({

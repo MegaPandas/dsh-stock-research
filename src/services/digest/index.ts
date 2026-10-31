@@ -17,6 +17,7 @@ import type { ArtifactService } from "../artifact-submission/index.js";
 import { assembleDigest } from "./draft.js";
 import { digestNumbers } from "./inputs.js";
 import { inheritRisks } from "../../artifacts/risks.js";
+import { summarizeArtifactGaps } from "../../artifacts/gaps.js";
 import type { RunCommands, RunReader } from "../../contracts/run-access.js";
 
 interface PendingDigest {
@@ -195,7 +196,7 @@ export class DigestService {
         references: versions.map((version) => version.ref),
         numbers: digestNumbers(versions, inputs),
         risks: inheritRisks(versions),
-        gaps: inputs.reportedGaps(versions),
+        gaps: summarizeArtifactGaps(inputs.reportedGaps(versions)),
       };
       return await this.generate(
         structuredClone(context),

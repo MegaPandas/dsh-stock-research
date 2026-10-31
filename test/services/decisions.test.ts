@@ -220,7 +220,7 @@ describe("decision finalization", () => {
       thesis: [],
     });
     expect(values.decision.targetPrice).toEqual(c.draft.payload.targetPrice);
-    expect(values.report.gaps).toContainEqual(
+    expect(values.report.decision.validation.dataQuality).toContainEqual(
       expect.objectContaining({
         gap: expect.objectContaining({ detail: "Latest close unavailable" }),
       }),
@@ -462,7 +462,7 @@ describe("decision finalization", () => {
       new DecisionService(c.runs, c.now).decide(c.operation, "final", "decide")
         .refs,
     );
-    expect(values.report.gaps).toEqual([
+    expect(values.report.decision.validation.dataQuality).toEqual([
       expect.objectContaining({
         kind: "source",
         source: {
@@ -478,13 +478,14 @@ describe("decision finalization", () => {
       }),
     ]);
     expect(values.decision.validation.warnings).toEqual([]);
-    expect(values.decision.validation.dataQuality).toEqual([
-      {
-        ...values.report.gaps[0]!,
-        fieldPattern: "/data/bars/*/volume",
-        count: 1,
-      },
-    ]);
+    expect(values.report).not.toHaveProperty("gaps");
+    expect(values.decision.validation.dataQuality).toEqual(
+      values.report.decision.validation.dataQuality,
+    );
+    expect(values.decision.validation.dataQuality[0]).toMatchObject({
+      fieldPattern: "/data/bars/*/volume",
+      count: 1,
+    });
     expect(values.report.limitations).toEqual(c.draft.payload.limitations);
   });
 
@@ -553,7 +554,7 @@ describe("decision finalization", () => {
       ]),
     );
     expect(result.decision.validation.dataQuality).toHaveLength(3);
-    expect(result.report.gaps).toHaveLength(3);
+    expect(result.report.decision.validation.dataQuality).toHaveLength(3);
   });
   it.each([false, true])(
     "checks gaps of an adopted whole-artifact premise (gap=%s)",
@@ -622,11 +623,13 @@ describe("decision finalization", () => {
       new DecisionService(c.runs, c.now).decide(c.operation, "final", "decide")
         .refs,
     );
-    expect(values.report.gaps).toEqual([
+    expect(values.report.decision.validation.dataQuality).toEqual([
       {
         kind: "source",
         source: { ...c.source, selector: "" },
         gap,
+        fieldPattern: "/data/bars/*/volume",
+        count: 1,
       },
     ]);
     expect(values.decision.riskResponses).toEqual(

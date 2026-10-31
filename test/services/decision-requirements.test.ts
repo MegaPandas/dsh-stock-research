@@ -143,6 +143,48 @@ describe("decision required-data coverage", () => {
     );
   });
 
+  it("checks original adopted analysis gaps behind a digest rather than summary examples", () => {
+    const fixture = setup({
+      required: false,
+      analysisGaps: [
+        {
+          code: "missing",
+          field: "/data/bars/0/close",
+          detail: "Earlier price basis unresolved.",
+        },
+        {
+          code: "missing",
+          field: "/data/bars/1/close",
+          detail: "Latest price basis unresolved.",
+        },
+      ],
+    });
+    const current = currentInputs(fixture);
+    const task = {
+      ...current.tasks.find((task) => task.id === "digest")!,
+      dataRequirements: [
+        {
+          dataset: "market" as const,
+          fields: ["close"],
+          requiredForDecision: true,
+        },
+      ],
+    };
+    expect(() =>
+      checkDecisionRequirements(
+        [task],
+        current.versions,
+        current.inputs,
+        current.cutoff,
+      ),
+    ).toThrowError(
+      expect.objectContaining({
+        code: "DATA_INSUFFICIENT",
+        message: expect.stringContaining("Latest price basis unresolved."),
+      }),
+    );
+  });
+
   it("does not treat registered but unadopted evidence as coverage", () => {
     const fixture = setup();
     const sourceState = fixture.store.read(fixture.operation.runId);

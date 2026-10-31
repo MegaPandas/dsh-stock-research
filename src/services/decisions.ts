@@ -128,7 +128,6 @@ export class DecisionService {
           digests: digests.map((version) => version.ref),
           decision: result,
           limitations: result.limitations,
-          gaps,
         },
       };
       signal?.throwIfAborted();

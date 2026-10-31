@@ -263,7 +263,7 @@ describe("stock-replay command", () => {
         .find((task) => task.taskId === "finalize")!
         .outputRefs.map((ref) => h.runtime.runs.readArtifact(ref).content)
         .find((content) => content.kind === "report")!.payload as ReportPayload;
-      expect(report.gaps).toContainEqual(
+      expect(report.decision.validation.dataQuality).toContainEqual(
         expect.objectContaining({
           kind: "source",
           source: expect.objectContaining({

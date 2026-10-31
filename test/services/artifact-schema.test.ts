@@ -94,7 +94,6 @@ function payloads(): ArtifactPayloads {
       digests: [ref],
       decision: decision(),
       limitations: ["资料有限"],
-      gaps: [],
     },
   };
 }
@@ -269,9 +268,31 @@ describe("parseArtifactInput payload boundary", () => {
         detail: "Unresolved coverage",
       },
     },
-  ])("keeps report gaps with $kind provenance", (gap) => {
-    const input = artifact("report", { ...payloads().report, gaps: [gap] });
+  ])("keeps digest summaries with $kind provenance", (gap) => {
+    const input = artifact("digest", {
+      ...payloads().digest,
+      gaps: [{ ...gap, fieldPattern: gap.gap.field, count: 1 }],
+    });
     expect(parseArtifactInput(input).payload).toEqual(input.payload);
+  });
+  it("rejects duplicate raw report gaps and uncounted digest gaps", () => {
+    invalid(
+      artifact("report", { ...payloads().report, gaps: [] }),
+      "artifact/payload/gaps",
+    );
+    invalid(
+      artifact("digest", {
+        ...payloads().digest,
+        gaps: [
+          {
+            kind: "source",
+            source,
+            gap: { code: "missing", field: "/data", detail: "No data" },
+          },
+        ],
+      }),
+      "artifact/payload/gaps/0/fieldPattern",
+    );
   });
   it("requires nonempty main findings", () => {
     invalid(

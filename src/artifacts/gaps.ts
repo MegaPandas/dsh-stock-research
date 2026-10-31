@@ -45,8 +45,6 @@ export function aggregateArtifactGaps(
     )
       for (const gap of version.content.payload.gaps)
         add({ kind: "artifact", artifact: version.ref, gap });
-    if (version.content.kind === "digest" || version.content.kind === "report")
-      for (const gap of version.content.payload.gaps) add(gap);
   }
   for (const { source, gaps: values } of sources)
     for (const gap of values)
@@ -62,7 +60,7 @@ export function aggregateArtifactGaps(
   return [...gaps.values()];
 }
 
-/** Summarize the deduplicated gap records; raw fields and details remain in the report. */
+/** Summarize original records; full reasons remain in their source or analysis artifact. */
 export function summarizeArtifactGaps(
   gaps: readonly ReportedGap[],
 ): GapSummary[] {

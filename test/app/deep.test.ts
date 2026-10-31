@@ -192,7 +192,7 @@ describe("stock-deep command and resume", () => {
       view.tasks.find((task) => task.taskId === "manager.research")!
         .outputRefs[0],
     );
-    expect(report.gaps).toContainEqual(
+    expect(report.decision.validation.dataQuality).toContainEqual(
       expect.objectContaining({
         kind: "source",
         gap: expect.objectContaining({

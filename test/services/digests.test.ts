@@ -411,6 +411,8 @@ describe("DigestService", () => {
         selector: "",
       },
       gap,
+      fieldPattern: "/data/bars/*/volume",
+      count: 1,
     });
     expect(content(c, saved.refs).body).not.toContain("## 数据缺口");
     expect(content(c, saved.refs).body).not.toContain(gap.detail);
@@ -418,11 +420,16 @@ describe("DigestService", () => {
   it("preserves original gap origin through a second digest", async () => {
     const gap = {
       code: "missing" as const,
-      field: "revenue",
+      field: "/data/rows/0/values/revenue",
       detail: "Revenue unavailable",
     };
+    const otherGap = {
+      ...gap,
+      field: "/data/rows/1/values/revenue",
+      detail: "Period basis is unavailable",
+    };
     const c = setup({
-      analysisGaps: [gap],
+      analysisGaps: [gap, otherGap],
       additionalTasks: [
         {
           id: "digest2",
@@ -447,10 +454,18 @@ describe("DigestService", () => {
       kind: "artifact",
       artifact: c.analysisRef,
       gap,
+      fieldPattern: "/data/rows/*/values/revenue",
+      count: 2,
     });
     expect(
       gaps.filter((entry) => entry.gap.detail === gap.detail),
     ).toHaveLength(1);
+    const original = c.runs.readArtifact(c.analysisRef).content;
+    expect(
+      original.kind === "analysis" &&
+        "gaps" in original.payload &&
+        original.payload.gaps,
+    ).toEqual([gap, otherGap]);
   });
   it("retains risks behind a selected manager artifact", async () => {
     const c = decisionFixture({

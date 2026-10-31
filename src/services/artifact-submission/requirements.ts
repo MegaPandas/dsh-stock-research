@@ -199,20 +199,13 @@ export function checkDecisionRequirements(
               `${gaps[0]!.field}: ${gaps[0]!.detail}`,
             );
         }
-        for (const version of versions.filter(
-          (version) => version.taskId === task.id,
-        )) {
+        for (const version of adopted) {
           if (
-            version.content.kind !== "analysis" &&
-            version.content.kind !== "digest"
+            version.content.kind !== "analysis" ||
+            "schemaVersion" in version.content.payload
           )
             continue;
-          const declared =
-            version.content.kind === "analysis"
-              ? "schemaVersion" in version.content.payload
-                ? []
-                : version.content.payload.gaps
-              : version.content.payload.gaps.map((entry) => entry.gap);
+          const declared = version.content.payload.gaps;
           const gap = declared.find(
             (gap) => gap.field === field || gap.field === latest.ref.selector,
           );

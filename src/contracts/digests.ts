@@ -4,11 +4,11 @@ import type {
   NumberInput,
   NumericClaim,
 } from "./artifacts.js";
-import type { ReportedGap, RiskIssue } from "./artifact-payloads.js";
+import type { GapSummary, RiskIssue } from "./artifact-payloads.js";
 import type { ArtifactCommitResult, TaskOperation } from "./runs.js";
 import type { AgentReport } from "./agent-reports.js";
 
-export const DIGEST_HANDOFF_VERSION = "12";
+export const DIGEST_HANDOFF_VERSION = "13";
 
 export interface DigestNumberCandidate {
   candidateId: string;
@@ -26,7 +26,7 @@ export interface DigestModelInput {
   references: ArtifactRef[];
   numbers: DigestNumberCandidate[];
   risks: RiskIssue[];
-  gaps: ReportedGap[];
+  gaps: GapSummary[];
 }
 export interface DigestDraft {
   report?: AgentReport<"digest">;

@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 import type {
+  GapSummary,
   ReportedGap,
   ResearchArtifactInput,
   ResearchArtifactVersion,
@@ -300,7 +301,7 @@ const sourceOrigin: SourceRef = {
 };
 function digestGapVersion(
   ref: ArtifactRef,
-  gaps: ReportedGap[],
+  gaps: GapSummary[],
 ): ResearchArtifactVersion {
   return gapVersion(ref, {
     kind: "digest",
@@ -361,9 +362,8 @@ describe("origin-preserving digest gaps", () => {
     expect({ versions, sources }).toEqual(before);
   });
 
-  it("does not reassign gaps already carried through multiple digest levels", () => {
+  it("does not count summary examples again when aggregating original source gaps", () => {
     const original: ReportedGap[] = [
-      { kind: "artifact", artifact: analysisOrigin, gap: missingClose },
       {
         kind: "source",
         source: { ...sourceOrigin, selector: "" },
@@ -372,14 +372,20 @@ describe("origin-preserving digest gaps", () => {
     ];
     const first = digestGapVersion(
       { ...analysisOrigin, artifactId: "digest-one" },
-      original,
+      [{ ...original[0]!, fieldPattern: "/data/bars/*/close", count: 2 }],
     );
     const second = digestGapVersion(
       { ...analysisOrigin, artifactId: "digest-two" },
-      structuredClone(original),
+      [{ ...original[0]!, fieldPattern: "/data/bars/*/close", count: 2 }],
     );
     const before = structuredClone([first, second]);
-    expect(aggregateArtifactGaps([first, second], [])).toEqual(original);
+    const other = { ...missingClose, field: "/data/bars/1/close" };
+    expect(
+      aggregateArtifactGaps(
+        [first, second],
+        [{ source: sourceOrigin, gaps: [missingClose, other] }],
+      ),
+    ).toEqual([original[0], { ...original[0], gap: other }]);
     expect([first, second]).toEqual(before);
   });
 });

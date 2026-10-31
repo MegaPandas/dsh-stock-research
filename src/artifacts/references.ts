@@ -1,6 +1,7 @@
 import type {
   DecisionProposal,
   DecisionResult,
+  GapSummary,
   ResearchArtifactInput,
   SupportedStatement,
 } from "../contracts/artifact-payloads.js";
@@ -87,13 +88,9 @@ export function artifactReferences(content: ResearchArtifactInput): {
       ...item.validation.checkedRefs,
     );
     proposal(item, item.draftRef);
+    gaps(item.validation.dataQuality);
   }
-  function gaps(
-    values: Extract<
-      ResearchArtifactInput,
-      { kind: "digest" | "report" }
-    >["payload"]["gaps"],
-  ): void {
+  function gaps(values: readonly GapSummary[]): void {
     for (const entry of values) {
       if (entry.kind === "artifact") refs.artifacts.push(entry.artifact);
       else refs.origins.push(entry.source);
@@ -132,7 +129,6 @@ export function artifactReferences(content: ResearchArtifactInput): {
       decision(content.payload);
       break;
     case "report":
-      gaps(content.payload.gaps);
       refs.artifacts.push(
         ...content.payload.sections,
         ...content.payload.digests,
