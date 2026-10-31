@@ -14,7 +14,7 @@ import type {
   MemoryInputSnapshot,
 } from "../../src/contracts/task-data.js";
 import { createRunService } from "../../src/services/create-run-service.js";
-import type { RunService } from "../../src/services/runs.js";
+import type { RunLifecycle } from "../../src/contracts/run-access.js";
 import { RunStore } from "../../src/runs/store.js";
 import { DataRoot } from "../../src/storage/data-root.js";
 import { US_SECURITY } from "../fixtures/market.js";
@@ -95,7 +95,7 @@ function opened(path: string) {
   return { root, store, service: createRunService(store, () => RECORDED) };
 }
 function claim(
-  service: RunService,
+  service: Pick<RunLifecycle, "claim">,
   runId: string,
   taskId: string,
   callId: string,

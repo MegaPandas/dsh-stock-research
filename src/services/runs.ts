@@ -1,5 +1,5 @@
 import { isDeepStrictEqual } from "node:util";
-import type { RunCommands, RunReader } from "../contracts/run-access.js";
+import type { RunAccess } from "../contracts/run-access.js";
 import { valuationDependencyIds } from "../valuation/dependencies.js";
 import type { ValuationCalculation } from "../contracts/valuation.js";
 import type { ValuationCalculationRegistration } from "../contracts/runs.js";
@@ -210,7 +210,7 @@ function initialInstructions(input: OpenRunInput) {
   });
 }
 
-export class RunService implements RunReader, RunCommands {
+export class RunService implements RunAccess {
   readonly #restored = new Set<string>();
 
   constructor(

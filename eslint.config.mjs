@@ -26,9 +26,9 @@ const pureImports = [
 ];
 const runConsumerRestriction = {
   selector:
-    "ImportDeclaration[source.value='./runs.js'], ImportDeclaration[source.value='../services/runs.js']",
+    ":matches(ImportDeclaration, ExportNamedDeclaration, ExportAllDeclaration)[source.value='./runs.js'], :matches(ImportDeclaration, ExportNamedDeclaration, ExportAllDeclaration)[source.value=/services\\u002Fruns\\.js$/]",
   message:
-    "Consumers must select RunReader or RunCommands capabilities instead of depending on the RunService implementation.",
+    "Consumers must select run capabilities instead of depending on the RunService implementation.",
 };
 const queryPrivateRestriction = {
   selector:
@@ -146,7 +146,7 @@ export default defineConfig(
     },
   },
   {
-    files: ["src/{app,services,tools}/**/*.ts"],
+    files: ["src/{app,services,tools,host}/**/*.ts", "src/*.ts"],
     ignores: ["src/services/create-run-service.ts"],
     rules: {
       "no-restricted-syntax": [

@@ -27,7 +27,7 @@ import type {
   TaskFailure,
   TaskOperation,
 } from "../contracts/runs.js";
-import type { RunService } from "../services/runs.js";
+import type { RunAccess } from "../contracts/run-access.js";
 import type { DigestService } from "../services/digests.js";
 import type { ResearchSessions } from "./sessions.js";
 import { observeModelCalls } from "./model-events.js";
@@ -110,6 +110,23 @@ function executionFailure(cause: unknown, signal: AbortSignal): TaskFailure {
 
 type StopBarrier = Promise<PromiseSettledResult<void>>;
 
+type DispatchRuns = Pick<
+  RunAccess,
+  | "readDefinition"
+  | "view"
+  | "readAttempt"
+  | "hasClaimReceipt"
+  | "hasStageDispatchReceipt"
+  | "recordStageDispatch"
+  | "resume"
+  | "dispatchForCall"
+  | "redo"
+  | "cancel"
+  | "recoverInterrupted"
+  | "bindTaskSession"
+  | "failServiceAttempt"
+>;
+
 async function finishStops(stops: readonly Promise<void>[]): Promise<void> {
   const failures = (await Promise.allSettled(stops)).flatMap((result) =>
     result.status === "rejected" ? [result.reason] : [],
@@ -133,7 +150,7 @@ export class DispatchBridge {
 
   constructor(
     private readonly ctx: Context,
-    private readonly runs: RunService,
+    private readonly runs: DispatchRuns,
     private readonly sessions: ResearchSessions,
     private readonly prepare: PrepareRole,
     private readonly digests: DigestService,

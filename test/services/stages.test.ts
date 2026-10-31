@@ -13,7 +13,7 @@ import type {
   StageReviewInput,
 } from "../../src/contracts/runs.js";
 import { createRunService } from "../../src/services/create-run-service.js";
-import type { RunService } from "../../src/services/runs.js";
+import type { RunAccess } from "../../src/contracts/run-access.js";
 import { RunStore } from "../../src/runs/store.js";
 import { DataRoot } from "../../src/storage/data-root.js";
 import { validateRunDefinition } from "../../src/services/definition.js";
@@ -128,7 +128,7 @@ function setup(staged = true) {
   };
 }
 function complete(
-  service: RunService,
+  service: Pick<RunAccess, "claim" | "commitArtifact">,
   runId: string,
   taskId: string,
   kind: ArtifactKind = "analysis",

@@ -191,9 +191,13 @@ export type {
   TaskState,
   TaskStatus,
 } from "./contracts/runs.js";
-export { RunService } from "./services/runs.js";
 export { createRunService } from "./services/create-run-service.js";
-export type { RunCommands, RunReader } from "./contracts/run-access.js";
+export type {
+  RunAccess,
+  RunCommands,
+  RunLifecycle,
+  RunReader,
+} from "./contracts/run-access.js";
 export type {
   ReplayEvidenceSource,
   ReplayEvidenceRequest,

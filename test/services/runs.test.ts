@@ -12,7 +12,7 @@ import type {
   TaskOperation,
 } from "../../src/contracts/runs.js";
 import { createRunService } from "../../src/services/create-run-service.js";
-import type { RunService } from "../../src/services/runs.js";
+import type { RunAccess } from "../../src/contracts/run-access.js";
 import { RunStore } from "../../src/runs/store.js";
 import { DataRoot } from "../../src/storage/data-root.js";
 import { US_SECURITY } from "../fixtures/market.js";
@@ -114,7 +114,7 @@ function setup(path?: string) {
   };
 }
 function claim(
-  service: RunService,
+  service: Pick<RunAccess, "claim">,
   runId: string,
   taskId: string,
   requestId = `claim-${taskId}`,
@@ -132,11 +132,17 @@ function claim(
     sessionId: `session-${taskId}-${result.attempt}`,
   };
 }
-function completeAnalysis(service: RunService, runId: string) {
+function completeAnalysis(
+  service: Pick<RunAccess, "claim" | "commitArtifact">,
+  runId: string,
+) {
   const op = claim(service, runId, "analysis");
   return service.commitArtifact(op, [artifact("analysis")], "submit-analysis");
 }
-function readyFinal(service: RunService, runId: string) {
+function readyFinal(
+  service: Pick<RunAccess, "claim" | "commitArtifact">,
+  runId: string,
+) {
   completeAnalysis(service, runId);
   const digest = claim(service, runId, "digest");
   service.commitArtifact(digest, [artifact("digest")], "submit-digest");

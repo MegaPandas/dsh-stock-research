@@ -8,7 +8,7 @@ import {
   type ResearchModels,
 } from "../../src/app/research-models.js";
 import type { JsonValue } from "../../src/contracts/json.js";
-import type { RunService } from "../../src/services/runs.js";
+import type { RunAccess } from "../../src/contracts/run-access.js";
 import { runtimeHost } from "../fixtures/runtime-host.js";
 import { dispatchHost } from "../fixtures/dispatch-host.js";
 
@@ -26,7 +26,7 @@ async function parent() {
 }
 
 function openSnapshot(
-  runs: RunService,
+  runs: Pick<RunAccess, "inputCatalog" | "readDefinition" | "open">,
   sourceRunId: string,
   models: ResearchModels,
 ) {

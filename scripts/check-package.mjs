@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import * as core from "@megapandas/dsh-stock-research/core";
 import {
   calculateIndicators,
   calculatePriceReturn,
@@ -43,6 +44,7 @@ import {
 import { openDecisionSample } from "./decision-sample.mjs";
 import { openDigestSample, sampleDigestReply } from "./digest-sample.mjs";
 
+assert.equal(Object.hasOwn(core, "RunService"), false);
 assert.equal(parseISOTime("2024-01-02T21:00:00Z"), "2024-01-02T21:00:00.000Z");
 assert.equal(parseLocalDate("2024-02-29"), "2024-02-29");
 assert.throws(() => parseLocalDate("2023-02-29"), { code: "INVALID_INPUT" });

@@ -8,6 +8,7 @@ import type {
   GenerateDigest,
 } from "../../src/contracts/digests.js";
 import type {
+  ClaimResult,
   OpenRunInput,
   RunState,
   TaskInstructionSnapshot,
@@ -18,7 +19,6 @@ import { ArtifactService } from "../../src/services/artifacts.js";
 import { DigestService } from "../../src/services/digests.js";
 import { NumberService } from "../../src/services/numbers.js";
 import { createRunService } from "../../src/services/create-run-service.js";
-import type { RunService } from "../../src/services/runs.js";
 import { DataRoot } from "../../src/storage/data-root.js";
 import { US_SECURITY } from "../fixtures/market.js";
 
@@ -112,7 +112,7 @@ function analysis(): ResearchArtifactInput {
     },
   };
 }
-function taskOperation(claim: ReturnType<RunService["claim"]>): TaskOperation {
+function taskOperation(claim: ClaimResult): TaskOperation {
   return { ...claim, identity: "analyst-worker", sessionId: null };
 }
 afterEach(async () => {

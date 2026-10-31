@@ -5,18 +5,31 @@ import type {
 } from "./artifacts.js";
 import type { ArtifactRef, SourceRef } from "./data.js";
 import type { NumberContext } from "./numbers.js";
-import type { ReplayEvidenceSource, ReplaySnapshot } from "./replay.js";
+import type {
+  ReplayEvidenceSource,
+  ReplayRunInput,
+  ReplaySnapshot,
+} from "./replay.js";
 import type {
   ArtifactCommitResult,
   AttemptFailureResult,
+  AttemptTarget,
   BlockReasonInput,
   BlockRunResult,
   ClaimResult,
+  CancelRunResult,
   OpenRunInput,
   ResearchRun,
+  RecoverAttemptsResult,
+  RedoTaskResult,
+  ResumeRunInput,
+  ResumeRunResult,
+  RoleDispatchContext,
   RunInputCatalog,
   RunOperation,
   RunView,
+  StageReviewInput,
+  StageReviewResult,
   TaskAttempt,
   TaskFailure,
   TaskOperation,
@@ -50,6 +63,59 @@ export interface RunReader {
   readDefinition(runId: string): OpenRunInput["definition"];
   replaySnapshot(runId: string): ReplaySnapshot | null;
   numberContext(runId: string): NumberContext;
+}
+
+export interface RunLifecycle {
+  open(
+    identity: string,
+    input: OpenRunInput | ReplayRunInput,
+    requestId: string,
+  ): { runId: string };
+  reviewStage(
+    operation: RunOperation,
+    input: StageReviewInput,
+    requestId: string,
+  ): StageReviewResult;
+  claim(
+    operation: RunOperation,
+    taskId: string,
+    requestId: string,
+  ): ClaimResult;
+  hasClaimReceipt(operation: RunOperation, requestId: string): boolean;
+  hasStageDispatchReceipt(
+    operation: RunOperation,
+    stageId: string,
+    requestId: string,
+  ): boolean;
+  recordStageDispatch(
+    operation: RunOperation,
+    stageId: string,
+    requestId: string,
+  ): void;
+  dispatchForCall(
+    operation: RunOperation,
+    taskId: string,
+    requestId: string,
+  ): RoleDispatchContext;
+  bindTaskSession(operation: TaskOperation & { sessionId: string }): void;
+  cancel(operation: RunOperation, requestId: string): CancelRunResult;
+  resume(
+    operation: RunOperation,
+    input: ResumeRunInput,
+    requestId: string,
+  ): ResumeRunResult;
+  redo(
+    operation: RunOperation,
+    taskId: string,
+    requestId: string,
+    reason?: string | null,
+  ): RedoTaskResult;
+  recoverInterrupted(
+    operation: RunOperation,
+    targets: readonly AttemptTarget[],
+    failure: TaskFailure,
+    requestId: string,
+  ): RecoverAttemptsResult;
 }
 
 export interface RunCommands {
@@ -154,4 +220,9 @@ export interface RunCommands {
     >,
     callId: string,
   ): ValuationCalculationRegistration;
+}
+
+/** Complete capability set held by composition; consumers select the methods they use. */
+export interface RunAccess extends RunReader, RunCommands, RunLifecycle {
+  repairProjections(runId: string): void;
 }

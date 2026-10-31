@@ -11,7 +11,7 @@ import type {
   TaskOperation,
 } from "../../src/contracts/runs.js";
 import { createRunService } from "../../src/services/create-run-service.js";
-import type { RunService } from "../../src/services/runs.js";
+import type { RunAccess } from "../../src/contracts/run-access.js";
 import { RunStore } from "../../src/runs/store.js";
 import { DataRoot } from "../../src/storage/data-root.js";
 import { US_SECURITY } from "../fixtures/market.js";
@@ -85,7 +85,7 @@ function content(body: string, inputRefs: ArtifactRef[] = []): ArtifactInput {
   };
 }
 function claim(
-  service: RunService,
+  service: Pick<RunAccess, "claim">,
   runId: string,
   taskId: string,
   requestId = `claim-${taskId}`,
@@ -104,7 +104,7 @@ function claim(
   };
 }
 function complete(
-  service: RunService,
+  service: Pick<RunAccess, "claim" | "commitArtifact">,
   runId: string,
   taskId: string,
   body = taskId,

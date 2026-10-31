@@ -32,7 +32,7 @@ import { CollectionService } from "../services/collection.js";
 import { CollectionSnapshotStore } from "../storage/collection-snapshots.js";
 import { selectQuerySnapshot } from "../services/query-snapshot.js";
 import { createRunService } from "../services/create-run-service.js";
-import type { RunService } from "../services/runs.js";
+import type { RunAccess } from "../contracts/run-access.js";
 import { DataRoot } from "../storage/data-root.js";
 import { createControlTools } from "../tools/control.js";
 import { createDataTools, type DataToolServices } from "../tools/data.js";
@@ -68,7 +68,7 @@ declare module "@deepseek-ai/cordis" {
 
 export interface ResearchRuntime {
   isBusy(): boolean;
-  readonly runs: RunService;
+  readonly runs: RunAccess;
   readonly queries: QueryService;
   readonly collection: CollectionService;
   readonly memory: MemoryService;
@@ -118,7 +118,7 @@ interface Components {
   root: DataRoot;
   cache: SqliteCache;
   http: HttpClient;
-  runs: RunService;
+  runs: RunAccess;
   queries: QueryService;
   taskQueries: TaskQueryService;
   collection: CollectionService;
@@ -153,7 +153,7 @@ async function releaseReverse(actions: readonly Dispose[]): Promise<void> {
 }
 
 class Runtime implements ResearchRuntime {
-  readonly runs: RunService;
+  readonly runs: RunAccess;
   readonly queries: QueryService;
   readonly collection: CollectionService;
   readonly memory: MemoryService;
