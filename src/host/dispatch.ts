@@ -29,7 +29,10 @@ import type {
 } from "../contracts/runs.js";
 import type { RunAccess } from "../contracts/run-access.js";
 import type { DigestService } from "../services/digests.js";
-import { RunDispatchPlanner } from "../services/run-dispatch.js";
+import {
+  dispatchClaimRequestId,
+  RunDispatchPlanner,
+} from "../services/run-dispatch.js";
 import type { ResearchSessions } from "./sessions.js";
 import { observeModelCalls } from "./model-events.js";
 
@@ -178,14 +181,11 @@ export class DispatchBridge {
     signal: AbortSignal,
   ): Promise<DispatchResult> {
     return this.#afterStops(runId, taskId, signal, () => {
-      if (
-        this.runs.hasClaimReceipt(
-          { runId, identity: parent.id },
-          JSON.stringify(["dispatch", requestId]),
-        )
-      )
-        return this.#startRole(parent, runId, taskId, requestId, signal);
-      this.#planning.assertIndividual(runId, taskId);
+      this.#planning.assertIndividual(
+        { runId, identity: parent.id },
+        taskId,
+        requestId,
+      );
       return this.#startRole(parent, runId, taskId, requestId, signal);
     });
   }
@@ -223,24 +223,12 @@ export class DispatchBridge {
       return Promise.reject(cause);
     }
     const result = this.#afterStops(runId, taskIds, signal, async () => {
-      const ready = this.runs.view({ runId }).readyTasks;
-      const requests = taskIds.map((taskId) => ({
-        taskId,
-        requestId: JSON.stringify(["stage", stageId, requestId, taskId]),
-      }));
-      const replays = requests.map((request) =>
-        this.runs.hasClaimReceipt(
-          { runId, identity: parent.id },
-          JSON.stringify(["dispatch", request.requestId]),
-        ),
+      const requests = this.#planning.stageRequests(
+        operation,
+        stageId,
+        taskIds,
+        requestId,
       );
-      if (replays.some(Boolean) && !replays.every(Boolean))
-        throw new ResearchError(
-          "STALE_ATTEMPT",
-          "The previous batch was interrupted while claiming tasks. Confirm interruption and recover before dispatching a new batch.",
-        );
-      if (!replays.every(Boolean))
-        this.#planning.assertStageReady(taskIds, ready);
       this.runs.recordStageDispatch(operation, stageId, requestId);
       const outcomes = await Promise.allSettled(
         requests.map(({ taskId, requestId: taskRequestId }) =>
@@ -375,7 +363,7 @@ export class DispatchBridge {
     const context = this.runs.dispatchForCall(
       { runId, identity: parent.id },
       taskId,
-      JSON.stringify(["dispatch", requestId]),
+      dispatchClaimRequestId(requestId),
     );
     const key = attemptKey(runId, context.claim);
     const existing = this.#active.get(key);

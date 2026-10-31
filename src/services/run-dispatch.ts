@@ -1,13 +1,26 @@
 import { ResearchError } from "../contracts/errors.js";
-import type { RunReader } from "../contracts/run-access.js";
+import type { RunLifecycle, RunReader } from "../contracts/run-access.js";
+import type { RunOperation } from "../contracts/runs.js";
+
+export function dispatchClaimRequestId(requestId: string): string {
+  return JSON.stringify(["dispatch", requestId]);
+}
 
 /** Read-only dispatch eligibility; claims and durable state belong to the run owner. */
 export class RunDispatchPlanner {
   constructor(
-    private readonly runs: Pick<RunReader, "readDefinition" | "view">,
+    private readonly runs: Pick<RunReader, "readDefinition" | "view"> &
+      Pick<RunLifecycle, "hasClaimReceipt">,
   ) {}
 
-  assertIndividual(runId: string, taskId: string): void {
+  assertIndividual(
+    operation: RunOperation,
+    taskId: string,
+    requestId: string,
+  ): void {
+    if (this.runs.hasClaimReceipt(operation, dispatchClaimRequestId(requestId)))
+      return;
+    const { runId } = operation;
     const definition = this.runs.readDefinition(runId);
     const stage = definition.stages?.find((entry) =>
       entry.taskIds.includes(taskId),
@@ -37,7 +50,33 @@ export class RunDispatchPlanner {
     return stage.taskIds;
   }
 
-  assertStageReady(
+  stageRequests(
+    operation: RunOperation,
+    stageId: string,
+    taskIds: readonly string[],
+    requestId: string,
+  ): { taskId: string; requestId: string }[] {
+    const ready = this.runs.view(operation).readyTasks;
+    const requests = taskIds.map((taskId) => ({
+      taskId,
+      requestId: JSON.stringify(["stage", stageId, requestId, taskId]),
+    }));
+    const replays = requests.map((request) =>
+      this.runs.hasClaimReceipt(
+        operation,
+        dispatchClaimRequestId(request.requestId),
+      ),
+    );
+    if (replays.some(Boolean) && !replays.every(Boolean))
+      throw new ResearchError(
+        "STALE_ATTEMPT",
+        "The previous batch was interrupted while claiming tasks. Confirm interruption and recover before dispatching a new batch.",
+      );
+    if (!replays.every(Boolean)) this.assertStageReady(taskIds, ready);
+    return requests;
+  }
+
+  private assertStageReady(
     taskIds: readonly string[],
     readyTasks: readonly string[],
   ): void {
