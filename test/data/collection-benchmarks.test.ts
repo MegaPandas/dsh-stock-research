@@ -729,9 +729,9 @@ describe("fixed benchmark market collection", () => {
       )!
       .run();
     expect(result.data.rows[0]!.values).toEqual({ close: null });
-    expect(
-      result.gaps.some((gap) => gap.field === "/data/rows/0/values/close"),
-    ).toBe(true);
+    expect(result.gaps.some((gap) => gap.field === "/data/columns/close")).toBe(
+      true,
+    );
     get.mockResolvedValue(
       JSON.stringify(yahoo("1d", [1792710000], { close: [0] })),
     );
@@ -776,9 +776,9 @@ describe("fixed benchmark market collection", () => {
       )!
       .run();
     expect(result.data.rows[0]!.values.close).toBeNull();
-    expect(
-      result.gaps.some((gap) => gap.field === "/data/rows/0/values/close"),
-    ).toBe(true);
+    expect(result.gaps.some((gap) => gap.field === "/data/columns/close")).toBe(
+      true,
+    );
   });
 
   it("rejects source identity and quote-direction mismatches", async () => {

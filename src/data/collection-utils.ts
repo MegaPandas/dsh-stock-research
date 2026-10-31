@@ -68,15 +68,13 @@ export function collectedEnvelope(
         detail:
           "The source supplies its current historical view; observation dates do not establish publication times or historical revisions.",
       },
-      ...data.rows.flatMap((row, index) =>
-        Object.keys(data.columns)
-          .filter((key) => row.values[key] === null)
-          .map((key) => ({
-            code: "missing" as const,
-            field: `/data/rows/${index}/values/${key}`,
-            detail: `${data.columns[key]!.label} is absent for ${row.date}.`,
-          })),
-      ),
+      ...Object.entries(data.columns)
+        .filter(([key]) => data.rows.every((row) => row.values[key] === null))
+        .map(([key, column]) => ({
+          code: "missing" as const,
+          field: `/data/columns/${key}`,
+          detail: `${column.label} is absent from all observations.`,
+        })),
     ],
   };
 }

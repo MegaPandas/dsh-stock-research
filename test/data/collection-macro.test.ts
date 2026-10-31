@@ -138,7 +138,7 @@ describe("fixed China macro collection", () => {
     expect(envelope.gaps).toContainEqual(
       expect.objectContaining({
         code: "missing",
-        field: "/data/rows/0/values/FREE_CASH",
+        field: "/data/columns/FREE_CASH",
       }),
     );
   });

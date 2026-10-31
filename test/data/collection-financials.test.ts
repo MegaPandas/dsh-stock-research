@@ -325,8 +325,7 @@ describe("deterministic China financial collection", () => {
     expect(result.data.rows[0]!.values.ZCFZL).toBe(0);
     expect(
       result.gaps.some(
-        (gap) =>
-          gap.field === "/data/rows/0/values/EPSJB" && gap.code === "missing",
+        (gap) => gap.field === "/data/columns/EPSJB" && gap.code === "missing",
       ),
     ).toBe(true);
   });

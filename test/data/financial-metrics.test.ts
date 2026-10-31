@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import { deriveFinancialMetrics } from "../../src/data/financial-metrics.js";
 import type { CollectionPacket } from "../../src/contracts/collection.js";
 import { CN_SECURITY } from "../fixtures/market.js";
+import { verifyEvidence } from "../../src/evidence/checks.js";
+import { referenceField } from "../../src/evidence/fields.js";
 const scope = {
   security: CN_SECURITY,
   date: "2026-10-01",
@@ -394,7 +396,7 @@ describe("snapshot financial metrics", () => {
       code: "unverified_time",
       field: "/data",
       detail:
-        "financial.income /data/rows/0/publishedDate: Publication not established.",
+        "Input sources do not establish publication times or historical revisions; see the source tables.",
     });
     for (const gap of result.gaps) {
       const resolved = gap.field
@@ -407,6 +409,82 @@ describe("snapshot financial metrics", () => {
       expect(resolved).not.toBeUndefined();
     }
     expect(result.data.columns.NET_INCOME_YTD!.label).not.toContain("2026");
+  });
+  it("keeps derivation failures and source basis constraints without copying missing cells", () => {
+    const source = packet("financial.income", [
+      ["2026-03-31", { PARENT_NETPROFIT: 20 }],
+    ]);
+    source.envelope.gaps = [
+      {
+        code: "missing",
+        field: "/data/columns/unused",
+        detail: "Unused field absent.",
+      },
+      {
+        code: "incomparable",
+        field: "/data",
+        detail: "Reported basis differs.",
+      },
+      {
+        code: "unverified_time",
+        field: "/data/rows",
+        detail: "Publication unknown.",
+      },
+      {
+        code: "unverified_time",
+        field: "/availableAt",
+        detail: "Revision unknown.",
+      },
+    ];
+    const original = structuredClone(source);
+    const result = deriveFinancialMetrics(scope, [source])!.envelope;
+    expect(
+      result.gaps.filter((g) => g.code === "unverified_time"),
+    ).toHaveLength(1);
+    expect(result.gaps).toContainEqual({
+      code: "incomparable",
+      field: "/data",
+      detail: "financial.income /data: Reported basis differs.",
+    });
+    expect(result.gaps.some((g) => g.detail.includes("Unused field"))).toBe(
+      false,
+    );
+    expect(result.gaps).toContainEqual({
+      code: "missing",
+      field: "/data/rows/0/values/NET_INCOME_TTM",
+      detail:
+        "Missing matching fiscal annual/prior-year cumulative, or four contiguous non-overlapping quarters.",
+    });
+    expect(source).toEqual(original);
+  });
+  it("rejects derived values captured after cutoff when source revision time is unverified", () => {
+    const source = packet("financial.income", [
+      ["2026-03-31", { PARENT_NETPROFIT: 20 }],
+    ]);
+    source.envelope.retrievedAt = "2026-10-02T00:00:00.000Z";
+    source.envelope.data.rows[0]!.availableAt = "2026-04-01T00:00:00.000Z";
+    source.envelope.gaps.push({
+      code: "unverified_time",
+      field: "/data/rows",
+      detail: "Revision time unknown.",
+    });
+    const result = deriveFinancialMetrics(scope, [source])!.envelope;
+    const ref = {
+      runId: "run",
+      evidenceId: "metrics",
+      selector: "/data/rows/0/values/NET_INCOME_QUARTER",
+    };
+    const verify = () =>
+      verifyEvidence(
+        scope,
+        result,
+        ref,
+        referenceField(result, ref.selector),
+        [],
+      );
+    expect(verify).toThrow("not established as known by cutoff");
+    result.retrievedAt = "2026-09-01T00:00:00.000Z";
+    expect(verify).not.toThrow();
   });
   it("uses absolute prior-year bases for cumulative, quarterly and TTM growth", () => {
     const source = packet("financial.income", [
@@ -474,6 +552,20 @@ describe("snapshot financial metrics", () => {
     expect(result.data.attributes).toMatchObject({
       valuationHistoryWindowStart: "2026-09-01",
       valuationHistoryWindowEnd: "2026-09-05",
+    });
+    expect(result.data.rows[0]!.values.HISTORY_PE_TTM_COUNT).toBeNull();
+    expect(stats[0]!.values.NET_INCOME_YTD).toBeNull();
+    expect(
+      result.gaps.some(
+        (g) =>
+          g.detail === "No matching source series for this reporting period.",
+      ),
+    ).toBe(false);
+    expect(result.gaps).toContainEqual({
+      code: "missing",
+      field: "/data/rows/1/values/HISTORY_PS_TTM_MEDIAN",
+      detail:
+        "No non-null valuation.history PS_TTM samples in the retained window.",
     });
     expect(deriveFinancialMetrics(scope, [valuation])).toBeUndefined();
   });

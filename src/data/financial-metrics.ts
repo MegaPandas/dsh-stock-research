@@ -28,13 +28,7 @@ export function deriveFinancialMetrics(
     packet.envelope.data.rows.map((row) => ({ packet, row })),
   );
   const columns: Record<string, CollectionColumn> = {};
-  const gaps: DataGap[] = financial.flatMap((p) =>
-    p.envelope.gaps.map((g) => ({
-      ...g,
-      field: "/data",
-      detail: `${p.id} ${g.field}: ${g.detail}`,
-    })),
-  );
+  const gaps: DataGap[] = [];
   const rows: CollectionRow[] = [];
   const rowDependencies = new Map<CollectionRow, Input[]>();
   const attributes: Record<string, string> = {};
@@ -478,11 +472,6 @@ export function deriveFinancialMetrics(
     for (const field of Object.keys(columns)) {
       if (field in row.values) continue;
       row.values[field] = null;
-      gaps.push({
-        code: "incomparable",
-        field: `/data/rows/${rows.indexOf(row)}/values/${field}`,
-        detail: "No matching source series for this reporting period.",
-      });
     }
   }
   for (const row of rows) {
@@ -500,14 +489,26 @@ export function deriveFinancialMetrics(
     row.complete = dependencies.every((i) => i.row.complete);
   }
   const sources = [...used].map((p) => p.envelope);
+  if (
+    sources.some((source) =>
+      source.gaps.some((g) => g.code === "unverified_time"),
+    )
+  )
+    gaps.push({
+      code: "unverified_time",
+      field: "/data",
+      detail:
+        "Input sources do not establish publication times or historical revisions; see the source tables.",
+    });
   for (const p of used) {
-    if (financial.includes(p)) continue;
     gaps.push(
-      ...p.envelope.gaps.map((g) => ({
-        ...g,
-        field: "/data",
-        detail: `${p.id} ${g.field}: ${g.detail}`,
-      })),
+      ...p.envelope.gaps
+        .filter((g) => g.code !== "missing" && g.code !== "unverified_time")
+        .map((g) => ({
+          ...g,
+          field: "/data",
+          detail: `${p.id} ${g.field}: ${g.detail}`,
+        })),
     );
   }
   const latest = (field: "asOf" | "retrievedAt") =>

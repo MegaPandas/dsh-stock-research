@@ -92,12 +92,7 @@ describe("fixed benchmark government-bond yields", () => {
     expect(envelope.gaps).toContainEqual(
       expect.objectContaining({ code: "unverified_time" }),
     );
-    expect(envelope.gaps).toContainEqual(
-      expect.objectContaining({
-        code: "missing",
-        field: "/data/rows/2/values/us10y",
-      }),
-    );
+    expect(envelope.gaps.some((gap) => gap.code === "missing")).toBe(false);
   });
 
   it("uses the same single source independently of the researched stock market", async () => {
