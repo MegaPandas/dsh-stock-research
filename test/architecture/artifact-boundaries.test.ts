@@ -23,7 +23,7 @@ describe("artifact rule boundaries", () => {
     ["src/artifacts/schema.ts", "../services/artifact-submission/index.js"],
     ["src/artifacts/agent-reports.ts", "../storage/data-root.js"],
     ["src/artifacts/stage-handoff.ts", "@deepseek-ai/dsh-agent"],
-    ["src/artifacts/assembly.ts", "../services/artifact-submission/index.js"],
+    ["src/artifacts/agent-reports.ts", "../report/agent-report.js"],
   ])(
     "rejects an upper or I/O dependency from %s to %s",
     async (file, dependency) => {
@@ -52,8 +52,9 @@ describe("artifact rule boundaries", () => {
     ["src/services/digest/draft.ts", "../../artifacts/schema.js"],
     ["src/artifacts/schema.ts", "./shape.js"],
     ["src/artifacts/agent-reports.ts", "../valuation/report-policy.js"],
-    ["src/app/role-preparation/role.ts", "../../artifacts/assembly.js"],
-    ["src/artifacts/assembly.ts", "../report/agent-report.js"],
+    ["src/app/role-preparation/role.ts", "../../services/agent-artifacts.js"],
+    ["src/services/agent-artifacts.ts", "../report/agent-report.js"],
+    ["src/services/agent-artifacts.ts", "../valuation/rating-policy.js"],
   ])(
     "allows the declared dependency from %s to %s",
     async (file, dependency) => {
@@ -72,7 +73,7 @@ describe("artifact rule boundaries", () => {
     expect(errors[0]!.messageId).toBe("privateEntry");
   });
 
-  it.each(["../artifacts/schema.js", "../artifacts/assembly.js"])(
+  it.each(["../artifacts/schema.js", "../services/agent-artifacts.js"])(
     "keeps report rendering independent of %s",
     async (dependency) => {
       const errors = await boundaryErrors(
@@ -81,6 +82,22 @@ describe("artifact rule boundaries", () => {
       );
       expect(errors).toHaveLength(1);
       expect(errors[0]!.message).toContain("Report rendering");
+    },
+  );
+
+  it.each([
+    "../artifacts/schema.js",
+    "./artifact-submission/index.js",
+    "node:fs",
+  ])(
+    "keeps parsing and I/O out of validated report assembly: %s",
+    async (dependency) => {
+      const errors = await boundaryErrors(
+        "src/services/agent-artifacts.ts",
+        `import { value } from "${dependency}";`,
+      );
+      expect(errors).toHaveLength(1);
+      expect(errors[0]!.message).toContain("Report assembly");
     },
   );
 

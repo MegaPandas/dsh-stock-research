@@ -1,5 +1,5 @@
 import { ResearchError } from "../contracts/errors.js";
-import { decisionPolicy } from "../contracts/rating-policy.js";
+import { decisionPolicy } from "../valuation/rating-policy.js";
 import type { RunCommands, RunReader } from "../contracts/run-access.js";
 import type { TaskOperation } from "../contracts/runs.js";
 import {

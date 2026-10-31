@@ -7,11 +7,8 @@ import type { ResearchScope } from "../contracts/data.js";
 import { ResearchError } from "../contracts/errors.js";
 import { ArtifactInputs } from "./artifact-inputs.js";
 import { PriceBasisError, verifyPriceBasis } from "../evidence/price-basis.js";
-import {
-  decisionPolicy,
-  priceRating,
-  PRICE_RATING_POLICY,
-} from "../contracts/rating-policy.js";
+import { PRICE_RATING_POLICY } from "../contracts/rating-policy.js";
+import { decisionPolicy, priceRating } from "../valuation/rating-policy.js";
 
 function invalid(detail: string): never {
   throw new ResearchError("INVALID_ARTIFACT", detail);

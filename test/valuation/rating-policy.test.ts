@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   decisionPolicy,
   priceRating,
-  PRICE_RATING_POLICY,
-} from "../../src/contracts/rating-policy.js";
+} from "../../src/valuation/rating-policy.js";
+import { PRICE_RATING_POLICY } from "../../src/contracts/rating-policy.js";
 
 describe("six-month absolute price ratings", () => {
   it.each([

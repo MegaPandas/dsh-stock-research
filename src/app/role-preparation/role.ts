@@ -14,7 +14,7 @@ import type { StageHandoff } from "../../contracts/stage-handoff.js";
 import type { RoleProvision } from "../../host/dispatch/index.js";
 import { reportMaterial } from "../../report/material.js";
 import { ArtifactInputs } from "../../services/artifact-inputs.js";
-import { assembleAgentArtifact } from "../../artifacts/assembly.js";
+import { assembleAgentArtifact } from "../../services/agent-artifacts.js";
 import { inheritRisks } from "../../artifacts/risks.js";
 import type { RoleServices } from "./services.js";
 import type { readApplicationInput } from "../research-input.js";
@@ -31,7 +31,7 @@ import {
 } from "../public-research.js";
 import { createPublicSearchSession } from "../public-search.js";
 import { referencePrice, type RegisteredTable } from "../reference-price.js";
-import { decisionPolicy } from "../../contracts/rating-policy.js";
+import { decisionPolicy } from "../../valuation/rating-policy.js";
 import { researchStageFeedback } from "../research-stages.js";
 import {
   createValuationMethodTool,

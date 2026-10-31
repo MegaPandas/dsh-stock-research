@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import type { GenerateDigest } from "../../src/contracts/digests.js";
 import type { TaskDefinition } from "../../src/contracts/workflow.js";
 import { parseAnalysisReport } from "../../src/artifacts/analysis-report.js";
-import { assembleAgentArtifact } from "../../src/artifacts/assembly.js";
+import { assembleAgentArtifact } from "../../src/services/agent-artifacts.js";
 import { ArtifactInputs } from "../../src/services/artifact-inputs.js";
 import { parseArtifactInput } from "../../src/artifacts/schema.js";
 import { checkDecisionRequirements } from "../../src/services/artifact-submission/requirements.js";

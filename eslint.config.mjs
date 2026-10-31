@@ -137,7 +137,6 @@ export default defineConfig(
               "analysis-report.js",
               "agent-reports.js",
               "stage-handoff.js",
-              "assembly.js",
             ],
           },
         ],
@@ -244,6 +243,23 @@ export default defineConfig(
     },
   },
   {
+    files: ["src/services/agent-artifacts.ts"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: [...pureImports, "./*.js", "../*.js", "**/artifacts/**"],
+              message:
+                "Report assembly must consume validated contracts and pure rules instead of parsing, stateful services, or I/O.",
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
     files: ["src/artifacts/**/*.ts"],
     rules: {
       "no-restricted-imports": [
@@ -251,7 +267,7 @@ export default defineConfig(
         {
           patterns: [
             {
-              group: [...pureImports, "!node:util"],
+              group: [...pureImports, "**/report/**", "!node:util"],
               message:
                 "Artifact rules must not depend on I/O, persistence, services, or integration layers.",
             },

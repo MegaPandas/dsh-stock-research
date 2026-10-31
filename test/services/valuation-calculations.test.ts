@@ -25,7 +25,7 @@ import { RunStore } from "../../src/runs/store.js";
 import { createRunService } from "../../src/services/run/index.js";
 import { ArtifactService } from "../../src/services/artifact-submission/index.js";
 import { NumberService } from "../../src/services/numbers.js";
-import { assembleAgentArtifact } from "../../src/artifacts/assembly.js";
+import { assembleAgentArtifact } from "../../src/services/agent-artifacts.js";
 import type { AgentReport } from "../../src/contracts/agent-reports.js";
 import type { NumberTarget } from "../../src/contracts/numbers.js";
 import { calculateValuation } from "../../src/services/valuation-calculations.js";

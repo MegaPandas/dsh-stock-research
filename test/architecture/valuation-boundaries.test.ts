@@ -50,6 +50,7 @@ describe("valuation module boundaries", () => {
     ["src/valuation/requests.ts", "../services/valuation-records.js"],
     ["src/valuation/report-policy.ts", "../runs/store.js"],
     ["src/valuation/report-policy.ts", "node:fs"],
+    ["src/valuation/rating-policy.ts", "../services/decision-basics.js"],
   ])("keeps %s independent of %s", async (file, dependency) => {
     const errors = await boundaryErrors(
       file,
@@ -61,7 +62,8 @@ describe("valuation module boundaries", () => {
 
   it.each([
     ["src/valuation/requests.ts", "../json/schema.js"],
-    ["src/valuation/report-policy.ts", "../contracts/rating-policy.js"],
+    ["src/valuation/report-policy.ts", "./rating-policy.js"],
+    ["src/valuation/rating-policy.ts", "../contracts/rating-policy.js"],
     ["src/services/numbers.ts", "./valuation-records.js"],
     ["src/services/valuation-reports.ts", "../valuation/report-policy.js"],
     ["src/services/valuation-calculations.ts", "./valuation-records.js"],

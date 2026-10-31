@@ -3,7 +3,7 @@ export { VALUATION_METHODS_INPUT } from "../contracts/valuation.js";
 import type { ResearchScope } from "../contracts/data.js";
 import type { TaskDefinition } from "../contracts/workflow.js";
 import type { CollectionPacket } from "../contracts/collection.js";
-import { decisionPolicy } from "../contracts/rating-policy.js";
+import { decisionPolicy } from "../valuation/rating-policy.js";
 import { VALUATION_ENGINE_VERSION } from "../contracts/valuation.js";
 import { researchTool } from "../tools/errors.js";
 import { valuationMethodDetail } from "../tools/valuation.js";

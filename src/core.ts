@@ -140,9 +140,8 @@ export {
   PRICE_RATING_POLICY,
   PRICE_RATING_MONTHS,
   PRICE_RATING_BANDS,
-  decisionPolicy,
-  priceRating,
 } from "./contracts/rating-policy.js";
+export { decisionPolicy, priceRating } from "./valuation/rating-policy.js";
 export type { PriceRating } from "./contracts/rating-policy.js";
 export { renderAgentReport } from "./report/agent-report.js";
 export type {

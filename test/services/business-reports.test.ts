@@ -1,35 +1,46 @@
 import { expect, it } from "vitest";
-import {
-  assembleAgentArtifact,
-  assembleBusinessReport,
-} from "../../src/artifacts/assembly.js";
+import { assembleAgentArtifact } from "../../src/services/agent-artifacts.js";
 import type { AgentReport } from "../../src/contracts/agent-reports.js";
+import { CN_SECURITY } from "../fixtures/market.js";
+import { parseArtifactInput } from "../../src/artifacts/schema.js";
+
+const scope = {
+  security: CN_SECURITY,
+  date: "2026-10-28",
+  cutoff: "2026-10-28T15:00:00.000Z",
+};
+const context = {
+  taskId: "manager.decision",
+  specialty: "decision",
+  title: "Decision",
+  inputRefs: [],
+  currency: "CNY",
+  referencePrice: null,
+  scope,
+};
 
 it("records decision inputs at report level and leaves thesis and estimate sources unassigned", () => {
   const ref = { runId: "run", artifactId: "digest", revision: 1 };
-  const content = assembleBusinessReport(
+  const content = assembleAgentArtifact(
+    "decision_draft",
     {
-      rating: "hold",
-      horizonEndDate: "2027-03-31",
-      thesis: ["Demand and margins determine the outlook."],
-      targetPrice: {
-        value: 83.9,
-        method: "Earnings times a valuation multiple",
-        assumptions: ["Earnings of 30 billion CNY"],
+      summary: "Demand and margins determine the outlook.",
+      content: {
+        thesis: ["Demand and margins determine the outlook."],
+        targetPrice: {
+          value: 83.9,
+          method: "Earnings times a valuation multiple",
+          assumptions: ["Earnings of 30 billion CNY"],
+        },
+        risks: [],
+        riskResponses: [],
+        invalidationConditions: [],
+        limitations: [],
       },
-      risks: [],
-      riskResponses: [],
-      invalidationConditions: [],
-      limitations: [],
     },
     {
-      kind: "decision_draft",
-      taskId: "manager.decision",
-      specialty: "decision",
-      title: "Decision",
+      ...context,
       inputRefs: [ref],
-      currency: "CNY",
-      referencePrice: null,
     },
   );
   expect(content.inputRefs).toEqual([ref]);
@@ -112,4 +123,70 @@ it("binds the rating and six-month horizon without changing the submitted busine
     report: original,
   });
   expect(report).toEqual(original);
+});
+
+it("preserves assigned risk identifiers, report text and the stage handoff", () => {
+  const issue = {
+    description: "折扣扩大",
+    impact: "毛利率下降。",
+    trigger: "主销车型降价。",
+    constraint: "估值按较低利润计算。",
+    recommendation: "跟踪终端价格。",
+  };
+  const report: AgentReport<"risk"> = {
+    summary: "价格竞争影响盈利兑现。",
+    content: { issues: [issue] },
+  };
+  const handoff = {
+    keyPoints: ["价格竞争影响盈利兑现。"],
+    disagreements: [],
+    risks: ["risk.finance.1"],
+    openQuestions: [],
+  };
+  const artifact = assembleAgentArtifact(
+    "risk",
+    report,
+    { ...context, taskId: "risk.finance" },
+    [],
+    handoff,
+  );
+  expect(artifact.payload).toEqual({
+    issues: [
+      { ...issue, issueId: "risk.finance.1", evidence: [], numbers: [] },
+    ],
+    report,
+    stageHandoff: handoff,
+  });
+  expect(artifact.body).toBe(
+    "价格竞争影响盈利兑现。\n\n## risk.finance.1：折扣扩大\n\n影响：毛利率下降。\n\n触发条件：主销车型降价。\n\n建议约束：估值按较低利润计算。\n\n处置建议：跟踪终端价格。\n",
+  );
+  expect(parseArtifactInput(artifact)).toEqual(artifact);
+});
+
+it("keeps research questions and their decision impact in a valid plan artifact", () => {
+  const report: AgentReport<"plan"> = {
+    summary: "确定新产品的盈利贡献。",
+    content: {
+      questions: [
+        {
+          question: "产品组合贡献多少？",
+          whyItMatters: "决定利润率能否持续。",
+          nextStep: "比较交付与价格。",
+        },
+      ],
+      constraints: ["比较相同季度。"],
+    },
+  };
+  const artifact = assembleAgentArtifact("plan", report, context);
+  expect(artifact.payload).toEqual({
+    thesis: [{ text: report.summary, evidence: [], numbers: [] }],
+    questions: [
+      "产品组合贡献多少？：决定利润率能否持续。；研究路径：比较交付与价格。",
+    ],
+    constraints: ["比较相同季度。"],
+    report,
+  });
+  expect(artifact.body).toContain("判断影响：决定利润率能否持续。");
+  expect(artifact.body).toContain("研究路径与检查点：比较交付与价格。");
+  expect(parseArtifactInput(artifact)).toEqual(artifact);
 });

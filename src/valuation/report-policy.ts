@@ -4,7 +4,7 @@ import type {
 } from "../contracts/agent-reports.js";
 import type { ResearchScope } from "../contracts/data.js";
 import { ResearchError } from "../contracts/errors.js";
-import { decisionPolicy } from "../contracts/rating-policy.js";
+import { decisionPolicy } from "./rating-policy.js";
 import { parseLocalDate } from "../contracts/time.js";
 import type { TaskDefinition } from "../contracts/workflow.js";
 

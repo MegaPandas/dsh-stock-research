@@ -7,7 +7,7 @@ import type { DecisionProposal } from "../contracts/artifact-payloads.js";
 import type { NumericClaim } from "../contracts/artifacts.js";
 import type { ResearchScope } from "../contracts/data.js";
 import { ResearchError } from "../contracts/errors.js";
-import { decisionPolicy } from "../contracts/rating-policy.js";
+import { decisionPolicy } from "../valuation/rating-policy.js";
 import type { RunReader } from "../contracts/run-access.js";
 import type { ValuationCalculation } from "../contracts/valuation.js";
 import type { TaskDefinition } from "../contracts/workflow.js";
