@@ -5,7 +5,7 @@ import { savedValuationMethods } from "../services/valuation-records.js";
 import {
   VALUATION_INPUT_SCHEMAS,
   valuationCalculationParameters,
-} from "../services/valuation-inputs.js";
+} from "../valuation/requests.js";
 import {
   VALUATION_ENGINE_VERSION,
   type ValuationMethodId,

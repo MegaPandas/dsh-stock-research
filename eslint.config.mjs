@@ -165,7 +165,7 @@ export default defineConfig(
         queryPrivateRestriction,
         {
           selector:
-            "ImportDeclaration[source.value='./valuation-calculations.js']",
+            ":matches(ImportDeclaration, ExportNamedDeclaration, ExportAllDeclaration)[source.value=/(^|\\u002F)valuation-calculations\\.js$/]",
           message:
             "Valuation readers and reports must not depend on calculation registration.",
         },
@@ -183,8 +183,8 @@ export default defineConfig(
               group: [
                 ...integrationImports,
                 "@deepseek-ai/*",
-                "./valuation-reports.js",
-                "../report/**",
+                "**/valuation-reports.js",
+                "**/report/**",
               ],
               message:
                 "Fixed valuation records must not depend on report rendering or integration layers.",

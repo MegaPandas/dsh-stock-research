@@ -9,7 +9,7 @@ import {
 } from "../contracts/agent-reports.js";
 import { ResearchError } from "../contracts/errors.js";
 import { parseLocalDate } from "../contracts/time.js";
-import { validateValuationRecord } from "./valuation.js";
+import { validateValuationRecord } from "../valuation/report-policy.js";
 
 function invalid(path: string, reason: string): never {
   throw new ResearchError("INVALID_INPUT", `${path}: ${reason}`);

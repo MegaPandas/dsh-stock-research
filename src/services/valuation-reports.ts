@@ -16,12 +16,12 @@ import {
   formatValuationDiagnostic,
   formatValuationStep,
 } from "../report/valuation-labels.js";
-import { valuationInputAt } from "./valuation-inputs.js";
+import { valuationInputAt } from "../valuation/requests.js";
 import {
   createValuationReader,
   savedValuationMethods,
 } from "./valuation-records.js";
-import { validateRoleValuation } from "./valuation.js";
+import { validateRoleValuation } from "../valuation/report-policy.js";
 
 type CalculationReader = Pick<
   RunReader,

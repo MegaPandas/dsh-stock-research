@@ -40,7 +40,7 @@ import {
   usesValuationMethods,
   valuationMethodContext,
 } from "./valuation-methods.js";
-import { validateRoleValuation } from "../services/valuation.js";
+import { validateRoleValuation } from "../valuation/report-policy.js";
 import { valuationCalculationCatalog } from "../services/valuation-records.js";
 import { valuationDraftInput } from "./valuation-draft.js";
 import { readResearchModels } from "./research-models.js";

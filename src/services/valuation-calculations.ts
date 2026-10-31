@@ -13,7 +13,7 @@ import { valuationDependencyIds } from "../valuation/dependencies.js";
 import {
   parseValuationRequest,
   sensitivityRequest,
-} from "./valuation-inputs.js";
+} from "../valuation/requests.js";
 import {
   createValuationReader,
   readValuationCalculation,

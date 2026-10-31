@@ -3,7 +3,7 @@ import { evaluateValuation } from "../../src/valuation/index.js";
 import {
   parseValuationRequest,
   sensitivityRequest,
-} from "../../src/services/valuation-inputs.js";
+} from "../../src/valuation/requests.js";
 import type {
   ValuationInputs,
   ValuationMethodId,

@@ -4,7 +4,7 @@ import {
   parseAgentReport,
   validateStoredAgentReport,
 } from "../../src/services/agent-reports.js";
-import { validateRoleValuation } from "../../src/services/valuation.js";
+import { validateRoleValuation } from "../../src/valuation/report-policy.js";
 import { agentAnalysisReport } from "../fixtures/analysis-report.js";
 import { US_SECURITY } from "../fixtures/market.js";
 import { valuationRecord } from "../fixtures/valuation.js";
