@@ -3,10 +3,16 @@ import { Buffer } from "node:buffer";
 import console from "node:console";
 import { mkdtempSync, rmSync } from "node:fs";
 import { cpus, tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { performance } from "node:perf_hooks";
 import process from "node:process";
-import {
+import { pathToFileURL } from "node:url";
+
+const core =
+  process.argv[2] === undefined
+    ? "@megapandas/dsh-stock-research/core"
+    : pathToFileURL(resolve(process.argv[2])).href;
+const {
   DataRoot,
   HostResearchAdapter,
   QueryService,
@@ -14,7 +20,7 @@ import {
   createRunService,
   RunStore,
   SqliteCache,
-} from "@megapandas/dsh-stock-research/core";
+} = await import(core);
 
 const directory = mkdtempSync(join(tmpdir(), "dsh-query-bench-"));
 const scope = {
@@ -38,17 +44,23 @@ const gate = Promise.withResolvers();
 const started = Promise.withResolvers();
 const count = 100;
 let sourceCalls = 0;
+let cacheReads = 0;
 const research = new HostResearchAdapter(async (input) => {
   sourceCalls++;
   started.resolve();
-  assert.deepEqual(input, request.parameters);
+  assert.equal(input.maxResults, 1);
+  assert.ok(
+    [request.parameters.query, `${request.parameters.query} large`].includes(
+      input.query,
+    ),
+  );
   await gate.promise;
   return {
     sources: [
       {
         url: "https://example.com/benchmark",
         title: "Synthetic query benchmark",
-        snippet: "x".repeat(1024),
+        snippet: "x".repeat(input.query.endsWith(" large") ? 65_536 : 1024),
       },
     ],
     truncated: false,
@@ -71,6 +83,11 @@ try {
     path: join(directory, "cache.sqlite"),
     maxEntries: 8,
   });
+  const get = cache.get.bind(cache);
+  cache.get = (...args) => {
+    cacheReads++;
+    return get(...args);
+  };
   const store = new RunStore(root);
   const runs = createRunService(store, () => "2024-01-03T00:00:00.000Z");
   const { runId } = runs.open(
@@ -136,6 +153,7 @@ try {
     Promise.all(tasks),
   ]);
   const concurrentMs = performance.now() - begin;
+  const coldCacheReads = cacheReads;
   assert.equal(sourceCalls, 1);
   assert.equal(store.read(runId).evidence.length, 1);
   for (const result of registered) {
@@ -162,6 +180,46 @@ try {
     .sources.find(({ provider }) => provider === "dsh-web");
   assert.equal(profile.cacheHits, count);
   assert.equal(profile.sourceCalls, 1);
+  const cachedBatches = [];
+  const batchCount = 9;
+  for (const large of [false, true]) {
+    const cachedRequest = large
+      ? {
+          ...request,
+          parameters: {
+            ...request.parameters,
+            query: `${request.parameters.query} large`,
+          },
+        }
+      : request;
+    const expected = await queries.query(scope, cachedRequest);
+    const sourceCount = sourceCalls;
+    const batch = () =>
+      Promise.all(
+        Array.from({ length: count }, () =>
+          queries.query(scope, cachedRequest),
+        ),
+      );
+    await batch();
+    const measurements = [];
+    const reads = [];
+    for (let i = 0; i < batchCount; i++) {
+      const startReads = cacheReads;
+      const start = performance.now();
+      const frames = await batch();
+      measurements.push(performance.now() - start);
+      reads.push(cacheReads - startReads);
+      for (const frame of frames) assert.deepEqual(frame, expected);
+    }
+    assert.equal(sourceCalls, sourceCount);
+    cachedBatches.push({
+      envelopeBytes: Buffer.byteLength(JSON.stringify(expected)),
+      queriesPerBatch: count,
+      batches: batchCount,
+      cacheReadCounts: [...new Set(reads)],
+      ...stats(measurements),
+    });
+  }
   console.log(
     JSON.stringify(
       {
@@ -175,10 +233,12 @@ try {
         concurrentOrdinaryQueries: count,
         concurrentSameTaskCallQueries: count,
         concurrentMs,
+        coldCacheReads,
         sourceCalls,
         registeredEvidence: store.read(runId).evidence.length,
         cacheHit: stats(hits),
         savedTaskCall: stats(saved),
+        cachedBatches,
       },
       null,
       2,

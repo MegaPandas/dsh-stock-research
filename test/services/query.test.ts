@@ -285,6 +285,47 @@ describe("query service composition", () => {
     ).toBe(10);
   });
 
+  it("shares a cached load across concurrent queries with independent snapshots", async () => {
+    const context = setup();
+    context.cache.set(cacheKey(), result(), 60000);
+    const read = vi.spyOn(context.cache, "get");
+    const [first, second, registered] = await Promise.all([
+      context.service.query(scope, request),
+      context.service.query(scope, request),
+      context.taskQueries.queryForTask(context.op, request, "cached"),
+    ]);
+    expect(read).toHaveBeenCalledTimes(1);
+    expect(context.query).not.toHaveBeenCalled();
+    expect(first).toEqual(result());
+    first.data.bars[0]!.close = 999;
+    first.gaps[0]!.detail = "changed";
+    expect(second).toEqual(result());
+    expect(registered.envelope.data).toEqual(result().data);
+    expect(registered.envelope.gaps).toEqual(result().gaps);
+    expect(context.service.health(scope).sources[0]).toMatchObject({
+      cacheHits: 1,
+      sourceCalls: 0,
+      lastQuery: null,
+    });
+    expect(await context.service.query(scope, request)).toEqual(result());
+    expect(read).toHaveBeenCalledTimes(2);
+  });
+
+  it("keeps a cached shared result available to the other waiter after cancellation", async () => {
+    const context = setup();
+    context.cache.set(cacheKey(), result(), 60000);
+    const read = vi.spyOn(context.cache, "get");
+    const controller = new AbortController();
+    const reason = new Error("cached caller cancelled");
+    const first = context.service.query(scope, request, controller.signal);
+    const surviving = context.service.query(scope, request);
+    controller.abort(reason);
+    await expect(first).rejects.toBe(reason);
+    expect(await surviving).toEqual(result());
+    expect(read).toHaveBeenCalledTimes(1);
+    expect(context.query).not.toHaveBeenCalled();
+  });
+
   it("closes task queries without cancelling a shared ordinary query or closing its kernel", async () => {
     const context = setup();
     const pending = gate(context);
