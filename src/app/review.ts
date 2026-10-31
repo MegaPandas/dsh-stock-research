@@ -1,15 +1,18 @@
 import { randomUUID } from "node:crypto";
 import type { Context } from "@deepseek-ai/cordis";
 import { runApplicationCommand } from "./settings.js";
-import type { AgentHandle, AgentOptions } from "@deepseek-ai/dsh-agent";
+import type { AgentOptions } from "@deepseek-ai/dsh-agent";
 import type {
   CommandInvocation,
   CommandResult,
 } from "@deepseek-ai/dsh-commands";
 import { createUserMessage } from "@deepseek-ai/dsh-llm";
 import { SessionId } from "@deepseek-ai/dsh-session";
-import { ResearchError } from "../contracts/errors.js";
 import type {} from "../host/runtime.js";
+import {
+  SubmittedAgents,
+  type SubmittedAgentRequest,
+} from "../host/submitted-agents.js";
 import { agentInput, createSubmission } from "../host/agent-execution.js";
 import { ArtifactInputs } from "../services/artifact-inputs.js";
 import { ModelConfigSchema, resolveModelOptions } from "./model-config.js";
@@ -20,68 +23,42 @@ import { createReportReader } from "./report-reader.js";
 import { ReviewSession } from "./review-session.js";
 import { createReviewTools } from "./review-tools.js";
 
-interface ActiveReview {
-  controller: AbortController;
-  drained: Promise<unknown[]>;
-}
-
 class ReviewApplication {
-  readonly #active = new Set<ActiveReview>();
-  #closed = false;
+  private readonly executions: SubmittedAgents;
   constructor(
     private readonly ctx: Context,
     private readonly model: ModelConfig | undefined,
-  ) {}
-
-  run(invocation: CommandInvocation): Promise<CommandResult> {
-    if (this.#closed)
-      throw new ResearchError("ACCESS_DENIED", "Stock review is closed.");
-    invocation.signal.throwIfAborted();
-    const input = parseReviewInput(
-      invocation.rawInput,
-      new Date(),
-      this.ctx.stockResearch.runs,
+  ) {
+    this.executions = new SubmittedAgents(
+      (...args) => ctx.stockResearch.createAgent(...args),
+      "review",
     );
-    const controller = new AbortController();
-    const signal = AbortSignal.any([controller.signal, invocation.signal]);
-    const failures: unknown[] = [];
-    const model = resolveModelOptions(
-      invocation.agent,
-      this.model ?? this.ctx.get("stockResearchSettings")?.model,
-    );
-    const work = Promise.resolve()
-      .then(() => this.#review(input, model, signal, failures))
-      .finally(() => this.#active.delete(active));
-    const active: ActiveReview = {
-      controller,
-      drained: work.then(
-        () => failures,
-        () => failures,
-      ),
-    };
-    this.#active.add(active);
-    return work;
   }
 
-  async close(): Promise<void> {
-    this.#closed = true;
-    const active = [...this.#active];
-    for (const entry of active) entry.controller.abort();
-    const failures = (
-      await Promise.all(active.map((entry) => entry.drained))
-    ).flat();
-    if (failures.length > 0)
-      throw new AggregateError(failures, "Could not release review Agents.", {
-        cause: failures[0],
-      });
+  run(invocation: CommandInvocation): Promise<CommandResult> {
+    return this.executions.run(invocation.signal, (signal) => {
+      const input = parseReviewInput(
+        invocation.rawInput,
+        new Date(),
+        this.ctx.stockResearch.runs,
+      );
+      const model = resolveModelOptions(
+        invocation.agent,
+        this.model ?? this.ctx.get("stockResearchSettings")?.model,
+      );
+      return this.#review(input, model, signal);
+    });
+  }
+
+  close(): Promise<void> {
+    return this.executions.close();
   }
 
   async #review(
     input: ReviewInput,
     model: AgentOptions,
     signal: AbortSignal,
-    failures: unknown[],
-  ): Promise<CommandResult> {
+  ): Promise<SubmittedAgentRequest<CommandResult>> {
     const runtime = this.ctx.stockResearch;
     const sessionId = SessionId(randomUUID());
     const policy = runtime.policy;
@@ -124,104 +101,59 @@ class ReviewApplication {
           runtime.queries.query(scope, request, signal),
       },
     );
-    let handle: AgentHandle | undefined;
-    let failure: { cause: unknown } | undefined;
-    const cancel = () =>
-      handle?.agent.cancel({ kind: this.#closed ? "disposed" : "user" });
-    signal.addEventListener("abort", cancel, { once: true });
-    const outcome = await Promise.resolve()
-      .then(async (): Promise<CommandResult> => {
-        signal.throwIfAborted();
-        const tools = [
-          runtime.createDataHealthTool(),
-          runtime.createRecallTool(),
-          ...createReviewTools(session, input.scope, policy),
-          reader.tool,
-        ];
-        const submission = createSubmission("review", (report, exec) => {
-          signal.throwIfAborted();
-          return session.submit(
-            report,
-            exec.agent!.id,
-            exec.callId,
-            exec.signal,
-          );
-        });
-        tools.push(submission.tool);
-        handle = await runtime.createAgent(
-          {
-            sessionId,
-            agentOptions: model,
-            signal,
-            setup: (agentCtx, agent) => {
-              agentCtx.systemPrompt.section({
-                name: "stock:review",
-                order: 0,
-                text: REVIEW_PROMPT,
-                complete: true,
-                interpolate: false,
-              });
-              agentCtx.on("agent/error", ({ agent: subject, error }) => {
-                if (subject === agent) failure ??= { cause: error };
-              });
-            },
+    signal.throwIfAborted();
+    const tools = [
+      runtime.createDataHealthTool(),
+      runtime.createRecallTool(),
+      ...createReviewTools(session, input.scope, policy),
+      reader.tool,
+    ];
+    const submission = createSubmission("review", (report, exec) => {
+      signal.throwIfAborted();
+      return session.submit(report, exec.agent!.id, exec.callId, exec.signal);
+    });
+    tools.push(submission.tool);
+    return {
+      options: {
+        sessionId,
+        agentOptions: model,
+        setup: (agentCtx) => {
+          agentCtx.systemPrompt.section({
+            name: "stock:review",
+            order: 0,
+            text: REVIEW_PROMPT,
+            complete: true,
+            interpolate: false,
+          });
+        },
+      },
+      binding: { kind: "review", runId: input.runId, scope: input.scope },
+      tools,
+      message: createUserMessage({
+        content: agentInput({
+          scope: input.scope,
+          task: { role: "review", objective: input.question },
+          context: {
+            runId: input.runId,
+            originalScope: input.originalScope,
+            referencePrice,
+            reportCatalog: reader.catalog,
+            availableSources: runtime.queries
+              .health(input.scope)
+              .sources.filter((source) => source.capability !== null),
           },
-          { kind: "review", runId: input.runId, scope: input.scope },
-          tools,
-        );
-        signal.throwIfAborted();
-        handle.agent.followup(
-          createUserMessage({
-            content: agentInput({
-              scope: input.scope,
-              task: { role: "review", objective: input.question },
-              context: {
-                runId: input.runId,
-                originalScope: input.originalScope,
-                referencePrice,
-                reportCatalog: reader.catalog,
-                availableSources: runtime.queries
-                  .health(input.scope)
-                  .sources.filter((source) => source.capability !== null),
-              },
-            }),
-            source: { kind: "user" },
-          }),
-        );
-        await handle.agent.whenIdle();
-        signal.throwIfAborted();
-        if (failure !== undefined) throw failure.cause;
+        }),
+        source: { kind: "user" },
+      }),
+      result: () => {
         const saved = submission.result();
         const entry = runtime.memory.read(saved);
         return {
           kind: "success",
           text: `复盘已保存：${saved.entryId}@${saved.revision}\n\n${entry.outcome}${entry.note === entry.outcome ? "" : `\n\n${entry.note}`}`,
         };
-      })
-      .then(
-        (value) => ({ status: "fulfilled" as const, value }),
-        (reason: unknown) => ({ status: "rejected" as const, reason }),
-      );
-    signal.removeEventListener("abort", cancel);
-    const cleanup = await Promise.allSettled(
-      handle === undefined ? [] : [handle.dispose()],
-    );
-    failures.push(
-      ...cleanup.flatMap((result) =>
-        result.status === "rejected" ? [result.reason] : [],
-      ),
-    );
-    if (failures.length > 0) {
-      const causes =
-        outcome.status === "rejected"
-          ? [outcome.reason, ...failures]
-          : failures;
-      throw new AggregateError(causes, "Review execution cleanup failed.", {
-        cause: causes[0],
-      });
-    }
-    if (outcome.status === "rejected") throw outcome.reason;
-    return outcome.value;
+      },
+    };
   }
 }
 
