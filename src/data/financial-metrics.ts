@@ -4,6 +4,7 @@ import type {
   CollectionRow,
 } from "../contracts/collection.js";
 import type { DataGap, ResearchScope } from "../contracts/data.js";
+import { FINANCIAL_FLOW_FIELDS } from "../contracts/financial-tables.js";
 import { FINANCIAL_METRICS_VERSION } from "./versions.js";
 
 const yearBefore = (date: string) =>
@@ -77,36 +78,26 @@ export function deriveFinancialMetrics(
       string,
       { input: Input; field: string; unit: string }
     > = {};
-    const select = (name: string, id: string, fields: string[]) => {
+    const select = (id: keyof typeof FINANCIAL_FLOW_FIELDS) => {
       const input = same.find((i) => i.packet.id === id);
       if (!input) return;
-      const field =
-        fields.find(
-          (f) =>
-            input.row.values[f] !== undefined && input.row.values[f] !== null,
-        ) ?? fields[0]!;
-      const column = input.packet.envelope.data.columns[field];
-      if (column) series[name] = { input, field, unit: column.unit };
+      for (const [name, fields] of Object.entries(FINANCIAL_FLOW_FIELDS[id])) {
+        const field =
+          fields.find(
+            (f) =>
+              input.row.values[f] !== undefined && input.row.values[f] !== null,
+          ) ?? fields[0];
+        const column = input.packet.envelope.data.columns[field];
+        if (column) series[name] = { input, field, unit: column.unit };
+      }
     };
-    select("REVENUE", "financial.income", [
-      "TOTAL_OPERATE_INCOME",
-      "OPERATE_INCOME",
-    ]);
-    select("NET_INCOME", "financial.income", ["PARENT_NETPROFIT"]);
-    select("DEDUCTED_NET_INCOME", "financial.income", [
-      "DEDUCT_PARENT_NETPROFIT",
-    ]);
-    select("COST", "financial.income", ["OPERATE_COST"]);
-    select("OPERATING_PROFIT", "financial.income", ["OPERATE_PROFIT"]);
+    select("financial.income");
     if (!same.some((i) => i.packet.id === "financial.income")) {
-      select("REVENUE", "financial.indicators", ["TOTALOPERATEREVE"]);
-      select("NET_INCOME", "financial.indicators", ["PARENTNETPROFIT"]);
-      select("DEDUCTED_NET_INCOME", "financial.indicators", ["KCFJCXSYJLR"]);
+      select("financial.indicators");
     }
-    select("REVENUE", "financial.revenue", ["revenue"]);
-    select("NET_INCOME", "financial.netIncome", ["netIncome"]);
-    select("OCF", "financial.cashflow", ["NETCASH_OPERATE"]);
-    select("CAPEX", "financial.cashflow", ["CONSTRUCT_LONG_ASSET"]);
+    select("financial.revenue");
+    select("financial.netIncome");
+    select("financial.cashflow");
     const amounts: Record<string, number | null> = {};
     for (const [name, s] of Object.entries(series)) {
       const sourceRows = s.input.packet.envelope.data.rows;

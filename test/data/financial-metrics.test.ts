@@ -51,6 +51,68 @@ function packet(
   };
 }
 describe("snapshot financial metrics", () => {
+  it.each([
+    { total: 120, expected: 120 },
+    { total: 0, expected: 0 },
+    { total: null, expected: 100 },
+    { total: undefined, expected: 100 },
+  ])("selects reported revenue with total=$total", ({ total, expected }) => {
+    const income = packet("financial.income", [
+      [
+        "2026-03-31",
+        {
+          ...(total === undefined ? {} : { TOTAL_OPERATE_INCOME: total }),
+          OPERATE_INCOME: 100,
+          PARENT_NETPROFIT: 20,
+        },
+      ],
+    ]);
+    const original = structuredClone(income);
+    const result = deriveFinancialMetrics(scope, [income])!.envelope;
+    expect(result.data.rows[0]!.values.REVENUE_QUARTER).toBe(expected);
+    expect(result.data.columns.REVENUE_QUARTER!.unit).toBe("CNY");
+    expect(income).toEqual(original);
+  });
+
+  it.each(["matching", "other-period", "absent"] as const)(
+    "uses indicator flows only without a matching income row: %s",
+    (incomePeriod) => {
+      const indicators = packet("financial.indicators", [
+        [
+          "2026-03-31",
+          { TOTALOPERATEREVE: 100, PARENTNETPROFIT: 20, KCFJCXSYJLR: 15 },
+        ],
+      ]);
+      const income = packet("financial.income", [
+        [
+          incomePeriod === "matching" ? "2026-03-31" : "2025-12-31",
+          { TOTAL_OPERATE_INCOME: null, PARENT_NETPROFIT: null },
+        ],
+      ]);
+      const result = deriveFinancialMetrics(
+        scope,
+        incomePeriod === "absent" ? [indicators] : [indicators, income],
+      )!.envelope;
+      const values = result.data.rows.find(
+        (row) => row.date === "2026-03-31",
+      )!.values;
+      expect(values.REVENUE_QUARTER).toBe(
+        incomePeriod === "matching" ? null : 100,
+      );
+      expect(values.NET_INCOME_QUARTER).toBe(
+        incomePeriod === "matching" ? null : 20,
+      );
+      if (incomePeriod !== "matching")
+        expect(values.DEDUCTED_NET_INCOME_QUARTER).toBe(15);
+      else
+        expect(result.gaps).toContainEqual({
+          code: "missing",
+          field: expect.stringMatching(/\/values\/REVENUE_YTD$/),
+          detail: "Missing TOTAL_OPERATE_INCOME for 2026-01-01/2026-03-31.",
+        });
+    },
+  );
+
   it.each(["CNY", "USD"])(
     "calculates TTM FCF from matching cumulative %s statements",
     (unit) => {

@@ -1,21 +1,11 @@
 import type { CollectedTableData } from "../contracts/collection.js";
 import type { DataEnvelope } from "../contracts/data.js";
+import { FINANCIAL_CORE_FIELDS } from "../contracts/financial-tables.js";
 
 // Each inner group permits source-reported alternatives within one table.
 const CORE_FIELDS: Record<string, readonly (readonly string[])[]> = {
+  ...FINANCIAL_CORE_FIELDS,
   "benchmark.bondYields": [["china10y", "us10y"]],
-  "financial.indicators": [["TOTALOPERATEREVE"], ["PARENTNETPROFIT"], ["BPS"]],
-  "financial.quarter": [["TOTALOPERATEREVE"], ["PARENTNETPROFIT"]],
-  "financial.income": [
-    ["TOTAL_OPERATE_INCOME", "OPERATE_INCOME"],
-    ["PARENT_NETPROFIT"],
-  ],
-  "financial.balance": [
-    ["TOTAL_ASSETS"],
-    ["TOTAL_LIABILITIES"],
-    ["TOTAL_PARENT_EQUITY"],
-  ],
-  "financial.cashflow": [["NETCASH_OPERATE"], ["CONSTRUCT_LONG_ASSET"]],
 };
 
 function coreFields(data: CollectedTableData): readonly (readonly string[])[] {

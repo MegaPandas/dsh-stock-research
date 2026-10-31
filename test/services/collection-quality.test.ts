@@ -90,6 +90,56 @@ describe("collection source coverage", () => {
     expect(result).toContain("PARENT_NETPROFIT");
   });
 
+  it("accepts zero revenue and rejects missing revenue alternatives", () => {
+    const data = envelope("financial.income", {
+      TOTAL_OPERATE_INCOME: null,
+      OPERATE_INCOME: 0,
+      PARENT_NETPROFIT: 0,
+    });
+    expect(collectionCoverageIssue(data)).toBeUndefined();
+    data.data.rows[0]!.values.OPERATE_INCOME = null;
+    expect(collectionCoverageIssue(data)).toBe(
+      "Core fields are missing in one or more observations: TOTAL_OPERATE_INCOME or OPERATE_INCOME.",
+    );
+  });
+
+  it.each<{
+    table: string;
+    values: Record<string, number | null>;
+    required: string;
+  }>([
+    {
+      table: "financial.indicators",
+      values: { TOTALOPERATEREVE: 0, PARENTNETPROFIT: 0, BPS: 0 },
+      required: "BPS",
+    },
+    {
+      table: "financial.quarter",
+      values: { TOTALOPERATEREVE: 0, PARENTNETPROFIT: 0 },
+      required: "PARENTNETPROFIT",
+    },
+    {
+      table: "financial.balance",
+      values: { TOTAL_ASSETS: 0, TOTAL_LIABILITIES: 0, TOTAL_PARENT_EQUITY: 0 },
+      required: "TOTAL_PARENT_EQUITY",
+    },
+    {
+      table: "financial.cashflow",
+      values: { NETCASH_OPERATE: 0, CONSTRUCT_LONG_ASSET: 0 },
+      required: "CONSTRUCT_LONG_ASSET",
+    },
+  ])(
+    "requires the core quantities of $table",
+    ({ table, values, required }) => {
+      const data = envelope(table, values);
+      expect(collectionCoverageIssue(data)).toBeUndefined();
+      data.data.rows[0]!.values[required] = null;
+      expect(collectionCoverageIssue(data)).toBe(
+        `Core fields are missing in one or more observations: ${required}.`,
+      );
+    },
+  );
+
   it("requires stock OHLCV while allowing close-only benchmarks", () => {
     expect(
       collectionCoverageIssue(envelope("market.daily", { close: 10 })),
