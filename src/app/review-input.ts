@@ -1,7 +1,7 @@
 import type { ResearchScope } from "../contracts/data.js";
 import { ResearchError } from "../contracts/errors.js";
 import type { RunReader } from "../contracts/run-access.js";
-import { scopeAtDate } from "./ask-input.js";
+import { scopeAtDate } from "./research-scope.js";
 
 export interface ReviewInput {
   runId: string;

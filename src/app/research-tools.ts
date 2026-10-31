@@ -17,7 +17,7 @@ import type {
   StartResearchRequest,
   ReviewResearchRequest,
 } from "./research-actions.js";
-import { securityFor, scopeAtDate } from "./ask-input.js";
+import { securityFor, scopeAtDate } from "./research-scope.js";
 import { parseRunControl, runControlParameters } from "./run-command-input.js";
 import { runStatus } from "./run-view.js";
 import { runApplicationTool } from "./settings.js";

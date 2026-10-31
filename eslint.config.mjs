@@ -328,6 +328,23 @@ export default defineConfig(
     },
   },
   {
+    files: ["src/app/research-scope.ts"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: [...pureImports, "./**"],
+              message:
+                "Research scope rules must depend on contracts and pure computations instead of command parsing or execution.",
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
     files: ["src/app/research-executions.ts"],
     rules: {
       "no-restricted-imports": [
