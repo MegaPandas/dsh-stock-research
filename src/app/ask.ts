@@ -1,7 +1,5 @@
 import { randomUUID } from "node:crypto";
 import type { Context } from "@deepseek-ai/cordis";
-import { runApplicationCommand } from "./settings.js";
-import type { AgentOptions } from "@deepseek-ai/dsh-agent";
 import type {
   CommandInvocation,
   CommandResult,
@@ -10,20 +8,13 @@ import { createUserMessage } from "@deepseek-ai/dsh-llm";
 import { SessionId } from "@deepseek-ai/dsh-session";
 import type {} from "@deepseek-ai/dsh-system-prompt";
 import type {} from "../host/runtime.js";
-import {
-  SubmittedAgents,
-  type SubmittedAgentRequest,
-} from "../host/submitted-agents.js";
-import { agentInput, createSubmission } from "../host/agent-execution.js";
-import { renderAgentReport } from "../report/agent-report.js";
-import { parseAskInput, type AskInput } from "./ask-input.js";
+import { SubmittedAgents } from "../host/submitted-agents.js";
+import type { ModelConfig } from "../contracts/settings.js";
+import { runApplicationCommand } from "./settings.js";
+import { parseAskInput } from "./ask-input.js";
 import { ASK_PROMPT } from "./ask-prompt.js";
 import { ModelConfigSchema, resolveModelOptions } from "./model-config.js";
-import type { ModelConfig } from "../contracts/settings.js";
-import { researchCutoff } from "./ask-input.js";
-import { collectionReadTools } from "./collection-tools.js";
-import { collectionDirectory } from "./collection-input.js";
-import { requireCollectionData } from "./collection-snapshot.js";
+import { prepareAskRequest } from "./ask-request.js";
 
 export type AskConfig = ModelConfig;
 export const Config = ModelConfigSchema.required(false);
@@ -41,71 +32,50 @@ class AskApplication {
   }
 
   run(invocation: CommandInvocation): Promise<CommandResult> {
-    return this.executions.run(invocation.signal, (signal) => {
-      const input = parseAskInput(invocation.rawInput, new Date());
-      const model = resolveModelOptions(
-        invocation.agent,
-        this.model ?? this.ctx.get("stockResearchSettings")?.model,
-      );
-      return this.#answer(input, model, signal);
-    });
+    return this.executions
+      .run(invocation.signal, async (signal) => {
+        const input = parseAskInput(invocation.rawInput, new Date());
+        const model = resolveModelOptions(
+          invocation.agent,
+          this.model ?? this.ctx.get("stockResearchSettings")?.model,
+        );
+        const runtime = this.ctx.stockResearch;
+        const prepared = await prepareAskRequest(
+          {
+            collection: runtime.collection,
+            recallTool: () => runtime.createRecallTool(),
+          },
+          input,
+          signal,
+        );
+        return {
+          options: {
+            sessionId: SessionId(randomUUID()),
+            agentOptions: model,
+            setup: (agentCtx) => {
+              agentCtx.systemPrompt.section({
+                name: "stock:ask",
+                order: 0,
+                text: ASK_PROMPT,
+                interpolate: false,
+                complete: true,
+              });
+            },
+          },
+          binding: { kind: "ask", scope: prepared.scope },
+          tools: prepared.tools,
+          message: createUserMessage({
+            content: prepared.input,
+            source: { kind: "user" },
+          }),
+          result: prepared.result,
+        };
+      })
+      .then((text): CommandResult => ({ kind: "success", text }));
   }
 
   close(): Promise<void> {
     return this.executions.close();
-  }
-
-  async #answer(
-    input: AskInput,
-    model: AgentOptions,
-    signal: AbortSignal,
-  ): Promise<SubmittedAgentRequest<CommandResult>> {
-    signal.throwIfAborted();
-    const runtime = this.ctx.stockResearch;
-    const collection = await runtime.collection.collect(input.scope, signal);
-    requireCollectionData(collection);
-    input = {
-      ...input,
-      scope: {
-        ...input.scope,
-        cutoff: researchCutoff(input.scope, new Date()),
-      },
-    };
-    runtime.collection.finalizeScope(collection, input.scope);
-    const tools = [runtime.createRecallTool()];
-    const submission = createSubmission("ask", (report) =>
-      renderAgentReport("ask", report).trimEnd(),
-    );
-    tools.push(...collectionReadTools(collection.packets), submission.tool);
-    return {
-      options: {
-        sessionId: SessionId(randomUUID()),
-        agentOptions: model,
-        setup: (agentCtx) => {
-          agentCtx.systemPrompt.section({
-            name: "stock:ask",
-            order: 0,
-            text: ASK_PROMPT,
-            interpolate: false,
-            complete: true,
-          });
-        },
-      },
-      binding: { kind: "ask", scope: input.scope },
-      tools,
-      message: createUserMessage({
-        content: agentInput({
-          scope: input.scope,
-          task: { role: "ask", objective: input.question },
-          context: {
-            dataCatalog: collectionDirectory(collection.packets),
-            collectionFailures: collection.failures,
-          },
-        }),
-        source: { kind: "user" },
-      }),
-      result: () => ({ kind: "success", text: submission.result() }),
-    };
   }
 }
 

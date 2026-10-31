@@ -394,6 +394,31 @@ export default defineConfig(
     },
   },
   {
+    files: ["src/app/{ask-request,review-request}.ts"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: [
+                "@deepseek-ai/cordis",
+                "@deepseek-ai/dsh-commands",
+                "**/host/runtime.js",
+                "../runtime.js",
+                "@megapandas/dsh-stock-research/runtime",
+                "./settings.js",
+                "./activity.js",
+              ],
+              message:
+                "Request preparation must use explicit capabilities instead of Context, total Runtime, or command adapters.",
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
     files: ["src/app/review-session.ts"],
     rules: {
       "no-restricted-imports": [
