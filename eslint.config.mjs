@@ -82,6 +82,10 @@ export default defineConfig(
             publicEntries: ["index.js"],
           },
           {
+            directory: "src/app/review-preparation",
+            publicEntries: ["index.js"],
+          },
+          {
             directory: "src/evidence",
             publicEntries: ["fields.js", "checks.js", "price-basis.js"],
           },
@@ -483,7 +487,7 @@ export default defineConfig(
     },
   },
   {
-    files: ["src/app/{ask-request,review-request}.ts"],
+    files: ["src/app/ask-request.ts", "src/app/review-preparation/**/*.ts"],
     rules: {
       "no-restricted-imports": [
         "error",
@@ -495,9 +499,12 @@ export default defineConfig(
                 "@deepseek-ai/dsh-commands",
                 "**/host/runtime.js",
                 "../runtime.js",
+                "../../runtime.js",
                 "@megapandas/dsh-stock-research/runtime",
                 "./settings.js",
                 "./activity.js",
+                "../settings.js",
+                "../activity.js",
               ],
               message:
                 "Request preparation must use explicit capabilities instead of Context, total Runtime, or command adapters.",

@@ -13,7 +13,7 @@ import { runApplicationCommand } from "./settings.js";
 import { ModelConfigSchema, resolveModelOptions } from "./model-config.js";
 import { parseReviewInput } from "./review-input.js";
 import { REVIEW_PROMPT } from "./review-prompt.js";
-import { prepareReviewRequest } from "./review-request.js";
+import { prepareReviewRequest } from "./review-preparation/index.js";
 
 class ReviewApplication {
   private readonly executions: SubmittedAgents;

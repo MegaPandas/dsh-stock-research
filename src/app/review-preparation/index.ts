@@ -1,16 +1,16 @@
 import type { ToolDefinition } from "@deepseek-ai/dsh-tools";
-import type { ResearchScope } from "../contracts/data.js";
-import type { MemoryRef } from "../contracts/memory.js";
-import type { QueryMemoryReturns } from "../contracts/memory-service.js";
-import type { QueryPolicy } from "../contracts/query.js";
-import type { RunReader } from "../contracts/run-access.js";
-import type { SourceHealth } from "../contracts/sources.js";
-import { agentInput, createSubmission } from "../host/agent-execution.js";
-import { ArtifactInputs } from "../services/artifact-inputs.js";
-import { createReportReader } from "./report-reader.js";
-import type { ReviewInput } from "./review-input.js";
-import { ReviewSession, type ReviewSessionPorts } from "./review-session.js";
-import { createReviewTools } from "./review-tools.js";
+import type { ResearchScope } from "../../contracts/data.js";
+import type { MemoryRef } from "../../contracts/memory.js";
+import type { QueryMemoryReturns } from "../../contracts/memory-service.js";
+import type { QueryPolicy } from "../../contracts/query.js";
+import type { RunReader } from "../../contracts/run-access.js";
+import type { SourceHealth } from "../../contracts/sources.js";
+import { agentInput, createSubmission } from "../../host/agent-execution.js";
+import { ArtifactInputs } from "../../services/artifact-inputs.js";
+import { createReportReader } from "../report-reader.js";
+import type { ReviewInput } from "../review-input.js";
+import { ReviewSession, type ReviewSessionPorts } from "../review-session.js";
+import { createReviewTools } from "./tools.js";
 
 export interface ReviewRequestPorts {
   runs: Pick<

@@ -1,7 +1,7 @@
 import type { ToolDefinition } from "@deepseek-ai/dsh-tools";
-import type { ResearchScope } from "../contracts/data.js";
-import type { QueryPolicy } from "../contracts/query.js";
-import { researchTool } from "../tools/errors.js";
+import type { ResearchScope } from "../../contracts/data.js";
+import type { QueryPolicy } from "../../contracts/query.js";
+import { researchTool } from "../../tools/errors.js";
 import {
   invalid,
   object,
@@ -11,10 +11,10 @@ import {
   resultOutput,
   stringSchema,
   text,
-} from "../tools/parameters.js";
-import { dataSchemas, parseDataRequest } from "../tools/query-inputs.js";
-import { scopedQueryParameters } from "../tools/query-scope.js";
-import type { ReviewSession } from "./review-session.js";
+} from "../../tools/parameters.js";
+import { dataSchemas, parseDataRequest } from "../../tools/query-inputs.js";
+import { scopedQueryParameters } from "../../tools/query-scope.js";
+import type { ReviewSession } from "../review-session.js";
 
 export function createReviewTools(
   session: Pick<ReviewSession, "queryReturns" | "select">,

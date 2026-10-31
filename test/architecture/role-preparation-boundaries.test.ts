@@ -38,7 +38,7 @@ describe("role preparation boundaries", () => {
     ["src/app/role-preparation/role.ts", "../collection-tools.js"],
     ["src/app/role-preparation/role.ts", "../report-reader.js"],
     ["src/app/ask-request.ts", "./collection-tools.js"],
-    ["src/app/review-request.ts", "./report-reader.js"],
+    ["src/app/review-preparation/index.ts", "../report-reader.js"],
     ["src/app/ask-prompt.ts", "./agent-prompt.js"],
     ["src/app/review-prompt.ts", "./agent-prompt.js"],
   ])(

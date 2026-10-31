@@ -55,28 +55,28 @@ it.each([
   },
 );
 
-it.each(["src/app/ask-request.ts", "src/app/review-request.ts"])(
-  "keeps %s independent of Context and commands",
-  async (filePath) => {
-    for (const dependency of [
-      "@deepseek-ai/cordis",
-      "@deepseek-ai/dsh-commands",
-      "../host/runtime.js",
-      "../runtime.js",
-      "@megapandas/dsh-stock-research/runtime",
-    ]) {
-      const [result] = await eslint.lintText(
-        `import type { Value } from "${dependency}";`,
-        { filePath },
-      );
-      expect(
-        result!.messages.filter(
-          ({ ruleId }) => ruleId === "no-restricted-imports",
-        ),
-      ).toHaveLength(1);
-    }
-  },
-);
+it.each([
+  ["src/app/ask-request.ts", ".."],
+  ["src/app/review-preparation/index.ts", "../.."],
+])("keeps %s independent of Context and commands", async (filePath, root) => {
+  for (const dependency of [
+    "@deepseek-ai/cordis",
+    "@deepseek-ai/dsh-commands",
+    `${root}/host/runtime.js`,
+    `${root}/runtime.js`,
+    "@megapandas/dsh-stock-research/runtime",
+  ]) {
+    const [result] = await eslint.lintText(
+      `import type { Value } from "${dependency}";`,
+      { filePath },
+    );
+    expect(
+      result!.messages.filter(
+        ({ ruleId }) => ruleId === "no-restricted-imports",
+      ),
+    ).toHaveLength(1);
+  }
+});
 
 it.each(["../host/runtime.js", "../runtime.js", "../storage/cleanup.js"])(
   "keeps activity tracking independent of resource owner %s",
