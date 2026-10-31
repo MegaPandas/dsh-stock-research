@@ -102,6 +102,7 @@ export { DataRoot } from "./storage/data-root.js";
 export { RunStore } from "./runs/store.js";
 export type {
   MemoryIndex,
+  MemoryReader,
   MemoryRef,
   MemoryWriter,
 } from "./contracts/memory.js";

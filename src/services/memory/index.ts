@@ -33,7 +33,10 @@ function inputQuery(query: RecallQuery): MemoryInputQuery {
 export class MemoryService implements MemoryAccess {
   readonly #writes = new SharedQueries<MemoryRef>();
   constructor(
-    private readonly store: MemoryStore<MemoryState>,
+    private readonly store: Pick<
+      MemoryStore<MemoryState>,
+      "readIndex" | "readEntry" | "inspect" | "commit"
+    >,
     private readonly runs: Pick<
       RunReader,
       "view" | "readArtifact" | "readEvidence" | "readInput"
@@ -160,51 +163,55 @@ export class MemoryService implements MemoryAccess {
   ): MemorySnapshotEntry<MemoryEntry>[] {
     this.#writes.signal.throwIfAborted();
     signal?.throwIfAborted();
-    const index = this.index();
-    const found: MemorySnapshotEntry<MemoryEntry>[] = [];
-    const cutoff = Date.parse(scope.cutoff);
-    const needle = query.text?.toLowerCase();
-    let pending = Object.entries(index.entries).map(([entryId, versions]) => ({
-      entryId,
-      versions,
-      position: versions.length - 1,
-    }));
-    while (pending.length > 0) {
-      const refs = pending.map(({ entryId, versions, position }) => ({
-        entryId,
-        revision: versions[position]!,
-      }));
-      const entries = this.store.readEntries<unknown>(refs);
-      const older: typeof pending = [];
-      for (let i = 0; i < pending.length; i++) {
-        const entry = entries[i];
-        assertMemoryEntry(entry, refs[i]!);
-        if (Date.parse(entry.recordedAt) > cutoff) {
-          const candidate = pending[i]!;
-          if (candidate.position > 0)
-            older.push({ ...candidate, position: candidate.position - 1 });
-          continue;
+    return this.store.inspect((index, reader) => {
+      assertMemoryState(index);
+      const found: MemorySnapshotEntry<MemoryEntry>[] = [];
+      const cutoff = Date.parse(scope.cutoff);
+      const needle = query.text?.toLowerCase();
+      let pending = Object.entries(index.entries).map(
+        ([entryId, versions]) => ({
+          entryId,
+          versions,
+          position: versions.length - 1,
+        }),
+      );
+      while (pending.length > 0) {
+        const refs = pending.map(({ entryId, versions, position }) => ({
+          entryId,
+          revision: versions[position]!,
+        }));
+        const entries = reader.readEntries<unknown>(refs);
+        const older: typeof pending = [];
+        for (let i = 0; i < pending.length; i++) {
+          const entry = entries[i];
+          assertMemoryEntry(entry, refs[i]!);
+          if (Date.parse(entry.recordedAt) > cutoff) {
+            const candidate = pending[i]!;
+            if (candidate.position > 0)
+              older.push({ ...candidate, position: candidate.position - 1 });
+            continue;
+          }
+          if (
+            entry.securityId !== scope.security.id ||
+            (query.runId !== null && entry.runId !== query.runId)
+          )
+            continue;
+          if (
+            needle !== undefined &&
+            !`${entry.outcome}\n${entry.note}`.toLowerCase().includes(needle)
+          )
+            continue;
+          found.push({ ref: entry.ref, content: entry });
         }
-        if (
-          entry.securityId !== scope.security.id ||
-          (query.runId !== null && entry.runId !== query.runId)
-        )
-          continue;
-        if (
-          needle !== undefined &&
-          !`${entry.outcome}\n${entry.note}`.toLowerCase().includes(needle)
-        )
-          continue;
-        found.push({ ref: entry.ref, content: entry });
+        pending = older;
       }
-      pending = older;
-    }
-    found.sort(
-      (a, b) =>
-        Date.parse(b.content.recordedAt) - Date.parse(a.content.recordedAt) ||
-        a.ref.entryId.localeCompare(b.ref.entryId),
-    );
-    return found.slice(0, query.limit);
+      found.sort(
+        (a, b) =>
+          Date.parse(b.content.recordedAt) - Date.parse(a.content.recordedAt) ||
+          a.ref.entryId.localeCompare(b.ref.entryId),
+      );
+      return found.slice(0, query.limit);
+    });
   }
   recallForTask(
     operation: TaskOperation,

@@ -196,12 +196,14 @@ describe("MemoryService durable review history", () => {
       input("Original"),
       "first",
     );
+    expect(c.recall().map(({ ref }) => ref)).toEqual([first]);
     const second = await c.memory.remember(
       c.operation,
       { ...input("Revised"), previous: first },
       "second",
     );
     expect(second).toEqual({ entryId: first.entryId, revision: 2 });
+    expect(c.recall().map(({ ref }) => ref)).toEqual([second]);
     expect(c.memory.read(first).note).toBe("Original");
     expect(c.memory.read(second)).toMatchObject({
       previous: first,
@@ -280,11 +282,21 @@ describe("MemoryService durable review history", () => {
     const older = [second, third].sort((a, b) =>
       a.entryId < b.entryId ? -1 : 1,
     );
-    expect(
-      c
-        .recall({ ...c.scope, cutoff: "2024-01-07T00:00:00.000Z" })
-        .map(({ ref }) => ref),
-    ).toEqual([current, ...older]);
+    const read = vi.spyOn(fs, "readFileSync");
+    try {
+      expect(
+        c
+          .recall({ ...c.scope, cutoff: "2024-01-07T00:00:00.000Z" })
+          .map(({ ref }) => ref),
+      ).toEqual([current, ...older]);
+      expect(
+        read.mock.calls.filter(
+          ([path]) => path === join(c.directory, "memory", "index.json"),
+        ),
+      ).toHaveLength(1);
+    } finally {
+      read.mockRestore();
+    }
     expect(() =>
       c.recall({ ...c.scope, cutoff: "2024-01-05T00:00:00.000Z" }),
     ).toThrowError(expect.objectContaining({ code: "STORAGE_FAILED" }));

@@ -323,6 +323,51 @@ describe("memory version store", () => {
     expect(store.readEntries([first.ref!])).toEqual([{ value: 1 }]);
   });
 
+  it("reads several batches against one index and observes later registrations on the next inspection", () => {
+    const { path, store } = open();
+    const first = store.commit((_current, writer) => ({
+      label: "first",
+      ref: writer.entry(null, () => ({ value: 1 })),
+    }));
+    const second = store.commit((_current, writer) => ({
+      label: "second",
+      ref: writer.entry(first.ref!, () => ({ value: 2 })),
+    }));
+    const read = vi.spyOn(fs, "readFileSync");
+    store.inspect((index, reader) => {
+      expect(index.revision).toBe(second.revision);
+      expect(reader.readEntries([second.ref!, first.ref!])).toEqual([
+        { value: 2 },
+        { value: 1 },
+      ]);
+      expect(reader.readEntries([first.ref!])).toEqual([{ value: 1 }]);
+      const unregistered = { ...second.ref!, revision: 3 };
+      expect(() => reader.readEntries([first.ref!, unregistered])).toThrowError(
+        expect.objectContaining({ code: "VERSION_UNAVAILABLE" }),
+      );
+    });
+    expect(
+      read.mock.calls.filter(([file]) => file === indexPath(path)),
+    ).toHaveLength(1);
+    expect(
+      read.mock.calls.filter(([file]) => file === entryPath(path, first.ref!)),
+    ).toHaveLength(2);
+    read.mockRestore();
+    const third = store.commit((_current, writer) => ({
+      label: "third",
+      ref: writer.entry(second.ref!, () => ({ value: 3 })),
+    }));
+    expect(
+      store.inspect((index, reader) => ({
+        revision: index.revision,
+        values: reader.readEntries([third.ref!, first.ref!]),
+      })),
+    ).toEqual({
+      revision: third.revision,
+      values: [{ value: 3 }, { value: 1 }],
+    });
+  });
+
   it("refuses to initialize an empty index over an existing entries directory", () => {
     const path = directory();
     const root = new DataRoot(path);
@@ -364,6 +409,7 @@ describe("memory version store", () => {
       () => store.currentRefs(),
       () => store.readEntry({ entryId: "__proto__", revision: 1 }),
       () => store.readEntries([]),
+      () => store.inspect(() => undefined),
       () => store.commit(() => ({ label: "new" })),
     ]) {
       expect(action).toThrowError(

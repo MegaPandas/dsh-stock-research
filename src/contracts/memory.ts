@@ -15,3 +15,8 @@ export interface MemoryWriter {
     build: (ref: MemoryRef) => unknown,
   ): MemoryRef;
 }
+
+/** Registered entry reads bound to one synchronous index inspection. */
+export interface MemoryReader {
+  readEntries<T>(refs: readonly MemoryRef[]): T[];
+}

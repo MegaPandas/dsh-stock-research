@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { ResearchError } from "../contracts/errors.js";
 import type {
   MemoryIndex,
+  MemoryReader,
   MemoryRef,
   MemoryWriter,
 } from "../contracts/memory.js";
@@ -172,19 +173,31 @@ export class MemoryStore<State extends object> {
   }
 
   readEntries<T>(refs: readonly MemoryRef[]): T[] {
+    return this.inspect((_index, reader) => reader.readEntries<T>(refs));
+  }
+
+  /** Index and registration checks belong to this synchronous inspection. */
+  inspect<Result>(
+    inspect: (index: MemoryIndex<State>, reader: MemoryReader) => Result,
+  ): Result {
     const index = this.readIndex();
-    for (const ref of refs)
-      if (!registered(index.entries, ref))
-        throw new ResearchError(
-          "VERSION_UNAVAILABLE",
-          "Memory revision is not registered.",
+    const directory = this.#directory;
+    return inspect(index, {
+      readEntries<T>(refs: readonly MemoryRef[]): T[] {
+        for (const ref of refs)
+          if (!registered(index.entries, ref))
+            throw new ResearchError(
+              "VERSION_UNAVAILABLE",
+              "Memory revision is not registered.",
+            );
+        return refs.map(
+          (ref) =>
+            readJson(
+              join(directory, "entries", ref.entryId, `${ref.revision}.json`),
+            ) as T,
         );
-    return refs.map(
-      (ref) =>
-        readJson(
-          join(this.#directory, "entries", ref.entryId, `${ref.revision}.json`),
-        ) as T,
-    );
+      },
+    });
   }
 
   commit(
