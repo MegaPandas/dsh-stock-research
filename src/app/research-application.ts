@@ -1,20 +1,32 @@
-import type { Context } from "@deepseek-ai/cordis";
 import type { Agent } from "@deepseek-ai/dsh-agent";
-import type { RunView } from "../contracts/runs.js";
+import type { ResearchScope } from "../contracts/data.js";
+import type { RunReader, RunLifecycle } from "../contracts/run-access.js";
+import type { QueryPolicy } from "../contracts/query.js";
+import type { SourceDescription } from "../contracts/sources.js";
+import type {
+  AttemptTarget,
+  OpenRunInput,
+  RecoverAttemptsResult,
+  RedoTaskResult,
+  RunOperation,
+  RunView,
+} from "../contracts/runs.js";
 import type { BoundCaller, ResearchCaller } from "../host/bindings.js";
 import type { ResearchOperations } from "../host/research-operations.js";
 import { ResearchError } from "../contracts/errors.js";
 import { serializeJson } from "../json/serialize.js";
 import { readCollection } from "./collection-input.js";
 import { savedCoordinator } from "./coordinator-input.js";
-import { openResearch } from "./open-research.js";
+import { openResearch, type OpenResearchPorts } from "./open-research.js";
 import {
   captureResearchModels,
   RESEARCH_MODELS_INPUT,
 } from "./research-models.js";
 import type { ModelConfig } from "../contracts/settings.js";
-import { holdActivity } from "./activity.js";
-import { ResearchExecutions } from "./research-executions.js";
+import {
+  ResearchExecutions,
+  type ResearchExecutionPorts,
+} from "./research-executions.js";
 import { createReplayInput } from "./replay-input.js";
 import {
   researchStartLabel,
@@ -40,6 +52,40 @@ interface ResearchCoordinator {
   ): void;
 }
 
+export interface ResearchApplicationPorts extends Omit<
+  ResearchExecutionPorts,
+  "runs" | "isClosing"
+> {
+  runs: Pick<
+    RunReader,
+    "view" | "readDefinition" | "inputCatalog" | "readInput"
+  > &
+    Pick<RunLifecycle, "open" | "reviewStage" | "resume">;
+  operations: ResearchOperations;
+  collection: OpenResearchPorts["collection"];
+  settings():
+    | {
+        readonly model: ModelConfig | undefined;
+        readonly publicSearchLimit: number;
+      }
+    | undefined;
+  policy(): QueryPolicy;
+  describeSources(scope: ResearchScope): readonly SourceDescription[];
+  openRun(owner: Agent, input: OpenRunInput, requestId: string): RunView;
+  authorizeRun(owner: Agent, runId: string): void;
+  recoverInterrupted(
+    operation: RunOperation,
+    targets: readonly AttemptTarget[],
+    requestId: string,
+  ): RecoverAttemptsResult;
+  redoRun(
+    operation: RunOperation,
+    taskId: string,
+    requestId: string,
+    reason: string | null,
+  ): Promise<RedoTaskResult>;
+}
+
 /** The receiving host Agent drives every transition through individual tools. */
 export class ResearchApplication implements ResearchActions {
   readonly #coordinators = new Map<Agent, (() => void)[]>();
@@ -51,19 +97,17 @@ export class ResearchApplication implements ResearchActions {
   readonly #disposing = new Map<Agent, Promise<void>>();
   #closed = false;
   constructor(
-    private readonly ctx: Context,
+    private readonly ports: ResearchApplicationPorts,
     private readonly model: ModelConfig | undefined,
     private readonly coordinator: ResearchCoordinator,
   ) {
-    const runtime = ctx.stockResearch;
     this.#executions = new ResearchExecutions({
-      jobs: ctx.jobs,
-      runs: runtime.runs,
-      cancelRun: (operation, requestId) =>
-        runtime.dispatch.cancel(operation, requestId),
-      releaseRun: (runId) => runtime.dispatch.releaseRun(runId),
-      holdActivity: () => holdActivity(runtime),
-      isOwnerLive: (owner) => ctx.agents.get(owner.id) === owner,
+      jobs: ports.jobs,
+      runs: ports.runs,
+      cancelRun: ports.cancelRun,
+      releaseRun: ports.releaseRun,
+      holdActivity: ports.holdActivity,
+      isOwnerLive: ports.isOwnerLive,
       isClosing: () => this.#closed,
     });
   }
@@ -71,7 +115,7 @@ export class ResearchApplication implements ResearchActions {
   #main(agent: Agent | undefined): Agent {
     if (this.#closed)
       throw new ResearchError("ACCESS_DENIED", "Stock research is closed.");
-    if (agent === undefined || this.ctx.agents.get(agent.id) !== agent)
+    if (agent === undefined || !this.ports.isOwnerLive(agent))
       throw new ResearchError(
         "ACCESS_DENIED",
         "A live host Agent is required.",
@@ -109,7 +153,7 @@ export class ResearchApplication implements ResearchActions {
           (active) => action(request, caller, active),
         );
       };
-    const operations = this.ctx.stockResearch.operations;
+    const operations = this.ports.operations;
     return {
       dispatchTask: wrap("stock_dispatch_task", operations.dispatchTask),
       dispatchStage: wrap("stock_dispatch_stage", operations.dispatchStage),
@@ -149,13 +193,12 @@ export class ResearchApplication implements ResearchActions {
         );
       return existing.work;
     }
-    const settings = this.ctx.get("stockResearchSettings");
+    const settings = this.ports.settings();
     const models = captureResearchModels(owner, this.model ?? settings?.model);
     const publicSearchLimit =
       settings?.publicSearchLimit ?? PUBLIC_SEARCH_LIMITS.maxSearches;
-    const runtime = this.ctx.stockResearch;
-    const policy = runtime.policy;
-    const sources = runtime.queries.health(scope).sources;
+    const policy = this.ports.policy();
+    const sources = this.ports.describeSources(scope);
     const work = this.#executions.start(
       owner,
       {
@@ -166,10 +209,10 @@ export class ResearchApplication implements ResearchActions {
       async (signal, attach, onProgress) => {
         const view = await openResearch(
           {
-            collection: runtime.collection,
+            collection: this.ports.collection,
             now: () => new Date(),
             openRun: (input, id) => {
-              const opened = runtime.openRun(owner, input, id);
+              const opened = this.ports.openRun(owner, input, id);
               // Attach before awaiting so cancellation can reach the published run.
               attach(opened.runId);
               return opened;
@@ -200,22 +243,22 @@ export class ResearchApplication implements ResearchActions {
   review(input: ReviewResearchRequest, caller: ResearchCaller): RunView {
     const { runId, requestId, stageId, verdict, feedback, refs } = input;
     const owner = this.#owned(caller.agent, runId);
-    this.ctx.stockResearch.runs.reviewStage(
+    this.ports.runs.reviewStage(
       { runId, identity: owner.id },
       { stageId, verdict, feedback, refs },
       requestId,
     );
     this.#executions.publish(runId);
-    return this.ctx.stockResearch.runs.view({ runId });
+    return this.ports.runs.view({ runId });
   }
 
   #context(runId: string): ResearchContext {
-    const runtime = this.ctx.stockResearch;
-    const collection = readCollection(runtime.runs, runId);
+    const runs = this.ports.runs;
+    const collection = readCollection(runs, runId);
     return {
       runId,
-      view: runtime.runs.view({ runId }),
-      tasks: runtime.runs
+      view: runs.view({ runId }),
+      tasks: runs
         .readDefinition(runId)
         .tasks.map(({ id, executor }) => ({ id, executor })),
       ...(collection === null
@@ -246,27 +289,27 @@ export class ResearchApplication implements ResearchActions {
     const owner = this.#main(caller.agent);
     const signal = caller.signal;
     signal.throwIfAborted();
-    const runtime = this.ctx.stockResearch;
+    const runs = this.ports.runs;
     const operation = { runId: input.runId, identity: owner.id };
     if (input.kind === "status")
       return {
         kind: "status",
-        view: runtime.runs.view(operation),
+        view: runs.view(operation),
       };
     if (input.kind === "cancel") {
       if (this.#executions.ownerOf(input.runId) === undefined)
-        await runtime.dispatch.cancel(operation, requestId);
+        await this.ports.cancelRun(operation, requestId);
       else await this.#executions.cancel(input.runId, requestId);
       return {
         kind: "status",
-        view: runtime.runs.view(operation),
+        view: runs.view(operation),
       };
     }
     if (input.kind === "recover") {
-      runtime.dispatch.recoverInterrupted(operation, input.attempts, requestId);
+      this.ports.recoverInterrupted(operation, input.attempts, requestId);
       return {
         kind: "status",
-        view: runtime.runs.view(operation),
+        view: runs.view(operation),
       };
     }
     const attached = this.#executions.ownerOf(input.runId);
@@ -276,24 +319,24 @@ export class ResearchApplication implements ResearchActions {
         "Continue this live research in its owning chat.",
       );
     if (input.kind === "resume" || input.kind === "redo")
-      savedCoordinator(runtime.runs, input.runId);
+      savedCoordinator(runs, input.runId);
     let runId = input.runId;
     if (input.kind === "replay")
-      runId = runtime.runs.open(
+      runId = runs.open(
         owner.id,
-        createReplayInput(runtime.runs, input.runId),
+        createReplayInput(runs, input.runId),
         requestId,
       ).runId;
     else if (input.kind === "resume")
-      runtime.runs.resume(operation, input.input, requestId);
+      runs.resume(operation, input.input, requestId);
     else
-      await runtime.dispatch.redo(
+      await this.ports.redoRun(
         operation,
         input.taskId,
         requestId,
         input.reason,
       );
-    runtime.authorizeCoordinatorRun(owner, runId);
+    this.ports.authorizeRun(owner, runId);
     const existing = this.#executions.ownerOf(runId);
     if (existing !== undefined && existing !== owner)
       throw new ResearchError(

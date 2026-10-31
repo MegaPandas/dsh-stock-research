@@ -317,6 +317,10 @@ export default defineConfig(
             {
               group: [
                 "**/tools/**",
+                "@deepseek-ai/cordis",
+                "**/host/runtime.js",
+                "../runtime.js",
+                "@megapandas/dsh-stock-research/runtime",
                 "@deepseek-ai/dsh-tools",
                 "@deepseek-ai/dsh-commands",
                 "@deepseek-ai/dsh-jobs",
@@ -327,6 +331,8 @@ export default defineConfig(
                 "./research-read-tools.js",
                 "./run-command-input.js",
                 "./run-view.js",
+                "./settings.js",
+                "./activity.js",
               ],
               message:
                 "Research actions must use typed requests and coordinator ports instead of command/tool adapters or output formatting.",
