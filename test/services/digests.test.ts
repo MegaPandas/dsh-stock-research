@@ -272,7 +272,7 @@ describe("DigestService", () => {
       "STORAGE_FAILED",
       "Simulated projection write failure",
     );
-    vi.spyOn(c.runs, "repairProjections").mockImplementationOnce(() => {
+    vi.spyOn(c.store, "syncProjections").mockImplementationOnce(() => {
       throw failure;
     });
     await expect(
