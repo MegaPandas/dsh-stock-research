@@ -36,7 +36,7 @@ const cases = [
 function snapshot(asOf) {
   return {
     schemaVersion: 1,
-    scope: structuredClone(scope),
+    scope: globalThis.structuredClone(scope),
     failures: [],
     packets: assets.map((asset) => {
       const id = `benchmark.${asset}.daily`;
