@@ -106,6 +106,7 @@
     "bench:collection-freshness": "node scripts/benchmark-collection-freshness.mjs",
     "bench:replay": "node scripts/benchmark-replay.mjs",
     "bench:numbers": "node scripts/benchmark-numbers.mjs",
+    "bench:number-references": "node scripts/benchmark-number-references.mjs",
     "bench:valuation-reads": "node scripts/benchmark-valuation-reads.mjs",
     "bench:decisions": "node scripts/benchmark-decisions.mjs",
     "bench:digests": "node scripts/benchmark-digests.mjs",

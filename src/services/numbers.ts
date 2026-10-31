@@ -74,10 +74,10 @@ export class NumberService {
           "An artifact input must belong to the authorized run.",
         );
       const key = artifactKey(ref);
-      if (!context.artifacts.some((entry) => artifactKey(entry.ref) === key))
-        fail("reference", "The artifact version is not registered.");
       let version = artifacts.get(key);
       if (version === undefined) {
+        if (!context.artifacts.some((entry) => artifactKey(entry.ref) === key))
+          fail("reference", "The artifact version is not registered.");
         version = this.runs.readArtifact(ref);
         artifacts.set(key, version);
       }

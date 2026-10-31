@@ -646,6 +646,36 @@ describe("numeric claim gate", () => {
     ).toBe("reference");
   });
 
+  it("rejects an unregistered revision after adopting another revision of the same artifact", () => {
+    const c = setup();
+    const ref = c.record();
+    const saved = c.runs.commitArtifact(
+      c.operation,
+      [content([observed(ref)])],
+      "submit",
+    ).refs[0]!;
+    const unregistered = { ...saved, revision: saved.revision + 1 };
+    const candidate = content([
+      {
+        ...gain(),
+        inputs: [
+          { kind: "artifact", artifact: saved, claimId: "base" },
+          { kind: "artifact", artifact: unregistered, claimId: "base" },
+        ],
+      },
+    ]);
+    candidate.inputRefs = [saved, unregistered];
+    const result = c.numbers.checkNumbers(c.operation, {
+      kind: "pending",
+      contentId: "revision-check",
+      content: candidate,
+    });
+    expect(result.passed).toBe(false);
+    expect(result.claims[0]!.issues).toEqual([
+      { code: "reference", detail: "The artifact version is not registered." },
+    ]);
+  });
+
   it("propagates actual missing-file failures instead of creating a successful check", () => {
     const c = setup();
     const ref = c.record();
