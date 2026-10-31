@@ -29,6 +29,7 @@ import type {
 } from "../contracts/runs.js";
 import type { RunAccess } from "../contracts/run-access.js";
 import type { DigestService } from "../services/digests.js";
+import { RunDispatchPlanner } from "../services/run-dispatch.js";
 import type { ResearchSessions } from "./sessions.js";
 import { observeModelCalls } from "./model-events.js";
 
@@ -146,6 +147,7 @@ export class DispatchBridge {
   readonly #followupReceipts: FollowupReceipt[] = [];
   readonly #stageReceipts: StageReceipt[] = [];
   readonly #unlistenParent: () => void;
+  readonly #planning: RunDispatchPlanner;
   #closed = false;
 
   constructor(
@@ -155,6 +157,7 @@ export class DispatchBridge {
     private readonly prepare: PrepareRole,
     private readonly digests: DigestService,
   ) {
+    this.#planning = new RunDispatchPlanner(runs);
     this.#unlistenParent = ctx.on("agent/disposed", ({ agent }) => {
       for (const [key, session] of this.#roleSessions)
         if (session.parent === agent) this.#roleSessions.delete(key);
@@ -182,19 +185,7 @@ export class DispatchBridge {
         )
       )
         return this.#startRole(parent, runId, taskId, requestId, signal);
-      const definition = this.runs.readDefinition(runId);
-      const stage = definition.stages?.find((entry) =>
-        entry.taskIds.includes(taskId),
-      );
-      if (stage?.dispatch === "together") {
-        const ready = new Set(this.runs.view({ runId }).readyTasks);
-        const readyPeers = stage.taskIds.filter((id) => ready.has(id));
-        if (readyPeers.length > 1)
-          throw new ResearchError(
-            "INVALID_INPUT",
-            `This stage requires ready roles to start together. Use stock_dispatch_stage with stageId=${stage.id}.`,
-          );
-      }
+      this.#planning.assertIndividual(runId, taskId);
       return this.#startRole(parent, runId, taskId, requestId, signal);
     });
   }
@@ -224,25 +215,16 @@ export class DispatchBridge {
         );
       return receipt.result;
     }
-    const definition = this.runs.readDefinition(runId);
-    const stage = definition.stages?.find((entry) => entry.id === stageId);
-    if (stage === undefined)
-      return Promise.reject(
-        new ResearchError("INVALID_INPUT", "Unknown research stage."),
-      );
-    const definitions = stage.taskIds.map((id) =>
-      definition.tasks.find((task) => task.id === id)!,
-    );
-    if (definitions.some((task) => task.executor.kind !== "role"))
-      return Promise.reject(
-        new ResearchError(
-          "INVALID_INPUT",
-          "Only role stages can be dispatched; use the service tool for summaries and finalization.",
-        ),
-      );
-    const result = this.#afterStops(runId, stage.taskIds, signal, async () => {
-      const ready = new Set(this.runs.view({ runId }).readyTasks);
-      const requests = stage.taskIds.map((taskId) => ({
+    let taskIds: readonly string[];
+    // Selection failures are returned through the dispatch promise.
+    try {
+      taskIds = this.#planning.stageTasks(runId, stageId);
+    } catch (cause) {
+      return Promise.reject(cause);
+    }
+    const result = this.#afterStops(runId, taskIds, signal, async () => {
+      const ready = this.runs.view({ runId }).readyTasks;
+      const requests = taskIds.map((taskId) => ({
         taskId,
         requestId: JSON.stringify(["stage", stageId, requestId, taskId]),
       }));
@@ -257,14 +239,8 @@ export class DispatchBridge {
           "STALE_ATTEMPT",
           "The previous batch was interrupted while claiming tasks. Confirm interruption and recover before dispatching a new batch.",
         );
-      if (
-        !replays.every(Boolean) &&
-        !stage.taskIds.every((taskId) => ready.has(taskId))
-      )
-        throw new ResearchError(
-          "TASK_NOT_READY",
-          "All roles in the stage must be ready for batch dispatch; use stock_dispatch_task for a single-sided revision.",
-        );
+      if (!replays.every(Boolean))
+        this.#planning.assertStageReady(taskIds, ready);
       this.runs.recordStageDispatch(operation, stageId, requestId);
       const outcomes = await Promise.allSettled(
         requests.map(({ taskId, requestId: taskRequestId }) =>
