@@ -12,8 +12,7 @@ import type { DataEnvelope, ResearchScope } from "../../contracts/data.js";
 import { CollectionCache } from "./cache.js";
 import { CollectionSourceRunner } from "./source.js";
 import {
-  assessCollectionCoverage,
-  type CollectionCoverage,
+  collectionCoverageIssue,
   improvesCollectionCoverage,
 } from "./quality.js";
 import { collectionError, collectionErrorDetail } from "./errors.js";
@@ -56,12 +55,7 @@ export class CollectionTableRunner {
     const failures: CollectionFailure[] = [];
     let reportedFailures = 0;
     let selected: DataEnvelope<CollectedTableData> | undefined;
-    let partial:
-      | {
-          envelope: DataEnvelope<CollectedTableData>;
-          coverage: CollectionCoverage;
-        }
-      | undefined;
+    let partial: DataEnvelope<CollectedTableData> | undefined;
     let lastSource = plan.candidates[0]!;
     const deadline = new AbortController();
     const expiresAt = performance.now() + plan.timeoutMs;
@@ -81,21 +75,21 @@ export class CollectionTableRunner {
       candidate: CollectionTask,
       envelope: DataEnvelope<CollectedTableData>,
     ) => {
-      const coverage = assessCollectionCoverage(envelope);
-      if (coverage.issue === undefined) {
+      const issue = collectionCoverageIssue(envelope);
+      if (issue === undefined) {
         selected = envelope;
       } else {
         if (
-          coverage.rowCount > 0 &&
+          envelope.data.rows.length > 0 &&
           (partial === undefined ||
-            improvesCollectionCoverage(partial.coverage, coverage))
+            improvesCollectionCoverage(partial, envelope))
         )
-          partial = { envelope, coverage };
+          partial = envelope;
         failures.push({
           id: plan.id,
           provider: candidate.provider,
           code: "DATA_INSUFFICIENT",
-          detail: coverage.issue,
+          detail: issue,
         });
       }
     };
@@ -213,11 +207,7 @@ export class CollectionTableRunner {
     if (selected !== undefined)
       return { status: "complete", envelope: selected, failures: unreported };
     if (partial !== undefined)
-      return {
-        status: "partial",
-        envelope: partial.envelope,
-        failures: unreported,
-      };
+      return { status: "partial", envelope: partial, failures: unreported };
     return { status: "unavailable", failures: unreported };
   }
 }

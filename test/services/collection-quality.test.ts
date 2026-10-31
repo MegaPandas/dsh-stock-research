@@ -2,13 +2,9 @@ import { describe, expect, it } from "vitest";
 import type { CollectedTableData } from "../../src/contracts/collection.js";
 import type { DataEnvelope } from "../../src/contracts/data.js";
 import {
-  assessCollectionCoverage,
+  collectionCoverageIssue,
   improvesCollectionCoverage,
 } from "../../src/services/collection/quality.js";
-
-function collectionCoverageIssue(envelope: DataEnvelope<CollectedTableData>) {
-  return assessCollectionCoverage(envelope).issue;
-}
 
 function envelope(
   table: string,
@@ -248,52 +244,23 @@ describe("collection source coverage", () => {
       OPERATE_INCOME: 100,
       PARENT_NETPROFIT: 20,
     });
-    expect(
-      improvesCollectionCoverage(
-        assessCollectionCoverage(current),
-        assessCollectionCoverage(candidate),
-      ),
-    ).toBe(true);
+    expect(improvesCollectionCoverage(current, candidate)).toBe(true);
     candidate.stale = true;
-    expect(
-      improvesCollectionCoverage(
-        assessCollectionCoverage(current),
-        assessCollectionCoverage(candidate),
-      ),
-    ).toBe(false);
+    expect(improvesCollectionCoverage(current, candidate)).toBe(false);
     candidate.stale = false;
     candidate.asOf = "2026-09-30T16:00:00.000Z";
-    expect(
-      improvesCollectionCoverage(
-        assessCollectionCoverage(current),
-        assessCollectionCoverage(candidate),
-      ),
-    ).toBe(false);
+    expect(improvesCollectionCoverage(current, candidate)).toBe(false);
   });
 
-  it("counts missing core groups per observation while keeping source alternatives equivalent", () => {
-    const data = envelope("financial.income", {
+  it("compares missing values across observations and accepts either revenue field", () => {
+    const current = envelope("financial.income", {
       TOTAL_OPERATE_INCOME: null,
       OPERATE_INCOME: 100,
       PARENT_NETPROFIT: null,
     });
-    const first = data.data.rows[0]!;
-    data.data.rows[0] = {
-      ...first,
-      date: "2026-10-24",
-      asOf: "2026-10-24T16:00:00.000Z",
-    };
-    data.data.rows.push(
-      {
-        ...first,
-        date: "2026-10-25",
-        asOf: "2026-10-25T16:00:00.000Z",
-        values: {
-          TOTAL_OPERATE_INCOME: 0,
-          OPERATE_INCOME: null,
-          PARENT_NETPROFIT: 10,
-        },
-      },
+    const first = current.data.rows[0]!;
+    current.data.rows = [
+      { ...first, date: "2026-10-25", asOf: "2026-10-25T16:00:00.000Z" },
       {
         ...first,
         values: {
@@ -302,39 +269,37 @@ describe("collection source coverage", () => {
           PARENT_NETPROFIT: null,
         },
       },
+    ];
+    const original = structuredClone(current);
+    const improved = structuredClone(current);
+    improved.data.rows[0]!.values = {
+      TOTAL_OPERATE_INCOME: 0,
+      OPERATE_INCOME: null,
+      PARENT_NETPROFIT: 0,
+    };
+    expect(collectionCoverageIssue(current)).toBe(
+      "Core fields are missing in one or more observations: TOTAL_OPERATE_INCOME or OPERATE_INCOME, PARENT_NETPROFIT.",
     );
-    const original = structuredClone(data);
-    expect(assessCollectionCoverage(data)).toEqual({
-      asOf: "2026-10-26T16:00:00.000Z",
-      stale: false,
-      rowCount: 3,
-      missingCoreValues: 3,
-      issue:
-        "Core fields are missing in one or more observations: TOTAL_OPERATE_INCOME or OPERATE_INCOME, PARENT_NETPROFIT.",
-    });
-    expect(data).toEqual(original);
+    expect(improvesCollectionCoverage(current, improved)).toBe(true);
+    expect(improvesCollectionCoverage(improved, current)).toBe(false);
+    expect(improvesCollectionCoverage(current, current)).toBe(false);
+    expect(current).toEqual(original);
   });
 
-  it.each([
-    [{}, false],
-    [{ rowCount: 3 }, true],
-    [{ rowCount: 1, missingCoreValues: 0 }, false],
-    [{ asOf: "2026-10-27T16:00:00.000Z" }, true],
-    [{ asOf: "2026-10-27T16:00:00.000Z", missingCoreValues: 2 }, false],
-    [{ stale: true, missingCoreValues: 0 }, false],
-  ] as const)(
-    "compares evaluated coverage without accepting a trade-off: %j",
-    (change, expected) => {
-      const current = {
-        asOf: "2026-10-26T16:00:00.000Z",
-        stale: false,
-        rowCount: 2,
-        missingCoreValues: 1,
-        issue: "Partial",
-      };
-      expect(
-        improvesCollectionCoverage(current, { ...current, ...change }),
-      ).toBe(expected);
-    },
-  );
+  it("requires missing values and row coverage to improve without a trade-off", () => {
+    const current = envelope("financial.income", {
+      OPERATE_INCOME: 100,
+      PARENT_NETPROFIT: null,
+    });
+    const candidate = structuredClone(current);
+    candidate.data.rows.push({
+      ...candidate.data.rows[0]!,
+      values: { OPERATE_INCOME: 100, PARENT_NETPROFIT: 10 },
+    });
+    expect(improvesCollectionCoverage(current, candidate)).toBe(true);
+    expect(improvesCollectionCoverage(candidate, current)).toBe(false);
+    candidate.data.rows[1]!.values.PARENT_NETPROFIT = null;
+    candidate.asOf = "2026-10-27T16:00:00.000Z";
+    expect(improvesCollectionCoverage(current, candidate)).toBe(false);
+  });
 });

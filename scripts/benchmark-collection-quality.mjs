@@ -79,30 +79,16 @@ try {
     entry = join(directory, "quality.mjs");
   } else entry = resolve(process.argv[2]);
   const quality = await import(pathToFileURL(entry).href);
-  // Frozen implementations can expose either envelopes or their evaluated coverage.
-  const assess =
-    quality.assessCollectionCoverage === undefined
-      ? (candidate) => ({
-          issue: quality.collectionCoverageIssue(candidate),
-          coverage: candidate,
-        })
-      : (candidate) => {
-          const coverage = quality.assessCollectionCoverage(candidate);
-          return { issue: coverage.issue, coverage };
-        };
   function select(candidates) {
     let selected;
     for (let i = 0; i < candidates.length; i++) {
-      const evaluated = assess(candidates[i]);
-      if (evaluated.issue === undefined) return i;
+      const candidate = candidates[i];
+      if (quality.collectionCoverageIssue(candidate) === undefined) return i;
       if (
         selected === undefined ||
-        quality.improvesCollectionCoverage(
-          selected.coverage,
-          evaluated.coverage,
-        )
+        quality.improvesCollectionCoverage(selected.envelope, candidate)
       )
-        selected = { index: i, coverage: evaluated.coverage };
+        selected = { index: i, envelope: candidate };
     }
     return selected.index;
   }
