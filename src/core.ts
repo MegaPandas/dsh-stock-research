@@ -134,7 +134,7 @@ export type {
   AgentReportContent,
   AgentReportKind,
 } from "./contracts/agent-reports.js";
-export { parseAgentReport } from "./services/agent-reports.js";
+export { parseAgentReport } from "./artifacts/agent-reports.js";
 export {
   PRICE_RATING_POLICY,
   PRICE_RATING_MONTHS,
@@ -307,7 +307,7 @@ export type {
   RiskPayload,
   SupportedStatement,
 } from "./contracts/artifact-payloads.js";
-export { parseArtifactInput } from "./services/artifact-schema.js";
+export { parseArtifactInput } from "./artifacts/schema.js";
 export { ArtifactService, ArtifactNumberError } from "./services/artifacts.js";
 export { DecisionService } from "./services/decisions.js";
 export { renderDecisionReport } from "./report/decision.js";

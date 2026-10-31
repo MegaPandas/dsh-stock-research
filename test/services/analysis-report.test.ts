@@ -1,10 +1,10 @@
 import { afterEach, describe, expect, it } from "vitest";
 import type { GenerateDigest } from "../../src/contracts/digests.js";
 import type { TaskDefinition } from "../../src/contracts/workflow.js";
-import { parseAnalysisReport } from "../../src/services/analysis-report.js";
+import { parseAnalysisReport } from "../../src/artifacts/analysis-report.js";
 import { assembleAgentArtifact } from "../../src/services/business-reports.js";
 import { ArtifactInputs } from "../../src/services/artifact-inputs.js";
-import { parseArtifactInput } from "../../src/services/artifact-schema.js";
+import { parseArtifactInput } from "../../src/artifacts/schema.js";
 import { checkDecisionRequirements } from "../../src/services/decision-requirements.js";
 import { DigestService } from "../../src/services/digests.js";
 import {

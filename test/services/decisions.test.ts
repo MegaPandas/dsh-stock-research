@@ -8,7 +8,7 @@ import type {
 } from "../../src/contracts/artifact-payloads.js";
 import type { MarketData } from "../../src/contracts/data.js";
 import type { EvidenceInput } from "../../src/contracts/task-data.js";
-import { parseArtifactInput } from "../../src/services/artifact-schema.js";
+import { parseArtifactInput } from "../../src/artifacts/schema.js";
 import { DecisionService } from "../../src/services/decisions.js";
 import { NumberService } from "../../src/services/numbers.js";
 import { createRunService } from "../../src/services/run/index.js";

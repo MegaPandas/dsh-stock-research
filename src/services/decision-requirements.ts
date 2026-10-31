@@ -6,7 +6,7 @@ import { ArtifactInputs } from "./artifact-inputs.js";
 import { ResearchError } from "../contracts/errors.js";
 import { numberField } from "../evidence/fields.js";
 import { EvidenceTimeError } from "../evidence/checks.js";
-import { isStageReport } from "./analysis-report.js";
+import { isStageReport } from "../artifacts/analysis-report.js";
 
 interface Observation {
   ref: SourceRef;

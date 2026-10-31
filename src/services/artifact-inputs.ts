@@ -13,7 +13,7 @@ import type { EvidenceData } from "../contracts/query.js";
 import type { NumberContext } from "../contracts/numbers.js";
 import type { RegisteredEvidenceRecord } from "../contracts/task-data.js";
 import { artifactReferences } from "../artifacts/references.js";
-import { isStageReport } from "./analysis-report.js";
+import { isStageReport } from "../artifacts/analysis-report.js";
 import { aggregateArtifactGaps } from "../artifacts/gaps.js";
 import { numberField, referenceField } from "../evidence/fields.js";
 import { artifactKey } from "../contracts/artifact-identity.js";

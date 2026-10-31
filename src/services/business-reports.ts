@@ -9,8 +9,7 @@ import type { StageHandoff } from "../contracts/stage-handoff.js";
 import { renderAgentReport } from "../report/agent-report.js";
 import type { ArtifactRef, ResearchScope } from "../contracts/data.js";
 import { decisionPolicy, priceRating } from "../contracts/rating-policy.js";
-import { parseArtifactInput } from "./artifact-schema.js";
-import { list, object, text } from "./artifact-shape.js";
+import { parseArtifactInput, list, object, text } from "../artifacts/schema.js";
 
 type BusinessRisk = Omit<RiskIssue, "issueId" | "evidence" | "numbers">;
 type TargetPrice = {

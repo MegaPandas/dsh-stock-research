@@ -8,7 +8,7 @@ import {
 import {
   parseAgentReport,
   validateStoredAgentReport,
-} from "../../src/services/agent-reports.js";
+} from "../../src/artifacts/agent-reports.js";
 
 function analysis(): AgentReport<"analysis"> {
   return {

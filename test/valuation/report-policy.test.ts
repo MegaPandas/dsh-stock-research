@@ -3,7 +3,7 @@ import type { AgentReport } from "../../src/contracts/agent-reports.js";
 import {
   parseAgentReport,
   validateStoredAgentReport,
-} from "../../src/services/agent-reports.js";
+} from "../../src/artifacts/agent-reports.js";
 import { validateRoleValuation } from "../../src/valuation/report-policy.js";
 import { agentAnalysisReport } from "../fixtures/analysis-report.js";
 import { US_SECURITY } from "../fixtures/market.js";

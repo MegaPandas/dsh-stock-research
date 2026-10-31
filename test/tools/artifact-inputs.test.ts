@@ -4,7 +4,7 @@ import {
 } from "@deepseek-ai/dsh-tools";
 import { describe, expect, it } from "vitest";
 import type { ResearchArtifactInput } from "../../src/contracts/artifact-payloads.js";
-import { parseArtifactInput } from "../../src/services/artifact-schema.js";
+import { parseArtifactInput } from "../../src/artifacts/schema.js";
 import {
   checkPendingNumbersParameters,
   saveReportParameters,

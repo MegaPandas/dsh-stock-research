@@ -7,7 +7,7 @@ import type {
   ResearchArtifactInput,
 } from "../contracts/artifact-payloads.js";
 import type { ArtifactInput } from "../contracts/artifacts.js";
-import { list, object, text } from "./artifact-shape.js";
+import { list, object, text } from "./shape.js";
 
 export type AnalysisNoteArtifact = Omit<ArtifactInput, "kind" | "payload"> & {
   kind: "analysis";

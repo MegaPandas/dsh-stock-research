@@ -6,7 +6,7 @@ import {
   taskOperation,
   type SessionBindings,
 } from "../host/bindings.js";
-import { parseArtifactInput } from "../services/artifact-schema.js";
+import { parseArtifactInput } from "../artifacts/schema.js";
 import {
   checkNumbersParameters,
   checkPendingNumbersParameters,

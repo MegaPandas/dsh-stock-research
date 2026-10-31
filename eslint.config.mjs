@@ -63,6 +63,18 @@ export default defineConfig(
             directory: "src/evidence",
             publicEntries: ["fields.js", "checks.js", "price-basis.js"],
           },
+          {
+            directory: "src/artifacts",
+            publicEntries: [
+              "references.js",
+              "risks.js",
+              "gaps.js",
+              "schema.js",
+              "analysis-report.js",
+              "agent-reports.js",
+              "stage-handoff.js",
+            ],
+          },
         ],
       ],
     },

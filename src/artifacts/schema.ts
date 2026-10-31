@@ -13,8 +13,8 @@ import {
   text,
   type Check,
   type ObjectValue,
-} from "./artifact-shape.js";
-export { list, object, text } from "./artifact-shape.js";
+} from "./shape.js";
+export { list, object, text } from "./shape.js";
 const numeric: Check = (value, path) => {
   if (typeof value !== "number") invalid(path, "expected a number");
 };

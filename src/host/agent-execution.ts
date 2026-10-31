@@ -9,7 +9,7 @@ import {
 } from "../contracts/agent-reports.js";
 import type { ResearchScope } from "../contracts/data.js";
 import { ResearchError } from "../contracts/errors.js";
-import { parseAgentReport } from "../services/agent-reports.js";
+import { parseAgentReport } from "../artifacts/agent-reports.js";
 import { researchTool } from "../tools/errors.js";
 import { objectSchema, resultOutput } from "../tools/parameters.js";
 import { preserveToolArguments } from "./tool-arguments.js";

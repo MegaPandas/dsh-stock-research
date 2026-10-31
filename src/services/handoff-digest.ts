@@ -12,7 +12,7 @@ import type {
 } from "../contracts/digests.js";
 import { ResearchError } from "../contracts/errors.js";
 import type { StageHandoff } from "../contracts/stage-handoff.js";
-import { parseAgentReport } from "./agent-reports.js";
+import { parseAgentReport } from "../artifacts/agent-reports.js";
 import { artifactKey } from "../contracts/artifact-identity.js";
 
 export const generateHandoffDigest: GenerateDigest = async (

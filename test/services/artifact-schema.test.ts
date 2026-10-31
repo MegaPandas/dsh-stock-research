@@ -6,7 +6,7 @@ import type {
   Rating,
 } from "../../src/contracts/artifact-payloads.js";
 import type { ArtifactKind } from "../../src/contracts/artifacts.js";
-import { parseArtifactInput } from "../../src/services/artifact-schema.js";
+import { parseArtifactInput } from "../../src/artifacts/schema.js";
 
 const ref = { runId: "run", artifactId: "analysis", revision: 1 };
 const source = {

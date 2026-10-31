@@ -11,7 +11,7 @@ import {
   type AgentReportKind,
 } from "../contracts/agent-reports.js";
 import { ResearchError } from "../contracts/errors.js";
-import { parseAgentReport } from "../services/agent-reports.js";
+import { parseAgentReport } from "../artifacts/agent-reports.js";
 import { researchTool } from "../tools/errors.js";
 import { objectSchema, resultOutput } from "../tools/parameters.js";
 import { createSubmissionSession } from "./agent-execution.js";
@@ -21,7 +21,7 @@ import {
   STAGE_HANDOFF_TARGET_CHARACTERS,
   type StageHandoff,
 } from "../contracts/stage-handoff.js";
-import { parseStageHandoff } from "../services/stage-handoff.js";
+import { parseStageHandoff } from "../artifacts/stage-handoff.js";
 
 export type ReportDraft<Kind extends AgentReportKind> = {
   summary?: string;
