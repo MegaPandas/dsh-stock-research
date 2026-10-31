@@ -73,6 +73,7 @@ export default defineConfig(
               "analysis-report.js",
               "agent-reports.js",
               "stage-handoff.js",
+              "assembly.js",
             ],
           },
         ],
@@ -152,6 +153,23 @@ export default defineConfig(
               group: pureImports,
               message:
                 "Pure modules must not depend on I/O, persistence, services, or integration layers.",
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    files: ["src/report/**/*.ts"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: [...pureImports, "**/artifacts/**"],
+              message:
+                "Report rendering must consume contracts and pure computations instead of artifact parsing or assembly.",
             },
           ],
         },

@@ -14,7 +14,7 @@ import type { StageHandoff } from "../contracts/stage-handoff.js";
 import type { RoleProvision } from "../host/dispatch.js";
 import { reportMaterial } from "../report/material.js";
 import { ArtifactInputs } from "../services/artifact-inputs.js";
-import { assembleAgentArtifact } from "../services/business-reports.js";
+import { assembleAgentArtifact } from "../artifacts/assembly.js";
 import { inheritRisks } from "../artifacts/risks.js";
 import type { RoleServices } from "./prepare-role.js";
 import type { readApplicationInput } from "./research-input.js";

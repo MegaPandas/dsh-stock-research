@@ -23,6 +23,7 @@ describe("artifact rule boundaries", () => {
     ["src/artifacts/schema.ts", "../services/artifacts.js"],
     ["src/artifacts/agent-reports.ts", "../storage/data-root.js"],
     ["src/artifacts/stage-handoff.ts", "@deepseek-ai/dsh-agent"],
+    ["src/artifacts/assembly.ts", "../services/artifacts.js"],
   ])(
     "rejects an upper or I/O dependency from %s to %s",
     async (file, dependency) => {
@@ -48,6 +49,8 @@ describe("artifact rule boundaries", () => {
     ["src/services/digest-draft.ts", "../artifacts/schema.js"],
     ["src/artifacts/schema.ts", "./shape.js"],
     ["src/artifacts/agent-reports.ts", "../valuation/report-policy.js"],
+    ["src/app/agent-role.ts", "../artifacts/assembly.js"],
+    ["src/artifacts/assembly.ts", "../report/agent-report.js"],
   ])(
     "allows the declared dependency from %s to %s",
     async (file, dependency) => {
@@ -61,13 +64,22 @@ describe("artifact rule boundaries", () => {
     'import { object } from "../artifacts/shape.js";',
     'const parser = import("../artifacts/nested/new-parser.js");',
   ])("keeps parsing implementation files private", async (source) => {
-    const errors = await boundaryErrors(
-      "src/services/business-reports.ts",
-      source,
-    );
+    const errors = await boundaryErrors("src/services/artifacts.ts", source);
     expect(errors).toHaveLength(1);
     expect(errors[0]!.messageId).toBe("privateEntry");
   });
+
+  it.each(["../artifacts/schema.js", "../artifacts/assembly.js"])(
+    "keeps report rendering independent of %s",
+    async (dependency) => {
+      const errors = await boundaryErrors(
+        "src/report/agent-report.ts",
+        `import { Value } from "${dependency}";`,
+      );
+      expect(errors).toHaveLength(1);
+      expect(errors[0]!.message).toContain("Report rendering");
+    },
+  );
 
   it.each([
     [

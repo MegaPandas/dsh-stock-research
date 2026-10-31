@@ -2,7 +2,7 @@ import { expect, it } from "vitest";
 import {
   assembleAgentArtifact,
   assembleBusinessReport,
-} from "../../src/services/business-reports.js";
+} from "../../src/artifacts/assembly.js";
 import type { AgentReport } from "../../src/contracts/agent-reports.js";
 
 it("records decision inputs at report level and leaves thesis and estimate sources unassigned", () => {
