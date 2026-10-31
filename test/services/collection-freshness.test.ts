@@ -1,10 +1,19 @@
 import { describe, expect, it } from "vitest";
-import type { CollectedTableData } from "../../src/contracts/collection.js";
+import { SqliteCache } from "../../src/cache/index.js";
+import type {
+  CollectedTableData,
+  CollectionOptions,
+  CollectionSnapshot,
+  CollectionTask,
+} from "../../src/contracts/collection.js";
 import type { DataEnvelope } from "../../src/contracts/data.js";
 import {
   applyCollectionFreshness,
   collectionFreshnessMs,
+  rebaseCollectionEnvelope,
 } from "../../src/services/collection-freshness.js";
+import { CollectionCache } from "../../src/services/collection-cache.js";
+import { CollectionService } from "../../src/services/collection.js";
 import { CN_SECURITY } from "../fixtures/market.js";
 
 const scope = {
@@ -116,5 +125,122 @@ describe("collection freshness budgets", () => {
         frame,
       ),
     ).toBe(day);
+  });
+
+  it.each([
+    ["2026-10-19", "2026-10-29", 8],
+    ["2026-10-20", "2026-10-30", 8],
+    ["2026-10-21", "2026-10-31", 7],
+    ["2026-10-22", "2026-11-01", 6],
+    ["2026-10-23", "2026-11-02", 6],
+    ["2026-10-24", "2026-11-03", 7],
+    ["2026-10-25", "2026-11-04", 8],
+    ["2024-02-28", "2024-03-01", 2],
+    ["2023-12-29", "2024-01-02", 2],
+    ["1969-12-31", "1970-01-02", 2],
+    ["2016-10-30", "2026-10-30", 2610],
+  ] as const)(
+    "counts UTC weekdays from %s through %s as %i",
+    (asOf, cutoff, weekdays) => {
+      const frame = packet("1d", `${asOf}T23:59:59.999Z`);
+      frame.data.attributes = { calendar: "global_weekdays_utc" };
+      expect(
+        collectionFreshnessMs(
+          { ...scope, date: cutoff, cutoff: `${cutoff}T23:59:59.999Z` },
+          frame,
+        ),
+      ).toBe(weekdays * day);
+    },
+  );
+
+  it.each([
+    ["2026-10-25T23:59:59.999Z", 0],
+    ["2026-10-26T23:59:59.998Z", 0],
+    ["2026-10-26T23:59:59.999Z", 1],
+    ["2026-10-27T00:00:00.000Z", 1],
+    ["2026-10-22T23:59:59.999Z", 0],
+  ] as const)(
+    "includes only completed days at cutoff %s",
+    (cutoff, weekdays) => {
+      const frame = packet("1d", "2026-10-23T23:59:59.999Z");
+      frame.data.attributes = { calendar: "global_weekdays_utc" };
+      expect(collectionFreshnessMs({ ...scope, cutoff }, frame)).toBe(
+        weekdays * day,
+      );
+    },
+  );
+
+  it("rebases natural age and cutoff without replacing source timestamps or existing limitations", () => {
+    const frame = packet("1d", "2026-10-23T23:59:59.999Z");
+    frame.data.attributes = { calendar: "global_weekdays_utc" };
+    const original = structuredClone(frame);
+    const finalScope = { ...scope, cutoff: "2026-10-26T23:59:59.999Z" };
+    rebaseCollectionEnvelope(finalScope, frame, 0);
+    expect(frame).toMatchObject({
+      cutoff: finalScope.cutoff,
+      ageMs: 3 * day,
+      stale: true,
+      asOf: original.asOf,
+      availableAt: original.availableAt,
+      retrievedAt: original.retrievedAt,
+      source: original.source,
+      data: original.data,
+    });
+    const gaps = structuredClone(frame.gaps);
+    rebaseCollectionEnvelope(finalScope, frame, 100 * day);
+    expect(frame.stale).toBe(true);
+    expect(frame.gaps).toEqual(gaps);
+  });
+
+  it("uses market budgets for cached and finalized valuation history while retaining the cached capture", async () => {
+    const capturedScope = { ...scope, cutoff: "2026-10-27T01:00:00.000Z" };
+    const finalScope = { ...scope, cutoff: "2026-10-27T03:00:00.000Z" };
+    const options: CollectionOptions = {
+      enabledSources: [],
+      freshness: { market: day, fundamentals: 0, macro: 0 },
+      ttl: { market: 60_000, fundamentals: 60_000, macro: 60_000, research: 0 },
+    };
+    const source = packet("1d", "2026-10-23T23:59:59.999Z");
+    source.dataset = "fundamentals";
+    source.data.table = "valuation.history";
+    source.data.attributes = { calendar: "global_weekdays_utc" };
+    source.cutoff = capturedScope.cutoff;
+    source.retrievedAt = capturedScope.cutoff;
+    source.ageMs = Date.parse(capturedScope.cutoff) - Date.parse(source.asOf);
+    const task: CollectionTask = {
+      id: "valuation.history",
+      dataset: "fundamentals",
+      provider: "fixture",
+      enabledBy: [],
+      run: async () => structuredClone(source),
+    };
+    const cache = new SqliteCache({ path: ":memory:", maxEntries: 1 });
+    const cached = new CollectionCache(cache, options);
+    const collection = new CollectionService(() => [], cache, options);
+    try {
+      cached.write(capturedScope, task, source);
+      const hit = cached.read(finalScope, task)!;
+      const snapshot: CollectionSnapshot = {
+        schemaVersion: 1,
+        scope: structuredClone(capturedScope),
+        packets: [{ id: task.id, envelope: structuredClone(source) }],
+        failures: [],
+      };
+      collection.finalizeScope(snapshot, finalScope);
+      expect(hit).toMatchObject({
+        cutoff: finalScope.cutoff,
+        retrievedAt: capturedScope.cutoff,
+        stale: false,
+        gaps: [],
+      });
+      expect(snapshot.packets[0]!.envelope).toEqual(hit);
+      expect(cached.read(capturedScope, task)).toEqual(source);
+    } finally {
+      try {
+        await collection.close();
+      } finally {
+        cache.close();
+      }
+    }
   });
 });

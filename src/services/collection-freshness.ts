@@ -1,9 +1,55 @@
-import type { CollectedTableData } from "../contracts/collection.js";
-import type { DataEnvelope, ResearchScope } from "../contracts/data.js";
+import type {
+  CollectedTableData,
+  CollectionDataset,
+  CollectionOptions,
+} from "../contracts/collection.js";
+import type {
+  DataEnvelope,
+  ISOTime,
+  ResearchScope,
+} from "../contracts/data.js";
 import { marketFreshnessMs } from "../data/market-calendar.js";
 import { sessionEnd } from "../data/market-session.js";
 
 const DAY_MS = 86_400_000;
+const DAYS_PER_WEEK = 7;
+const WEEKDAYS_PER_WEEK = 5;
+const SUNDAY = 0;
+const SATURDAY = 6;
+
+function globalDailyFreshnessMs(asOf: ISOTime, cutoff: ISOTime): number {
+  const observationDay = Math.floor(Date.parse(asOf) / DAY_MS);
+  // A UTC day becomes complete at its final millisecond, including that instant.
+  const completedDay = Math.floor((Date.parse(cutoff) + 1) / DAY_MS) - 1;
+  const days = Math.max(0, completedDay - observationDay);
+  let weekdays = Math.floor(days / DAYS_PER_WEEK) * WEEKDAYS_PER_WEEK;
+  const firstWeekday = new Date((observationDay + 1) * DAY_MS).getUTCDay();
+  const remainder = days % DAYS_PER_WEEK;
+  for (let offset = 0; offset < remainder; offset++) {
+    const weekday = (firstWeekday + offset) % DAYS_PER_WEEK;
+    if (weekday !== SUNDAY && weekday !== SATURDAY) weekdays++;
+  }
+  return weekdays * DAY_MS;
+}
+
+export function collectionFreshnessBudget(
+  tableId: string,
+  dataset: CollectionDataset,
+  budgets: CollectionOptions["freshness"],
+): number {
+  return budgets[tableId === "valuation.history" ? "market" : dataset];
+}
+
+/** Update consumer timing while preserving source timestamps and limitations. */
+export function rebaseCollectionEnvelope(
+  scope: ResearchScope,
+  envelope: DataEnvelope<CollectedTableData>,
+  budget: number,
+): void {
+  envelope.cutoff = scope.cutoff;
+  envelope.ageMs = Date.parse(scope.cutoff) - Date.parse(envelope.asOf);
+  applyCollectionFreshness(scope, envelope, budget);
+}
 
 /** Market budgets count completed bars: one lagged daily/weekly/monthly bar costs one day unit. */
 export function collectionFreshnessMs(
@@ -19,7 +65,8 @@ export function collectionFreshnessMs(
       Math.max(
         0,
         Math.floor(
-          (Date.parse(scope.cutoff) - Date.parse(envelope.asOf)) / (7 * DAY_MS),
+          (Date.parse(scope.cutoff) - Date.parse(envelope.asOf)) /
+            (DAYS_PER_WEEK * DAY_MS),
         ),
       ) * DAY_MS
     );
@@ -46,25 +93,7 @@ export function collectionFreshnessMs(
       ) * DAY_MS
     );
   }
-  if (global) {
-    let lag = 0;
-    const end = scope.cutoff.slice(0, 10);
-    for (
-      let date = new Date(`${envelope.asOf.slice(0, 10)}T00:00:00.000Z`);
-      ;
-    ) {
-      date = new Date(date.getTime() + DAY_MS);
-      const day = date.toISOString().slice(0, 10);
-      if (day > end) break;
-      if (
-        date.getUTCDay() !== 0 &&
-        date.getUTCDay() !== 6 &&
-        `${day}T23:59:59.999Z` <= scope.cutoff
-      )
-        lag++;
-    }
-    return lag * DAY_MS;
-  }
+  if (global) return globalDailyFreshnessMs(envelope.asOf, scope.cutoff);
   return marketFreshnessMs(scope.security, envelope.asOf, scope.cutoff);
 }
 

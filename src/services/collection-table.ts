@@ -3,6 +3,7 @@ import type {
   CollectedTableData,
   CollectionDiagnostics,
   CollectionFailure,
+  CollectionOptions,
   CollectionPlan,
   CollectionProgress,
   CollectionTask,
@@ -15,6 +16,10 @@ import {
   improvesCollectionCoverage,
 } from "./collection-quality.js";
 import { collectionError, collectionErrorDetail } from "./collection-errors.js";
+import {
+  applyCollectionFreshness,
+  collectionFreshnessBudget,
+} from "./collection-freshness.js";
 
 const MAX_ROUNDS = 2;
 const RETRY_DELAY_MS = 2_000;
@@ -39,6 +44,7 @@ export class CollectionTableRunner {
   constructor(
     private readonly cache: CollectionCache,
     private readonly sources: CollectionSourceRunner,
+    private readonly freshness: CollectionOptions["freshness"],
   ) {}
 
   async collect(
@@ -111,7 +117,15 @@ export class CollectionTableRunner {
       else if (outcome.kind === "success") {
         // Cache failures are local integrity errors, outside the source-failure boundary.
         this.cache.write(scope, candidate, outcome.envelope);
-        this.cache.refresh(scope, candidate, outcome.envelope);
+        applyCollectionFreshness(
+          scope,
+          outcome.envelope,
+          collectionFreshnessBudget(
+            candidate.id,
+            candidate.dataset,
+            this.freshness,
+          ),
+        );
         accept(candidate, outcome.envelope);
       }
       return outcome.kind;

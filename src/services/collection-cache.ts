@@ -6,7 +6,10 @@ import type {
 } from "../contracts/collection.js";
 import type { DataEnvelope, ResearchScope } from "../contracts/data.js";
 import { COLLECTION_VERSION } from "../data/versions.js";
-import { applyCollectionFreshness } from "./collection-freshness.js";
+import {
+  collectionFreshnessBudget,
+  rebaseCollectionEnvelope,
+} from "./collection-freshness.js";
 
 const CHINA_REUSABLE_TABLES = new Set([
   "market.daily",
@@ -83,9 +86,11 @@ export class CollectionCache {
   ): DataEnvelope<CollectedTableData> | undefined {
     const cached = this.cache.get<CollectedTableData>(this.key(scope, task));
     if (cached === undefined || cached.cutoff > scope.cutoff) return undefined;
-    cached.cutoff = scope.cutoff;
-    cached.ageMs = Date.parse(scope.cutoff) - Date.parse(cached.asOf);
-    applyCollectionFreshness(scope, cached, this.freshness(task));
+    rebaseCollectionEnvelope(
+      scope,
+      cached,
+      collectionFreshnessBudget(task.id, task.dataset, this.options.freshness),
+    );
     return cached;
   }
 
@@ -99,20 +104,6 @@ export class CollectionCache {
       envelope,
       this.options.ttl[task.dataset],
     );
-  }
-
-  refresh(
-    scope: ResearchScope,
-    task: CollectionTask,
-    envelope: DataEnvelope<CollectedTableData>,
-  ): void {
-    applyCollectionFreshness(scope, envelope, this.freshness(task));
-  }
-
-  private freshness(task: CollectionTask): number {
-    return this.options.freshness[
-      task.id === "valuation.history" ? "market" : task.dataset
-    ];
   }
 
   private key(scope: ResearchScope, task: CollectionTask) {
@@ -129,7 +120,11 @@ export class CollectionCache {
       parameters: {
         table: task.id,
         date: scope.date,
-        freshness: this.freshness(task),
+        freshness: collectionFreshnessBudget(
+          task.id,
+          task.dataset,
+          this.options.freshness,
+        ),
         ...(window === undefined ? {} : { cacheWindow: "cn-segment-v1" }),
       },
       adapterVersion: COLLECTION_VERSION,

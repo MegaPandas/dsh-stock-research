@@ -19,7 +19,10 @@ import { CollectionCache } from "./collection-cache.js";
 import { CollectionSourceRunner } from "./collection-source.js";
 import { CollectionTableRunner } from "./collection-table.js";
 import { SharedQueries } from "./shared-queries.js";
-import { applyCollectionFreshness } from "./collection-freshness.js";
+import {
+  collectionFreshnessBudget,
+  rebaseCollectionEnvelope,
+} from "./collection-freshness.js";
 
 interface ProgressObservers {
   waiters: number;
@@ -44,6 +47,7 @@ export class CollectionService {
     this.#tables = new CollectionTableRunner(
       new CollectionCache(cache, this.#options),
       new CollectionSourceRunner(),
+      this.#options.freshness,
     );
   }
 
@@ -91,17 +95,14 @@ export class CollectionService {
   finalizeScope(snapshot: CollectionSnapshot, scope: ResearchScope): void {
     snapshot.scope = structuredClone(scope);
     for (const packet of snapshot.packets) {
-      const envelope = packet.envelope;
-      envelope.cutoff = scope.cutoff;
-      envelope.ageMs = Date.parse(scope.cutoff) - Date.parse(envelope.asOf);
-      const dataset =
-        packet.id === "valuation.history"
-          ? "market"
-          : (envelope.dataset as CollectionDataset);
-      applyCollectionFreshness(
+      rebaseCollectionEnvelope(
         scope,
-        envelope,
-        this.#options.freshness[dataset],
+        packet.envelope,
+        collectionFreshnessBudget(
+          packet.id,
+          packet.envelope.dataset as CollectionDataset,
+          this.#options.freshness,
+        ),
       );
     }
   }

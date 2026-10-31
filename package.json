@@ -102,6 +102,7 @@
     "bench:run-control": "node scripts/benchmark-run-control.mjs",
     "bench:run-data": "node scripts/benchmark-run-data.mjs",
     "bench:query": "node scripts/benchmark-query.mjs",
+    "bench:collection-freshness": "node scripts/benchmark-collection-freshness.mjs",
     "bench:replay": "node scripts/benchmark-replay.mjs",
     "bench:numbers": "node scripts/benchmark-numbers.mjs",
     "bench:valuation-reads": "node scripts/benchmark-valuation-reads.mjs",
