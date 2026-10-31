@@ -1,6 +1,9 @@
-import type { DigestModelInput, GenerateDigest } from "../contracts/digests.js";
-import { ResearchError } from "../contracts/errors.js";
-import type { ResearchScope } from "../contracts/data.js";
+import type {
+  DigestModelInput,
+  GenerateDigest,
+} from "../../contracts/digests.js";
+import { ResearchError } from "../../contracts/errors.js";
+import type { ResearchScope } from "../../contracts/data.js";
 import type {
   ArtifactCommitResult,
   AttemptTarget,
@@ -8,13 +11,13 @@ import type {
   RunOperation,
   TaskInstructionSnapshot,
   TaskOperation,
-} from "../contracts/runs.js";
-import { ArtifactInputs } from "./artifact-inputs.js";
-import type { ArtifactService } from "./artifact-submission/index.js";
-import { assembleDigest } from "./digest-draft.js";
-import { digestNumbers } from "./digest-inputs.js";
-import { inheritRisks } from "../artifacts/risks.js";
-import type { RunCommands, RunReader } from "../contracts/run-access.js";
+} from "../../contracts/runs.js";
+import { ArtifactInputs } from "../artifact-inputs.js";
+import type { ArtifactService } from "../artifact-submission/index.js";
+import { assembleDigest } from "./draft.js";
+import { digestNumbers } from "./inputs.js";
+import { inheritRisks } from "../../artifacts/risks.js";
+import type { RunCommands, RunReader } from "../../contracts/run-access.js";
 
 interface PendingDigest {
   operation: TaskOperation;

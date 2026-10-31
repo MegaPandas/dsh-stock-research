@@ -1,13 +1,13 @@
-import type { ResearchArtifactVersion } from "../contracts/artifact-payloads.js";
-import type { NumberInput } from "../contracts/artifacts.js";
-import type { ArtifactRef } from "../contracts/data.js";
-import type { DigestNumberCandidate } from "../contracts/digests.js";
-import type { ArtifactInputs } from "./artifact-inputs.js";
+import type { ResearchArtifactVersion } from "../../contracts/artifact-payloads.js";
+import type { NumberInput } from "../../contracts/artifacts.js";
+import type { ArtifactRef } from "../../contracts/data.js";
+import type { DigestNumberCandidate } from "../../contracts/digests.js";
+import type { ArtifactInputs } from "../artifact-inputs.js";
 import {
   artifactReferences,
   bindArtifactNumber,
-} from "../artifacts/references.js";
-import { artifactKey } from "../contracts/artifact-identity.js";
+} from "../../artifacts/references.js";
+import { artifactKey } from "../../contracts/artifact-identity.js";
 
 export function digestNumbers(
   versions: readonly ResearchArtifactVersion[],

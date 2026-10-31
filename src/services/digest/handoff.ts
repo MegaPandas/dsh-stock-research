@@ -2,18 +2,18 @@ import {
   DIGEST_MAX_CHARACTERS,
   DIGEST_TARGET_CHARACTERS,
   type AgentReport,
-} from "../contracts/agent-reports.js";
-import type { ResearchArtifactInput } from "../contracts/artifact-payloads.js";
-import type { ArtifactRef } from "../contracts/data.js";
+} from "../../contracts/agent-reports.js";
+import type { ResearchArtifactInput } from "../../contracts/artifact-payloads.js";
+import type { ArtifactRef } from "../../contracts/data.js";
 import type {
   DigestDraft,
   DigestModelInput,
   GenerateDigest,
-} from "../contracts/digests.js";
-import { ResearchError } from "../contracts/errors.js";
-import type { StageHandoff } from "../contracts/stage-handoff.js";
-import { parseAgentReport } from "../artifacts/agent-reports.js";
-import { artifactKey } from "../contracts/artifact-identity.js";
+} from "../../contracts/digests.js";
+import { ResearchError } from "../../contracts/errors.js";
+import type { StageHandoff } from "../../contracts/stage-handoff.js";
+import { parseAgentReport } from "../../artifacts/agent-reports.js";
+import { artifactKey } from "../../contracts/artifact-identity.js";
 
 export const generateHandoffDigest: GenerateDigest = async (
   input,

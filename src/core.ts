@@ -320,6 +320,6 @@ export type {
   DigestNumberCandidate,
   GenerateDigest,
 } from "./contracts/digests.js";
-export { DigestService } from "./services/digests.js";
+export { DigestService } from "./services/digest/index.js";
 export { DIGEST_HANDOFF_VERSION } from "./contracts/digests.js";
-export { generateHandoffDigest } from "./services/handoff-digest.js";
+export { generateHandoffDigest } from "./services/digest/handoff.js";

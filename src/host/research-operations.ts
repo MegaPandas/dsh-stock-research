@@ -3,7 +3,7 @@ import type {
   RedoTaskResult,
 } from "../contracts/runs.js";
 import type { DecisionService } from "../services/decisions.js";
-import type { DigestService } from "../services/digests.js";
+import type { DigestService } from "../services/digest/index.js";
 import type { BoundCaller } from "./bindings.js";
 import type {
   DispatchBridge,

@@ -4,8 +4,8 @@ import type { RiskIssue } from "../../src/contracts/artifact-payloads.js";
 import type { ArtifactVersion } from "../../src/contracts/artifacts.js";
 import type { DigestModelInput } from "../../src/contracts/digests.js";
 import type { StageHandoff } from "../../src/contracts/stage-handoff.js";
-import { assembleDigest } from "../../src/services/digest-draft.js";
-import { handoffDigest } from "../../src/services/handoff-digest.js";
+import { assembleDigest } from "../../src/services/digest/draft.js";
+import { handoffDigest } from "../../src/services/digest/handoff.js";
 import { CN_SECURITY } from "../fixtures/market.js";
 
 const scope = {

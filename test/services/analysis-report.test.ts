@@ -6,7 +6,7 @@ import { assembleAgentArtifact } from "../../src/artifacts/assembly.js";
 import { ArtifactInputs } from "../../src/services/artifact-inputs.js";
 import { parseArtifactInput } from "../../src/artifacts/schema.js";
 import { checkDecisionRequirements } from "../../src/services/artifact-submission/requirements.js";
-import { DigestService } from "../../src/services/digests.js";
+import { DigestService } from "../../src/services/digest/index.js";
 import {
   agentAnalysisReport,
   analysisReport,

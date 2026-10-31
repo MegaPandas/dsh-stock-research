@@ -1,5 +1,5 @@
 import type { GenerateDigest } from "../../src/contracts/digests.js";
-import { handoffDigest } from "../../src/services/handoff-digest.js";
+import { handoffDigest } from "../../src/services/digest/handoff.js";
 
 function deferred() {
   let resolve!: () => void;

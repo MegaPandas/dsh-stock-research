@@ -20,7 +20,7 @@ import {
 } from "../../src/host/bindings.js";
 import { MemoryStore } from "../../src/memory/store.js";
 import { DecisionService } from "../../src/services/decisions.js";
-import { DigestService } from "../../src/services/digests.js";
+import { DigestService } from "../../src/services/digest/index.js";
 import { MemoryService } from "../../src/services/memory.js";
 import { rememberInputSchema } from "../../src/tools/write-inputs.js";
 import { createWriteTools } from "../../src/tools/write.js";

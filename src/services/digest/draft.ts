@@ -1,11 +1,11 @@
-import type { ResearchArtifactInput } from "../contracts/artifact-payloads.js";
-import type { DigestDraft, DigestModelInput } from "../contracts/digests.js";
-import { ResearchError } from "../contracts/errors.js";
-import { numberText } from "../report/render.js";
-import { renderAgentReport } from "../report/agent-report.js";
-import { artifactRef, list, object, text } from "../artifacts/schema.js";
-import { artifactKey } from "../contracts/artifact-identity.js";
-import { parseAgentReport } from "../artifacts/agent-reports.js";
+import type { ResearchArtifactInput } from "../../contracts/artifact-payloads.js";
+import type { DigestDraft, DigestModelInput } from "../../contracts/digests.js";
+import { ResearchError } from "../../contracts/errors.js";
+import { numberText } from "../../report/render.js";
+import { renderAgentReport } from "../../report/agent-report.js";
+import { artifactRef, list, object, text } from "../../artifacts/schema.js";
+import { artifactKey } from "../../contracts/artifact-identity.js";
+import { parseAgentReport } from "../../artifacts/agent-reports.js";
 
 function invalid(detail: string): never {
   throw new ResearchError("INVALID_ARTIFACT", detail);

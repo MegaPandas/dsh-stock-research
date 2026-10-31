@@ -3,7 +3,7 @@ import type {
   DigestDraft,
   DigestModelInput,
 } from "../../src/contracts/digests.js";
-import { assembleDigest } from "../../src/services/digest-draft.js";
+import { assembleDigest } from "../../src/services/digest/draft.js";
 import { US_SECURITY } from "../fixtures/market.js";
 
 describe("digest identity diagnostics", () => {

@@ -25,13 +25,6 @@ const pureImports = [
   "**/runs/**",
   "**/storage/**",
 ];
-const digestPrivateRestriction = {
-  selector:
-    ":matches(ImportDeclaration, ExportNamedDeclaration, ExportAllDeclaration)[source.value=/(^|\\u002F)digest-(inputs|draft)\\.js$/]",
-  message:
-    "Digest consumers must use the digest service or shared artifact rules instead of digest assembly internals.",
-};
-
 export default defineConfig(
   globalIgnores(["dist/", "coverage/"]),
   {
@@ -62,6 +55,10 @@ export default defineConfig(
           {
             directory: "src/services/artifact-submission",
             publicEntries: ["index.js"],
+          },
+          {
+            directory: "src/services/digest",
+            publicEntries: ["index.js", "handoff.js"],
           },
           {
             directory: "src/evidence",
@@ -147,6 +144,7 @@ export default defineConfig(
       "src/{evidence,indicators,json,report,valuation}/**/*.ts",
       "src/services/collection/{plan,quality,view,errors}.ts",
       "src/services/query/calculations.ts",
+      "src/services/digest/{draft,handoff}.ts",
     ],
     rules: {
       "no-restricted-imports": [
@@ -201,6 +199,7 @@ export default defineConfig(
     files: [
       "src/services/query/calculations.ts",
       "src/services/collection/{plan,quality,view,errors}.ts",
+      "src/services/digest/{draft,handoff}.ts",
     ],
     rules: {
       "no-restricted-imports": [
@@ -218,22 +217,10 @@ export default defineConfig(
     },
   },
   {
-    files: ["src/{app,tools,host,client,services}/**/*.{ts,tsx}", "src/*.ts"],
-    ignores: [
-      "src/services/digests.ts",
-      "src/services/digest-inputs.ts",
-      "src/services/digest-draft.ts",
-    ],
-    rules: {
-      "no-restricted-syntax": ["error", digestPrivateRestriction],
-    },
-  },
-  {
     files: ["src/services/{numbers,valuation-records,valuation-reports}.ts"],
     rules: {
       "no-restricted-syntax": [
         "error",
-        digestPrivateRestriction,
         {
           selector:
             ":matches(ImportDeclaration, ExportNamedDeclaration, ExportAllDeclaration)[source.value=/(^|\\u002F)valuation-calculations\\.js$/]",

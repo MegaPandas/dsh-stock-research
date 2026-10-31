@@ -4,7 +4,7 @@ import type {
   DigestDraft,
   DigestModelInput,
 } from "../../src/contracts/digests.js";
-import { DigestService } from "../../src/services/digests.js";
+import { DigestService } from "../../src/services/digest/index.js";
 import { ResearchError } from "../../src/contracts/errors.js";
 import { NumberService } from "../../src/services/numbers.js";
 import { oneDigest } from "../fixtures/digest-conversation.js";

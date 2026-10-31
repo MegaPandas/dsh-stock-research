@@ -13,7 +13,7 @@ import type {
 import type { TaskDefinition } from "../../src/contracts/workflow.js";
 import { aggregateArtifactGaps } from "../../src/artifacts/gaps.js";
 import { ArtifactInputs } from "../../src/services/artifact-inputs.js";
-import { digestNumbers } from "../../src/services/digest-inputs.js";
+import { digestNumbers } from "../../src/services/digest/inputs.js";
 import { inheritRisks } from "../../src/artifacts/risks.js";
 import {
   decisionFixture,

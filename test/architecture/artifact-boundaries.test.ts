@@ -16,7 +16,7 @@ async function boundaryErrors(filePath: string, source: string) {
 describe("artifact rule boundaries", () => {
   it.each([
     ["src/artifacts/references.ts", "../services/artifact-inputs.js"],
-    ["src/artifacts/risks.ts", "../services/digest-inputs.js"],
+    ["src/artifacts/risks.ts", "../services/digest/index.js"],
     ["src/artifacts/gaps.ts", "../runs/store.js"],
     ["src/artifacts/risks.ts", "node:fs"],
     ["src/artifacts/references.ts", "../host/runtime.js"],
@@ -44,12 +44,12 @@ describe("artifact rule boundaries", () => {
       "../../artifacts/references.js",
     ],
     ["src/app/agent-role.ts", "../artifacts/risks.js"],
-    ["src/services/digests.ts", "./digest-inputs.js"],
+    ["src/services/digest/index.ts", "./inputs.js"],
     ["src/tools/read.ts", "../artifacts/schema.js"],
     ["src/host/report-draft.ts", "../artifacts/agent-reports.js"],
     ["src/host/report-draft.ts", "../artifacts/stage-handoff.js"],
     ["src/services/artifact-inputs.ts", "../artifacts/analysis-report.js"],
-    ["src/services/digest-draft.ts", "../artifacts/schema.js"],
+    ["src/services/digest/draft.ts", "../../artifacts/schema.js"],
     ["src/artifacts/schema.ts", "./shape.js"],
     ["src/artifacts/agent-reports.ts", "../valuation/report-policy.js"],
     ["src/app/agent-role.ts", "../artifacts/assembly.js"],
@@ -99,7 +99,7 @@ describe("artifact rule boundaries", () => {
   it.each([
     ["src/core.ts", "./services/artifact-submission/index.js"],
     ["src/tools/errors.ts", "../services/artifact-submission/index.js"],
-    ["src/services/digests.ts", "./artifact-submission/index.js"],
+    ["src/services/digest/index.ts", "../artifact-submission/index.js"],
     ["src/services/artifact-submission/index.ts", "./requirements.js"],
     ["src/services/artifact-submission/index.ts", "../decision-basics.js"],
   ])("allows the submission boundary from %s", async (file, dependency) => {
@@ -107,24 +107,4 @@ describe("artifact rule boundaries", () => {
       await boundaryErrors(file, `import { Value } from "${dependency}";`),
     ).toEqual([]);
   });
-
-  it.each([
-    [
-      "src/app/agent-role.ts",
-      'import { digestNumbers } from "../services/digest-inputs.js";',
-    ],
-    ["src/core.ts", 'export * from "./services/digest-draft.js";'],
-    [
-      "src/services/decisions.ts",
-      'import { digestNumbers } from "./digest-inputs.js";',
-    ],
-    ["src/services/numbers.ts", 'export * from "./digest-draft.js";'],
-  ])(
-    "keeps digest assembly internal to its service from %s",
-    async (file, source) => {
-      const errors = await boundaryErrors(file, source);
-      expect(errors).toHaveLength(1);
-      expect(errors[0]!.message).toContain("digest assembly internals");
-    },
-  );
 });

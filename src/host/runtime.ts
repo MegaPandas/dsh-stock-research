@@ -23,7 +23,7 @@ import { MemoryStore } from "../memory/store.js";
 import { RunStore } from "../runs/store.js";
 import { ArtifactService } from "../services/artifact-submission/index.js";
 import { DecisionService } from "../services/decisions.js";
-import { DigestService } from "../services/digests.js";
+import { DigestService } from "../services/digest/index.js";
 import { MemoryService } from "../services/memory.js";
 import { NumberService } from "../services/numbers.js";
 import { QueryService } from "../services/query/index.js";
@@ -58,7 +58,7 @@ import {
 } from "./report-submission.js";
 import { Config } from "./config.js";
 import type { ResearchConfig } from "../contracts/settings.js";
-import { generateHandoffDigest } from "../services/handoff-digest.js";
+import { generateHandoffDigest } from "../services/digest/handoff.js";
 import { DispatchBridge, type PrepareRole } from "./dispatch.js";
 import { ResearchSessions } from "./sessions.js";
 import { createSources } from "./sources.js";

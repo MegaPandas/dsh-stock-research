@@ -28,7 +28,7 @@ import type {
   TaskOperation,
 } from "../contracts/runs.js";
 import type { RunAccess } from "../contracts/run-access.js";
-import type { DigestService } from "../services/digests.js";
+import type { DigestService } from "../services/digest/index.js";
 import {
   dispatchClaimRequestId,
   RunDispatchPlanner,

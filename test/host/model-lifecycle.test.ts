@@ -4,7 +4,7 @@ import { errorChain } from "@deepseek-ai/dsh-llm";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { TaskOperation } from "../../src/contracts/runs.js";
 import type { GenerateDigest } from "../../src/contracts/digests.js";
-import { handoffDigest } from "../../src/services/handoff-digest.js";
+import { handoffDigest } from "../../src/services/digest/handoff.js";
 import { agentAnalysisReport } from "../fixtures/analysis-report.js";
 import { digestGate, gatedDigest } from "../fixtures/digest-execution.js";
 import {

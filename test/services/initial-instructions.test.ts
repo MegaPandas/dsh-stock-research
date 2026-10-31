@@ -16,7 +16,7 @@ import type {
 } from "../../src/contracts/runs.js";
 import { RunStore } from "../../src/runs/store.js";
 import { ArtifactService } from "../../src/services/artifact-submission/index.js";
-import { DigestService } from "../../src/services/digests.js";
+import { DigestService } from "../../src/services/digest/index.js";
 import { NumberService } from "../../src/services/numbers.js";
 import { createRunService } from "../../src/services/run/index.js";
 import { DataRoot } from "../../src/storage/data-root.js";
