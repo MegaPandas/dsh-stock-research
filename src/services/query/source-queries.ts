@@ -98,12 +98,17 @@ export class SourceQueries {
       adapterVersion: selected.capability.adapterVersion,
       normalizationVersion: selected.capability.normalizationVersion,
     };
+    const cached = this.cache.get<SourceData>(key);
+    if (cached !== undefined) {
+      observation.cacheHits++;
+      return cached;
+    }
     const identity = createCacheKey(key);
     const envelope = await this.#flights.run(
       identity,
       identity,
       (producerSignal) =>
-        this.load(
+        this.fetch(
           selected,
           key,
           this.cachePolicy[request.dataset],
@@ -116,7 +121,7 @@ export class SourceQueries {
     return structuredClone(envelope);
   }
 
-  private async load(
+  private async fetch(
     selected: SourceSelection,
     key: QueryCacheKey,
     ttlMs: number,
@@ -124,11 +129,6 @@ export class SourceQueries {
     signal: AbortSignal,
   ): Promise<SourceEnvelope> {
     signal.throwIfAborted();
-    const cached = this.cache.get<SourceData>(key);
-    if (cached !== undefined) {
-      observation.cacheHits++;
-      return cached;
-    }
     observation.sourceCalls++;
     let envelope: SourceEnvelope;
     try {
