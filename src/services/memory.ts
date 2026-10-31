@@ -18,7 +18,7 @@ import type {
   MemorySnapshotEntry,
 } from "../contracts/task-data.js";
 import type { MemoryStore } from "../memory/store.js";
-import { readPointer } from "./number-fields.js";
+import { readPointer } from "../json/pointer.js";
 import { assertMemoryEntry, assertMemoryState } from "./memory-state.js";
 import type { RunCommands, RunReader } from "../contracts/run-access.js";
 import { SharedQueries } from "./shared-queries.js";

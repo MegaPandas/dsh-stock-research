@@ -14,11 +14,10 @@ import {
   INDICATORS_ALGORITHM_VERSION,
 } from "../../src/indicators/index.js";
 import { PRICE_RETURN_ALGORITHM_VERSION } from "../../src/indicators/returns.js";
+import { SelectorError } from "../../src/json/pointer.js";
 import {
   numberField,
-  readPointer,
   referenceField,
-  SelectorError,
 } from "../../src/services/number-fields.js";
 
 // Artificial observations with explicit dates; no provider data is used.
@@ -88,32 +87,6 @@ const lastThree = [
   "2024-01-09T21:00:00.000Z",
   "2024-01-10T21:00:00.000Z",
 ];
-
-describe("readPointer", () => {
-  it("decodes slash and tilde escapes once", () => {
-    expect(readPointer({ "a/b": { "~1": 7 } }, "/a~1b/~01")).toEqual({
-      value: 7,
-      tokens: ["a/b", "~1"],
-    });
-  });
-  it.each(["/01", "/-", "/1e0", "/length"])(
-    "rejects noncanonical array index %s",
-    (selector) => {
-      expect(() => readPointer([1, 2], selector)).toThrow(SelectorError);
-    },
-  );
-  it("reads only own properties", () => {
-    expect(() =>
-      readPointer(Object.create({ inherited: 1 }), "/inherited"),
-    ).toThrow(SelectorError);
-  });
-  it.each(["field", "/bad~2", "/bad~"])(
-    "rejects malformed pointer %s",
-    (selector) => {
-      expect(() => readPointer({}, selector)).toThrow(SelectorError);
-    },
-  );
-});
 
 describe("numberField observations", () => {
   it("rejects numeric envelope metadata", () => {
