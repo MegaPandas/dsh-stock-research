@@ -14,6 +14,8 @@ export type {
 export { createControlTools } from "./control.js";
 export { createReadTools } from "./read.js";
 export type { ReadToolServices } from "./read.js";
+export { createRunReadOperations } from "../host/run-reading.js";
+export type { RunReadOperations } from "../host/run-reading.js";
 export { createDataTools } from "./data.js";
 export type { DataToolServices } from "./data.js";
 export { createWriteTools } from "./write.js";

@@ -28,7 +28,7 @@ export function apply(ctx: Context, config?: ModelConfig): void {
     bind: (owner) => runtime.bindCoordinator(owner),
     register: (owner, actions, operations, retain) => {
       retain(owner.ctx.tools.register(createResearchReviewTool(ctx, actions)));
-      for (const tool of createResearchReadTools(runtime.runs, runtime.tools))
+      for (const tool of createResearchReadTools(runtime.reads))
         retain(owner.ctx.tools.register(tool));
       for (const tool of runtime.createCoordinatorTools(operations))
         retain(owner.ctx.tools.register(applicationTool(ctx, tool)));

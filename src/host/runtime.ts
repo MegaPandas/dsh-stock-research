@@ -47,6 +47,10 @@ import {
 } from "./research-operations.js";
 import { SessionBindings, type ResearchBinding } from "./bindings.js";
 import {
+  createRunReadOperations,
+  type RunReadOperations,
+} from "./run-reading.js";
+import {
   createReportSubmission,
   type SubmitReport,
 } from "./report-submission.js";
@@ -69,6 +73,7 @@ declare module "@deepseek-ai/cordis" {
 export interface ResearchRuntime {
   isBusy(): boolean;
   readonly runs: RunAccess;
+  readonly reads: RunReadOperations;
   readonly queries: QueryService;
   readonly collection: CollectionService;
   readonly memory: MemoryService;
@@ -154,6 +159,7 @@ async function releaseReverse(actions: readonly Dispose[]): Promise<void> {
 
 class Runtime implements ResearchRuntime {
   readonly runs: RunAccess;
+  readonly reads: RunReadOperations;
   readonly queries: QueryService;
   readonly collection: CollectionService;
   readonly memory: MemoryService;
@@ -174,6 +180,7 @@ class Runtime implements ResearchRuntime {
     private readonly publicSearchEnabled: boolean,
   ) {
     this.runs = components.runs;
+    this.reads = createRunReadOperations(this.runs, components.bindings);
     this.queries = components.queries;
     this.collection = components.collection;
     this.memory = components.memory;
@@ -294,6 +301,7 @@ class Runtime implements ResearchRuntime {
       ...createReadTools(
         {
           runs: this.runs,
+          reads: this.reads,
           queries: this.queries,
           memory: this.memory,
           numbers,

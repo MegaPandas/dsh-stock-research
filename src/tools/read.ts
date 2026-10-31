@@ -19,6 +19,7 @@ import type { NumberService } from "../services/numbers.js";
 import { readPointer, SelectorError } from "../json/pointer.js";
 import type { QueryService } from "../services/query/index.js";
 import type { RunReader } from "../contracts/run-access.js";
+import type { RunReadOperations } from "../host/run-reading.js";
 import {
   collectionGaps,
   collectionRowSelectors,
@@ -39,7 +40,8 @@ import {
 } from "./parameters.js";
 
 export interface ReadToolServices {
-  runs: Pick<RunReader, "view" | "readArtifact" | "readEvidence">;
+  runs: Pick<RunReader, "view" | "readEvidence">;
+  reads: RunReadOperations;
   queries: Pick<QueryService, "health">;
   memory: Pick<MemoryService, "recall" | "recallForTask">;
   numbers: Pick<NumberService, "checkNumbers">;
@@ -80,7 +82,7 @@ export function createReadTools(
   services: ReadToolServices,
   bindings: SessionBindings,
 ): ToolDefinition[] {
-  const { runs, queries, memory, numbers } = services;
+  const { runs, reads, queries, memory, numbers } = services;
   const tools: ToolDefinition[] = [
     {
       name: "stock_read_run",
@@ -90,12 +92,7 @@ export function createReadTools(
         objectSchema({ kind: kind("run_view"), view: opaqueObject }),
       ),
       async execute(value, exec) {
-        exec.signal.throwIfAborted();
-        const caller = bindings.require(exec.agent);
-        const item = object(value, ["runId"]);
-        const runId = text(item.runId, "runId");
-        authorizeRun(caller.binding, runId);
-        return { kind: "run_view", view: runs.view({ runId }) };
+        return { kind: "run_view", view: reads.readRun(value, exec) };
       },
     },
     {
@@ -107,12 +104,7 @@ export function createReadTools(
         objectSchema({ kind: kind("artifact"), artifact: opaqueObject }),
       ),
       async execute(value, exec) {
-        exec.signal.throwIfAborted();
-        const caller = bindings.require(exec.agent);
-        const item = object(value, ["ref"]);
-        const ref = artifactRef(item.ref);
-        authorizeRun(caller.binding, ref.runId);
-        return { kind: "artifact", artifact: runs.readArtifact(ref) };
+        return { kind: "artifact", artifact: reads.readArtifact(value, exec) };
       },
     },
     {

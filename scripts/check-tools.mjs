@@ -22,6 +22,7 @@ import {
 import {
   createDataTools,
   createReadTools,
+  createRunReadOperations,
   createWriteTools,
   createServiceTaskTools,
   createServiceTaskOperations,
@@ -111,7 +112,16 @@ try {
     secCiks: {},
   };
   const tools = [
-    ...createReadTools({ runs, queries, memory, numbers }, bindings),
+    ...createReadTools(
+      {
+        runs,
+        reads: createRunReadOperations(runs, bindings),
+        queries,
+        memory,
+        numbers,
+      },
+      bindings,
+    ),
     ...createDataTools({ runs, queries, taskQueries }, bindings, policy),
     ...createWriteTools({ artifacts, memory }, bindings, policy),
     ...createServiceTaskTools(

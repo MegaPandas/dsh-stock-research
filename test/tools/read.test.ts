@@ -14,6 +14,7 @@ import { MemoryStore } from "../../src/memory/store.js";
 import { MemoryService } from "../../src/services/memory.js";
 import { QueryService } from "../../src/services/query/index.js";
 import { createReadTools } from "../../src/tools/read.js";
+import { createRunReadOperations } from "../../src/host/run-reading.js";
 import { decisionFixture } from "../fixtures/decision.js";
 
 const cleanups: (() => void | Promise<void>)[] = [];
@@ -53,7 +54,13 @@ function setup() {
   });
   const bindings = new SessionBindings();
   const tools = createReadTools(
-    { runs: f.runs, numbers: f.numbers, memory, queries },
+    {
+      runs: f.runs,
+      reads: createRunReadOperations(f.runs, bindings),
+      numbers: f.numbers,
+      memory,
+      queries,
+    },
     bindings,
   );
   function agent(binding?: ResearchBinding, id = "worker") {
