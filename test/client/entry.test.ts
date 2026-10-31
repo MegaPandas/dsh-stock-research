@@ -66,13 +66,24 @@ describe("packaged DSH settings client", () => {
     expect(load).toHaveBeenCalledOnce();
     const entry = load.mock.calls[0]![0] as {
       id: string;
-      factory: (require: ReturnType<typeof createRequire>) => {
+      factory: (require: (id: string) => unknown) => {
         inject: string[];
         apply(ctx: Context): void;
       };
     };
     expect(entry.id).toBe("@megapandas/dsh-stock-research");
-    const client = entry.factory(createRequire(import.meta.url));
+    const require = createRequire(import.meta.url);
+    const platformModules = new Map([
+      ["react", require("react")],
+      ["react/jsx-runtime", require("react/jsx-runtime")],
+    ]);
+    const client = entry.factory((id) => {
+      if (!platformModules.has(id))
+        throw new Error(
+          `Client dependency is absent from the browser module table: ${id}`,
+        );
+      return platformModules.get(id);
+    });
     const form = {};
     const jobs = {};
     const catalog = { groups: [] };

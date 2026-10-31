@@ -26,7 +26,10 @@ export default defineConfig([
     target: "es2022",
     dts: true,
     clean: false,
-    deps: { neverBundle: ["react", "react/jsx-runtime"] },
+    deps: {
+      neverBundle: ["react", "react/jsx-runtime"],
+      alwaysBundle: ["@deepseek-ai/dsh-jobs/brand"],
+    },
     outExtensions: () => ({ js: ".js" }),
     banner:
       'window.__ModuleLoader__.load({id:"@megapandas/dsh-stock-research",factory:(require)=>{var module={exports:{}};var exports=module.exports;',
