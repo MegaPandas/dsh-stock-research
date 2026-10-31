@@ -15,7 +15,7 @@ it.each([
   "../host/runtime.js",
   "../tools/parameters.js",
   "../runs/store.js",
-  "../services/memory.js",
+  "../services/memory/index.js",
 ])(
   "keeps review business state independent of runtime dependency %s",
   async (dependency) => {
@@ -25,7 +25,7 @@ it.each([
   },
 );
 it.each([
-  'import type { MemoryService } from "../services/memory.js";',
+  'import type { MemoryService } from "../services/memory/index.js";',
   'import { renderAgentReport } from "../report/agent-report.js";',
   'import type { QueryMemoryReturns } from "../contracts/memory-service.js";',
 ])("allows a declared review capability or pure dependency", async (source) => {

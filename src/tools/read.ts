@@ -11,7 +11,7 @@ import {
   checkNumbersParameters,
   checkPendingNumbersParameters,
 } from "./artifact-inputs.js";
-import type { MemoryService } from "../services/memory.js";
+import type { MemoryService } from "../services/memory/index.js";
 import type { NumberService } from "../services/numbers.js";
 import { readPointer, SelectorError } from "../json/pointer.js";
 import type { QueryService } from "../services/query/index.js";

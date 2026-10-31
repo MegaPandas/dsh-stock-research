@@ -8,7 +8,7 @@ import type {
 } from "../contracts/memory-service.js";
 import type { PriceReturnsQuery, QueryResponse } from "../contracts/query.js";
 import { renderAgentReport } from "../report/agent-report.js";
-import type { MemoryService } from "../services/memory.js";
+import type { MemoryService } from "../services/memory/index.js";
 import type { ReviewInput } from "./review-input.js";
 
 interface ReturnsAttempt {

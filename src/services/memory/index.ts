@@ -1,6 +1,6 @@
-import { serializeJson } from "../json/serialize.js";
-import type { ISOTime, ResearchScope } from "../contracts/data.js";
-import { ResearchError } from "../contracts/errors.js";
+import { serializeJson } from "../../json/serialize.js";
+import type { ISOTime, ResearchScope } from "../../contracts/data.js";
+import { ResearchError } from "../../contracts/errors.js";
 import type {
   MemoryEntry,
   MemoryState,
@@ -8,20 +8,20 @@ import type {
   RecallQuery,
   RememberInput,
   RememberOperation,
-} from "../contracts/memory-service.js";
-import type { MemoryIndex, MemoryRef } from "../contracts/memory.js";
-import type { TaskOperation } from "../contracts/runs.js";
+} from "../../contracts/memory-service.js";
+import type { MemoryIndex, MemoryRef } from "../../contracts/memory.js";
+import type { TaskOperation } from "../../contracts/runs.js";
 import type {
   MemoryInputQuery,
   MemoryInputRegistration,
   MemoryInputSnapshot,
   MemorySnapshotEntry,
-} from "../contracts/task-data.js";
-import type { MemoryStore } from "../memory/store.js";
-import { readPointer } from "../json/pointer.js";
-import { assertMemoryEntry, assertMemoryState } from "./memory-state.js";
-import type { RunCommands, RunReader } from "../contracts/run-access.js";
-import { SharedQueries } from "./shared-queries.js";
+} from "../../contracts/task-data.js";
+import type { MemoryStore } from "../../memory/store.js";
+import { readPointer } from "../../json/pointer.js";
+import { assertMemoryEntry, assertMemoryState } from "./state.js";
+import type { RunCommands, RunReader } from "../../contracts/run-access.js";
+import { SharedQueries } from "../shared-queries.js";
 
 function inputQuery(query: RecallQuery): MemoryInputQuery {
   return {

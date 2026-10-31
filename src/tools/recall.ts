@@ -2,7 +2,7 @@ import type { ToolDefinition } from "@deepseek-ai/dsh-tools";
 import { ResearchError } from "../contracts/errors.js";
 import type { MemoryInputRegistration } from "../contracts/task-data.js";
 import { taskOperation, type SessionBindings } from "../host/bindings.js";
-import type { MemoryService } from "../services/memory.js";
+import type { MemoryService } from "../services/memory/index.js";
 import { researchTool } from "./errors.js";
 import { scopedQueryParameters } from "./query-scope.js";
 import {

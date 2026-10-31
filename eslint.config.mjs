@@ -61,6 +61,10 @@ export default defineConfig(
             publicEntries: ["index.js", "handoff.js"],
           },
           {
+            directory: "src/services/memory",
+            publicEntries: ["index.js"],
+          },
+          {
             directory: "src/evidence",
             publicEntries: ["fields.js", "checks.js", "price-basis.js"],
           },
@@ -145,6 +149,7 @@ export default defineConfig(
       "src/services/collection/{plan,quality,view,errors}.ts",
       "src/services/query/calculations.ts",
       "src/services/digest/{draft,handoff}.ts",
+      "src/services/memory/state.ts",
     ],
     rules: {
       "no-restricted-imports": [
@@ -200,6 +205,7 @@ export default defineConfig(
       "src/services/query/calculations.ts",
       "src/services/collection/{plan,quality,view,errors}.ts",
       "src/services/digest/{draft,handoff}.ts",
+      "src/services/memory/state.ts",
     ],
     rules: {
       "no-restricted-imports": [

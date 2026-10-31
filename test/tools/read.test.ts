@@ -11,7 +11,7 @@ import {
   type ResearchBinding,
 } from "../../src/host/bindings.js";
 import { MemoryStore } from "../../src/memory/store.js";
-import { MemoryService } from "../../src/services/memory.js";
+import { MemoryService } from "../../src/services/memory/index.js";
 import { QueryService } from "../../src/services/query/index.js";
 import { createReadTools } from "../../src/tools/read.js";
 import { createRunReadOperations } from "../../src/host/run-reading.js";

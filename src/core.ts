@@ -115,7 +115,7 @@ export type {
   RememberInput,
   RememberOperation,
 } from "./contracts/memory-service.js";
-export { MemoryService } from "./services/memory.js";
+export { MemoryService } from "./services/memory/index.js";
 export type {
   ArtifactInput,
   ArtifactVersion,

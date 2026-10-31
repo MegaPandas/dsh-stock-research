@@ -1,7 +1,10 @@
-import type { MemoryEntry, MemoryState } from "../contracts/memory-service.js";
-import type { MemoryIndex, MemoryRef } from "../contracts/memory.js";
-import { ResearchError } from "../contracts/errors.js";
-import { parseISOTime, parseLocalDate } from "../contracts/time.js";
+import type {
+  MemoryEntry,
+  MemoryState,
+} from "../../contracts/memory-service.js";
+import type { MemoryIndex, MemoryRef } from "../../contracts/memory.js";
+import { ResearchError } from "../../contracts/errors.js";
+import { parseISOTime, parseLocalDate } from "../../contracts/time.js";
 
 function invalid(field: string): never {
   throw new ResearchError("STORAGE_FAILED", `Invalid stored memory: ${field}.`);
