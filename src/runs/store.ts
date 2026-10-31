@@ -5,6 +5,7 @@ import { ResearchError } from "../contracts/errors.js";
 import type {
   ArtifactContentRef,
   ContentRef,
+  ContentReader,
   ContentWriter,
   RunLocation,
   StoredRun,
@@ -82,12 +83,29 @@ function decode<State extends object>(value: unknown): StoredRun<State> {
 
 class FileContents implements ContentWriter {
   readonly entries: ContentRef[];
+  readonly #registered: Set<string>;
 
   constructor(
     private readonly directory: string,
     contents: readonly ContentRef[],
   ) {
     this.entries = [...contents];
+    this.#registered = new Set(contents.map(contentPath));
+  }
+
+  readContent<T>(ref: ContentRef): T {
+    return this.readContents<T>([ref])[0]!;
+  }
+
+  readContents<T>(refs: readonly ContentRef[]): T[] {
+    const paths = refs.map(contentPath);
+    for (const path of paths)
+      if (!this.#registered.has(path))
+        throw new ResearchError(
+          "VERSION_UNAVAILABLE",
+          "Content is not registered in this run.",
+        );
+    return paths.map((path) => readJson(join(this.directory, path)) as T);
   }
 
   input(build: (id: string) => unknown): ContentRef {
@@ -105,6 +123,7 @@ class FileContents implements ContentWriter {
     const ref: ContentRef = { kind, id: randomUUID() };
     writeImmutable(join(this.directory, contentPath(ref)), build(ref.id));
     this.entries.push(ref);
+    this.#registered.add(contentPath(ref));
     return ref;
   }
 
@@ -118,11 +137,7 @@ class FileContents implements ContentWriter {
       id = randomUUID();
       revision = 1;
     } else {
-      if (
-        !this.entries.some(
-          (entry) => contentPath(entry) === contentPath(previous),
-        )
-      )
+      if (!this.#registered.has(contentPath(previous)))
         throw new ResearchError(
           "VERSION_UNAVAILABLE",
           "Previous artifact version is not registered in this run.",
@@ -136,6 +151,7 @@ class FileContents implements ContentWriter {
     const ref: ArtifactContentRef = { kind: "artifact", id, revision };
     writeImmutable(join(this.directory, contentPath(ref)), build(ref));
     this.entries.push(ref);
+    this.#registered.add(contentPath(ref));
     return ref;
   }
 }
@@ -235,6 +251,18 @@ export class RunStore<State extends object> {
     return manifest;
   }
 
+  /** Contents and state belong to this synchronous operation, never a shared cache. */
+  inspect<Result>(
+    runId: string,
+    inspect: (current: StoredRun<State>, contents: ContentReader) => Result,
+  ): Result {
+    const current = this.read(runId);
+    return inspect(
+      current,
+      new FileContents(this.entry(runId).path, current.contents),
+    );
+  }
+
   listRunIds(): string[] {
     this.root.assertOpen();
     const result: string[] = [];
@@ -250,12 +278,13 @@ export class RunStore<State extends object> {
 
   commit(
     runId: string,
-    build: (current: StoredRun<State>, writer: ContentWriter) => State,
+    build: (current: StoredRun<State>, writer: ContentWriter) => State | null,
   ): StoredRun<State> {
     const current = this.read(runId);
     const directory = this.entry(runId).path;
     const writer = new FileContents(directory, current.contents);
     const state = build(current, writer);
+    if (state === null) return current;
     const revision = current.revision + 1;
     if (!positiveInteger(revision)) invalid("manifest revision exhausted");
     const manifest: StoredRun<State> = {
@@ -270,31 +299,14 @@ export class RunStore<State extends object> {
   }
 
   readContent<T>(runId: string, ref: ContentRef): T {
-    const manifest = this.read(runId);
-    if (
-      !manifest.contents.some(
-        (entry) => contentPath(entry) === contentPath(ref),
-      )
-    )
-      throw new ResearchError(
-        "VERSION_UNAVAILABLE",
-        "Content is not registered in this run.",
-      );
-    return readJson(join(this.entry(runId).path, contentPath(ref))) as T;
+    return this.inspect(runId, (_run, contents) =>
+      contents.readContent<T>(ref),
+    );
   }
 
   readContents<T>(runId: string, refs: readonly ContentRef[]): T[] {
-    const manifest = this.read(runId);
-    const registered = new Set(manifest.contents.map(contentPath));
-    const paths = refs.map(contentPath);
-    for (const path of paths)
-      if (!registered.has(path))
-        throw new ResearchError(
-          "VERSION_UNAVAILABLE",
-          "Content is not registered in this run.",
-        );
-    return paths.map(
-      (path) => readJson(join(this.entry(runId).path, path)) as T,
+    return this.inspect(runId, (_run, contents) =>
+      contents.readContents<T>(refs),
     );
   }
 

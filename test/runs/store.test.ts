@@ -137,6 +137,78 @@ describe("single-writer run store", () => {
     expect(store.readContent(second.runId, second.ref!)).toEqual({ value: 2 });
   });
 
+  it("inspects state and registered contents from one manifest without caching across operations", () => {
+    const { path, store } = open();
+    const run = store.create(location, (_id, writer) => ({
+      label: "first",
+      ref: writer.input(() => ({ value: 1 })),
+    }));
+    const reads = vi.spyOn(fs, "readFileSync");
+    const first = store.inspect(run.runId, (state, contents) => ({
+      label: state.label,
+      value: contents.readContent<{ value: number }>(state.ref!),
+      again: contents.readContents<{ value: number }>([state.ref!]),
+    }));
+    expect(first).toEqual({
+      label: "first",
+      value: { value: 1 },
+      again: [{ value: 1 }],
+    });
+    expect(
+      reads.mock.calls.filter(
+        ([file]) => String(file) === manifestPath(path, run.runId),
+      ),
+    ).toHaveLength(1);
+    first.value.value = 99;
+    store.commit(run.runId, (state, writer) => ({
+      ...state,
+      label: "next",
+      ref: writer.evidence(() => ({ value: 2 })),
+    }));
+    const next = store.inspect(run.runId, (state, contents) => ({
+      label: state.label,
+      value: contents.readContent(state.ref!),
+      original: contents.readContent(run.ref!),
+    }));
+    expect(next).toEqual({
+      label: "next",
+      value: { value: 2 },
+      original: { value: 1 },
+    });
+    const foreign = store.create(location, (_id, writer) => ({
+      label: "foreign",
+      ref: writer.input(() => ({})),
+    }));
+    expect(() =>
+      store.inspect(run.runId, (_state, contents) =>
+        contents.readContent(foreign.ref!),
+      ),
+    ).toThrowError(expect.objectContaining({ code: "VERSION_UNAVAILABLE" }));
+  });
+
+  it("returns the current manifest without publishing when a commit has no changes", () => {
+    const { path, store } = open();
+    const run = store.create(location, (_id, writer) => ({
+      label: "saved",
+      ref: writer.input(() => ({ value: 7 })),
+    }));
+    const read = vi.spyOn(fs, "readFileSync");
+    const result = store.commit(run.runId, (state, contents) => {
+      expect(contents.readContent(state.ref!)).toEqual({ value: 7 });
+      return null;
+    });
+    expect(
+      read.mock.calls.filter(
+        ([file]) => String(file) === manifestPath(path, run.runId),
+      ),
+    ).toHaveLength(1);
+    expect(result).toEqual(run);
+    expect(store.read(run.runId)).toEqual(run);
+    expect(
+      fs.readdirSync(join(runDirectory(path, run.runId), "inputs")),
+    ).toEqual([`${run.ref!.id}.json`]);
+  });
+
   it("batch reads preserve missing-file causes and data-root ownership", () => {
     const { path, root, store } = open();
     const run = store.create(location, (_runId, writer) => ({
@@ -152,6 +224,9 @@ describe("single-writer run store", () => {
       expect.objectContaining({ code: "STORAGE_FAILED" }),
     );
     expect(() => store.readContent(run.runId, run.ref!)).toThrowError(
+      expect.objectContaining({ code: "STORAGE_FAILED" }),
+    );
+    expect(() => store.inspect(run.runId, () => null)).toThrowError(
       expect.objectContaining({ code: "STORAGE_FAILED" }),
     );
   });

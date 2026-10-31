@@ -55,7 +55,11 @@ import type {
   StageView,
   SyncRunProjections,
 } from "../../contracts/runs.js";
-import type { ContentRef, ContentWriter } from "../../contracts/storage.js";
+import type {
+  ContentReader,
+  ContentRef,
+  ContentWriter,
+} from "../../contracts/storage.js";
 import type { StageDefinition } from "../../contracts/workflow.js";
 import type {
   EvidenceCall,
@@ -228,21 +232,23 @@ export class RunService implements RunAccess {
     const key = JSON.stringify([scope, requestId]);
     const existing = this.store.findCreation(key);
     if (existing !== null) {
-      const run = this.read(existing);
-      const receipt = findReceipt(run, scope, "open", requestId);
-      if (receipt === undefined)
-        throw new ResearchError(
-          "STORAGE_FAILED",
-          `Run ${existing} does not contain the matching creation receipt.`,
-        );
-      return this.replay(run, receipt, input) as { runId: string };
+      return this.inspect(existing, (run, contents) => {
+        const receipt = findReceipt(run, scope, "open", requestId);
+        if (receipt === undefined)
+          throw new ResearchError(
+            "STORAGE_FAILED",
+            `Run ${existing} does not contain the matching creation receipt.`,
+          );
+        return this.replay(receipt, input, contents) as { runId: string };
+      });
     }
     let prepared: OpenRunInput;
     let replay: PreparedReplay | null = null;
     if ("replay" in input) {
-      const source = this.read(input.replay.runId);
-      replay = prepareReplay(source, input.versions, <T>(ref: ContentRef) =>
-        this.readInput<T>(source.runId, ref),
+      replay = this.inspect(input.replay.runId, (source, contents) =>
+        prepareReplay(source, input.versions, <T>(ref: ContentRef) =>
+          contents.readContent<T>(ref),
+        ),
       );
       prepared = replay.input;
     } else {
@@ -493,19 +499,22 @@ export class RunService implements RunAccess {
     contents: unknown,
     requestId: string,
   ): ArtifactCommitResult | null {
-    const run = this.read(operation.runId);
-    const receipt = findReceipt(
-      run,
-      taskScope(operation),
-      "commit_artifact",
-      requestId,
-    );
-    if (receipt === undefined) return null;
-    const result = this.replay(run, receipt, {
-      contents,
-    }) as ArtifactCommitResult;
-    this.project(run);
-    return result;
+    return this.inspect(operation.runId, (run, reader) => {
+      const receipt = findReceipt(
+        run,
+        taskScope(operation),
+        "commit_artifact",
+        requestId,
+      );
+      if (receipt === undefined) return null;
+      const result = this.replay(
+        receipt,
+        { contents },
+        reader,
+      ) as ArtifactCommitResult;
+      this.project(run, reader);
+      return result;
+    });
   }
 
   finalize(
@@ -572,16 +581,17 @@ export class RunService implements RunAccess {
     stageId: string,
     requestId: string,
   ): boolean {
-    const run = this.read(operation.runId);
-    const receipt = findReceipt(
-      run,
-      controlScope(operation.identity),
-      "dispatch_stage",
-      requestId,
-    );
-    if (receipt === undefined) return false;
-    this.replay(run, receipt, { stageId });
-    return true;
+    return this.inspect(operation.runId, (run, contents) => {
+      const receipt = findReceipt(
+        run,
+        controlScope(operation.identity),
+        "dispatch_stage",
+        requestId,
+      );
+      if (receipt === undefined) return false;
+      this.replay(receipt, { stageId }, contents);
+      return true;
+    });
   }
 
   recordStageDispatch(
@@ -655,19 +665,20 @@ export class RunService implements RunAccess {
     result: ArtifactCommitResult | null;
     context: Pick<ResearchRun, "scope" | "definition" | "tasks">;
   } {
-    const run = this.read(operation.runId);
-    const context = {
-      scope: run.scope,
-      definition: run.definition,
-      tasks: run.tasks,
-    };
-    const receipt = findReceipt(run, taskScope(operation), action, requestId);
-    if (receipt !== undefined) {
-      this.project(run);
-      return { result: receipt.result as ArtifactCommitResult, context };
-    }
-    currentAttempt(run, operation);
-    return { result: null, context };
+    return this.inspect(operation.runId, (run, contents) => {
+      const context = {
+        scope: run.scope,
+        definition: run.definition,
+        tasks: run.tasks,
+      };
+      const receipt = findReceipt(run, taskScope(operation), action, requestId);
+      if (receipt !== undefined) {
+        this.project(run, contents);
+        return { result: receipt.result as ArtifactCommitResult, context };
+      }
+      currentAttempt(run, operation);
+      return { result: null, context };
+    });
   }
 
   failAttempt(
@@ -766,7 +777,14 @@ export class RunService implements RunAccess {
       "redo",
       requestId,
       { taskId, reason },
-      (run) => redoRun(run, taskId, (ref) => this.readArtifact(ref)),
+      (run, contents) =>
+        redoRun(run, taskId, (ref) =>
+          contents.readContent<ArtifactVersion>({
+            kind: "artifact",
+            id: ref.artifactId,
+            revision: ref.revision,
+          }),
+        ),
     );
   }
 
@@ -792,20 +810,22 @@ export class RunService implements RunAccess {
     callId: string,
     source: ReplayEvidenceSource | null = null,
   ): EvidenceCall {
-    const run = this.read(operation.runId);
-    if (source !== null && run.lineage === null)
-      throw new ResearchError(
-        "INVALID_INPUT",
-        "An original evidence selection requires a replay run.",
+    return this.inspect(operation.runId, (run, contents) => {
+      if (source !== null && run.lineage === null)
+        throw new ResearchError(
+          "INVALID_INPUT",
+          "An original evidence selection requires a replay run.",
+        );
+      const { scope, lineage, result } = this.taskDataCall<SourceRef>(
+        run,
+        operation,
+        run.lineage === null ? "record_evidence" : "replay_evidence",
+        run.lineage === null ? query : evidenceReplayRequest(query, source),
+        callId,
+        contents,
       );
-    const { scope, lineage, result } = this.taskDataCall<SourceRef>(
-      run,
-      operation,
-      run.lineage === null ? "record_evidence" : "replay_evidence",
-      run.lineage === null ? query : evidenceReplayRequest(query, source),
-      callId,
-    );
-    return { scope, lineage, sourceRef: result };
+      return { scope, lineage, sourceRef: result };
+    });
   }
 
   memoryInputForCall(
@@ -814,25 +834,27 @@ export class RunService implements RunAccess {
     callId: string,
     source: MemoryInputRegistration | null = null,
   ): MemoryInputCall {
-    const run = this.read(operation.runId);
-    if (source !== null && run.lineage === null)
-      throw new ResearchError(
-        "INVALID_INPUT",
-        "An original memory selection requires a replay run.",
-      );
-    const { scope, lineage, result } =
-      this.taskDataCall<MemoryInputRegistration>(
-        run,
-        operation,
-        run.lineage === null ? "record_memory_input" : "replay_memory_input",
-        run.lineage === null ? query : { query, source },
-        callId,
-      );
-    return {
-      scope,
-      lineage,
-      inputRef: result === null ? null : result.inputRef,
-    };
+    return this.inspect(operation.runId, (run, contents) => {
+      if (source !== null && run.lineage === null)
+        throw new ResearchError(
+          "INVALID_INPUT",
+          "An original memory selection requires a replay run.",
+        );
+      const { scope, lineage, result } =
+        this.taskDataCall<MemoryInputRegistration>(
+          run,
+          operation,
+          run.lineage === null ? "record_memory_input" : "replay_memory_input",
+          run.lineage === null ? query : { query, source },
+          callId,
+          contents,
+        );
+      return {
+        scope,
+        lineage,
+        inputRef: result === null ? null : result.inputRef,
+      };
+    });
   }
 
   recordEvidence<T>(
@@ -924,28 +946,29 @@ export class RunService implements RunAccess {
     request: ValuationCalculation["request"],
     callId: string,
   ): ValuationCalculation | null {
-    const run = this.read(operation.runId);
-    const receipt = findReceipt(
-      run,
-      taskScope(operation),
-      "record_valuation_calculation",
-      callId,
-    );
-    if (receipt === undefined) {
-      currentAttempt(run, operation);
-      return null;
-    }
-    const saved = this.store.readContent<{
-      request: ValuationCalculation["request"];
-    }>(operation.runId, receipt.request);
-    if (!isDeepStrictEqual(saved.request, request))
-      throw new ResearchError(
-        "REQUEST_CONFLICT",
-        `Request ${callId} has different content.`,
+    return this.inspect(operation.runId, (run, contents) => {
+      const receipt = findReceipt(
+        run,
+        taskScope(operation),
+        "record_valuation_calculation",
+        callId,
       );
-    return this.store.readContent(operation.runId, {
-      kind: "input",
-      id: (receipt.result as ValuationCalculationRegistration).calculationId,
+      if (receipt === undefined) {
+        currentAttempt(run, operation);
+        return null;
+      }
+      const saved = contents.readContent<{
+        request: ValuationCalculation["request"];
+      }>(receipt.request);
+      if (!isDeepStrictEqual(saved.request, request))
+        throw new ResearchError(
+          "REQUEST_CONFLICT",
+          `Request ${callId} has different content.`,
+        );
+      return contents.readContent<ValuationCalculation>({
+        kind: "input",
+        id: (receipt.result as ValuationCalculationRegistration).calculationId,
+      });
     });
   }
 
@@ -1062,10 +1085,11 @@ export class RunService implements RunAccess {
   }
 
   replaySnapshot(runId: string): ReplaySnapshot | null {
-    const lineage = this.read(runId).lineage;
-    return lineage === null
-      ? null
-      : this.readInput<ReplaySnapshot>(runId, lineage.snapshotRef);
+    return this.inspect(runId, ({ lineage }, contents) =>
+      lineage === null
+        ? null
+        : contents.readContent<ReplaySnapshot>(lineage.snapshotRef),
+    );
   }
 
   numberContext(runId: string): NumberContext {
@@ -1088,20 +1112,23 @@ export class RunService implements RunAccess {
   }
 
   repairProjections(runId: string): void {
-    this.project(this.read(runId));
+    this.inspect(runId, (run, contents) => this.project(run, contents));
   }
 
-  private project(run: ResearchRun): void {
+  private project(run: ResearchRun, contents: ContentReader): void {
     const currentRefs = new Set(
       run.tasks.flatMap((task) => task.outputRefs.map(artifactKey)),
     );
-    this.syncProjections({
-      runId: run.runId,
-      revision: run.revision,
-      artifactRefs: run.artifacts
-        .filter((artifact) => currentRefs.has(artifactKey(artifact.ref)))
-        .map((artifact) => artifact.ref),
-    });
+    this.syncProjections(
+      {
+        runId: run.runId,
+        revision: run.revision,
+        artifactRefs: run.artifacts
+          .filter((artifact) => currentRefs.has(artifactKey(artifact.ref)))
+          .map((artifact) => artifact.ref),
+      },
+      contents,
+    );
   }
 
   private submit(
@@ -1234,6 +1261,7 @@ export class RunService implements RunAccess {
       | ReplayEvidenceRequest
       | ReplayMemoryRequest,
     callId: string,
+    contents: ContentReader,
   ): {
     scope: ResearchScope;
     lineage: RunState["lineage"];
@@ -1244,13 +1272,25 @@ export class RunService implements RunAccess {
       return {
         scope: run.scope,
         lineage: run.lineage,
-        result: this.replay(run, receipt, query) as Result,
+        result: this.replay(receipt, query, contents) as Result,
       };
     currentAttempt(run, operation);
     return { scope: run.scope, lineage: run.lineage, result: null };
   }
 
   private replayReads(): ReplayDataReader {
+    const sources = new Map<
+      string,
+      { run: ResearchRun; contents: ContentReader }
+    >();
+    const source = (runId: string) => {
+      let current = sources.get(runId);
+      if (current === undefined) {
+        current = this.inspect(runId, (run, contents) => ({ run, contents }));
+        sources.set(runId, current);
+      }
+      return current;
+    };
     const queries = <Q>(
       refs: readonly (ReplayEvidenceSource | MemoryInputRegistration)[],
     ): { scope: ResearchScope; query: Q }[] => {
@@ -1268,7 +1308,7 @@ export class RunService implements RunAccess {
       });
       const result: { scope: ResearchScope; query: Q }[] = [];
       for (const [runId, group] of groups) {
-        const run = this.read(runId);
+        const { run, contents } = source(runId);
         const receipts = group.map(({ ref }) =>
           run.receipts.find((entry) =>
             "evidenceId" in ref
@@ -1282,8 +1322,7 @@ export class RunService implements RunAccess {
                 isDeepStrictEqual(entry.result.inputRef, ref.inputRef),
           )!,
         );
-        const bodies = this.store.readContents<Q | { query: Q }>(
-          runId,
+        const bodies = contents.readContents<Q | { query: Q }>(
           receipts.map((receipt) => receipt.request),
         );
         group.forEach(({ index }, item) => {
@@ -1301,10 +1340,23 @@ export class RunService implements RunAccess {
       return result;
     };
     return {
-      artifact: (ref) => this.readArtifact(ref),
-      evidence: (ref) => this.readEvidence<unknown>(ref),
+      artifact: (ref) =>
+        source(ref.runId).contents.readContent<ArtifactVersion>({
+          kind: "artifact",
+          id: ref.artifactId,
+          revision: ref.revision,
+        }),
+      evidence: (ref) =>
+        source(ref.runId).contents.readContent<
+          RegisteredEvidenceRecord<unknown>
+        >({
+          kind: "evidence",
+          id: ref.evidenceId,
+        }),
       memory: (ref) =>
-        this.readInput<MemoryInputSnapshot<unknown>>(ref.runId, ref.inputRef),
+        source(ref.runId).contents.readContent<MemoryInputSnapshot<unknown>>(
+          ref.inputRef,
+        ),
       evidenceQueries: (refs) => queries<EvidenceQuery>(refs),
       memoryQueries: (refs) => queries<MemoryInputQuery>(refs),
     };
@@ -1318,35 +1370,36 @@ export class RunService implements RunAccess {
     request: unknown,
     apply: (run: ResearchRun, writer: ContentWriter) => Result,
   ): Result {
-    const current = this.read(operation.runId);
     const repairsViews =
       action === "commit_artifact" ||
       action === "finalize" ||
       action === "redo";
-    const receipt = findReceipt(current, scope, action, requestId);
-    if (receipt !== undefined) {
-      const result = this.replay(current, receipt, request) as Result;
-      if (repairsViews) this.project(current);
-      return result;
-    }
-    let result: Result;
+    let result!: Result;
+    let contents!: ContentReader;
     const committed = this.store.commit(operation.runId, (run, writer) => {
+      this.restore(run);
+      contents = writer;
+      const receipt = findReceipt(run, scope, action, requestId);
+      if (receipt !== undefined) {
+        result = this.replay(receipt, request, writer) as Result;
+        return null;
+      }
       run.updatedAt = this.now();
       result = apply(run, writer);
       const input = writer.input(() => request);
       run.receipts.push({ scope, action, requestId, request: input, result });
       return run;
     });
-    if (repairsViews) this.project(committed);
-    return result!;
+    if (repairsViews) this.project(committed, contents);
+    return result;
   }
 
   private replay(
-    run: ResearchRun,
     receipt: RunReceipt,
     request: unknown,
+    contents: ContentReader,
   ): RunWriteResult {
-    const previous = this.store.readContent(run.runId, receipt.request);
+    const previous = contents.readContent(receipt.request);
     // Compare persisted JSON values; object key order is not request identity.
     if (!isDeepStrictEqual(previous, JSON.parse(JSON.stringify(request))))
       throw new ResearchError(
@@ -1357,7 +1410,20 @@ export class RunService implements RunAccess {
   }
 
   private read(runId: string): ResearchRun {
-    const run = this.store.read(runId);
+    return this.restore(this.store.read(runId));
+  }
+
+  private inspect<Result>(
+    runId: string,
+    inspect: (run: ResearchRun, contents: ContentReader) => Result,
+  ): Result {
+    return this.store.inspect(runId, (run, contents) =>
+      inspect(this.restore(run), contents),
+    );
+  }
+
+  private restore(run: ResearchRun): ResearchRun {
+    const runId = run.runId;
     if (!this.#restored.has(runId)) {
       assertStoredRun(run);
       this.#restored.add(runId);

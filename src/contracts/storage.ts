@@ -23,7 +23,12 @@ export type StoredRun<State extends object> = State & {
   readonly contents: readonly ContentRef[];
 };
 
-export interface ContentWriter {
+export interface ContentReader {
+  readContent<T>(ref: ContentRef): T;
+  readContents<T>(refs: readonly ContentRef[]): T[];
+}
+
+export interface ContentWriter extends ContentReader {
   input(build: (id: string) => unknown): ContentRef;
   evidence(build: (id: string) => unknown): ContentRef;
   artifact(

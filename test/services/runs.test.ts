@@ -734,34 +734,24 @@ describe("run service transactions", () => {
     const published = measured(() =>
       service.commitArtifact(op, contents, "submit"),
     );
-    expect(published.manifests).toBeLessThanOrEqual(4);
+    expect(published.manifests).toBe(2);
     const canonical = store.read(runId);
     const report = join(runDirectory(path, runId), "reports", "analysis.md");
-    for (const { action, limit } of [
-      {
-        action: () => service.commitArtifact(op, contents, "submit"),
-        limit: 4,
-      },
-      {
-        action: () => service.artifactForCall(op, contents, "submit"),
-        limit: 4,
-      },
-      {
-        action: () =>
-          service.serviceForCall(op, "submit", "commit_artifact").result,
-        limit: 3,
-      },
+    for (const action of [
+      () => service.commitArtifact(op, contents, "submit"),
+      () => service.artifactForCall(op, contents, "submit"),
+      () => service.serviceForCall(op, "submit", "commit_artifact").result,
     ]) {
       fs.unlinkSync(report);
       const replayed = measured(action);
       expect(replayed.result).toEqual(published.result);
-      expect(replayed.manifests).toBeLessThanOrEqual(limit);
+      expect(replayed.manifests).toBe(2);
       expect(store.read(runId)).toEqual(canonical);
       expect(fs.readFileSync(report, "utf8")).toContain("analysis body");
     }
     fs.unlinkSync(report);
     const repaired = measured(() => service.repairProjections(runId));
-    expect(repaired.manifests).toBeLessThanOrEqual(3);
+    expect(repaired.manifests).toBe(2);
     expect(store.read(runId)).toEqual(canonical);
     expect(fs.readFileSync(report, "utf8")).toContain("analysis body");
   });

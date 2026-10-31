@@ -33,11 +33,18 @@ function measure(action) {
   const read = fs.readFileSync;
   let manifestReads = 0;
   let manifestBytes = 0;
+  let contentReads = 0;
+  let contentBytes = 0;
   fs.readFileSync = function (path, ...args) {
     const result = read.call(this, path, ...args);
     if (String(path).endsWith("/manifest.json")) {
       manifestReads++;
       manifestBytes += Buffer.byteLength(result);
+    } else if (
+      /\/(?:inputs|evidence|artifacts)\/.*\.json$/.test(String(path))
+    ) {
+      contentReads++;
+      contentBytes += Buffer.byteLength(result);
     }
     return result;
   };
@@ -48,6 +55,8 @@ function measure(action) {
       ms: performance.now() - start,
       manifestReads,
       manifestBytes,
+      contentReads,
+      contentBytes,
     };
   } finally {
     fs.readFileSync = read;
@@ -65,6 +74,12 @@ function summarize(values) {
     medianManifestBytes: values
       .map(({ manifestBytes }) => manifestBytes)
       .sort((a, b) => a - b)[Math.floor(values.length / 2)],
+    contentReadCounts: [
+      ...new Set(values.map(({ contentReads }) => contentReads)),
+    ],
+    medianContentBytes: values
+      .map(({ contentBytes }) => contentBytes)
+      .sort((a, b) => a - b)[Math.floor(values.length / 2)],
   };
 }
 
@@ -75,6 +90,8 @@ for (const tasks of taskCounts) {
     commitReplay: [],
     artifactReceipt: [],
     repair: [],
+    redo: [],
+    replayOpen: [],
   };
   const directory = fs.mkdtempSync(join(tmpdir(), "dsh-projection-bench-"));
   let root;
@@ -111,7 +128,14 @@ for (const tasks of taskCounts) {
             adapters: {},
             normalization: {},
           },
-          inputs: [],
+          inputs: Array.from({ length: tasks }, (_, i) => ({
+            name: `fixed-${i}`,
+            content: { body },
+          })),
+          instructions: Array.from({ length: tasks }, (_, i) => ({
+            taskId: `analysis.${i}`,
+            instruction: `Fixed instruction ${i}`,
+          })),
         },
         `open-${tasks}-${sample}`,
       );
@@ -173,6 +197,36 @@ for (const tasks of taskCounts) {
             )
             .includes(body),
         );
+        const redone = measure(() =>
+          runs.redo({ runId, identity: "benchmark" }, "analysis.0", "redo"),
+        );
+        timings.redo.push(redone);
+        assert.deepEqual(redone.result.affectedTasks, ["analysis.0"]);
+        const source = store.read(runId);
+        assert.equal(source.revision, canonical.revision + 1);
+        const replayedRun = measure(() =>
+          runs.open(
+            "benchmark",
+            { replay: { runId }, versions: source.versions },
+            `replay-${tasks}-${sample}`,
+          ),
+        );
+        timings.replayOpen.push(replayedRun);
+        const snapshot = runs.replaySnapshot(replayedRun.result.runId);
+        assert.equal(snapshot.sourceRevision, source.revision);
+        const catalog = runs.inputCatalog(replayedRun.result.runId);
+        assert.equal(catalog.inputs.length, tasks * 2);
+        const fixed = catalog.inputs.filter(({ name }) =>
+          name.startsWith("fixed-"),
+        );
+        assert.deepEqual(
+          runs.readInputs(
+            replayedRun.result.runId,
+            fixed.map(({ ref }) => ref),
+          ),
+          Array.from({ length: tasks }, () => ({ body })),
+        );
+        assert.deepEqual(store.read(runId), source);
       }
     }
     results.push({

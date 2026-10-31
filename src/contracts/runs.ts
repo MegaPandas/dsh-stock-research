@@ -1,7 +1,7 @@
 import type { ArtifactKind } from "./artifacts.js";
 import type { JsonValue } from "./json.js";
 import type { ArtifactRef, ISOTime, ResearchScope, SourceRef } from "./data.js";
-import type { ContentRef, StoredRun } from "./storage.js";
+import type { ContentReader, ContentRef, StoredRun } from "./storage.js";
 import type { MemoryInputRegistration, RunEvidence } from "./task-data.js";
 import type {
   RunDefinition,
@@ -118,7 +118,10 @@ export interface RunProjectionSnapshot {
   artifactRefs: readonly ArtifactRef[];
 }
 
-export type SyncRunProjections = (snapshot: RunProjectionSnapshot) => void;
+export type SyncRunProjections = (
+  snapshot: RunProjectionSnapshot,
+  contents: ContentReader,
+) => void;
 export interface AttemptFailureResult {
   runId: string;
   taskId: string;

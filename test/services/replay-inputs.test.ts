@@ -194,7 +194,13 @@ describe("pinned replay run inputs", () => {
     );
     const source = context.store.read(context.runId);
     context.advance();
+    const reads = vi.spyOn(fs, "readFileSync");
     const { runId } = context.replay();
+    expect(
+      reads.mock.calls.filter(([file]) =>
+        String(file).endsWith("/manifest.json"),
+      ),
+    ).toHaveLength(1);
     const target = context.store.read(runId);
     expect(runId).not.toBe(context.runId);
     expect(target).toMatchObject({

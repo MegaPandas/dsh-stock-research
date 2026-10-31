@@ -91,6 +91,7 @@ export { HostResearchAdapter } from "./data/host-research.js";
 export type {
   ArtifactContentRef,
   ContentRef,
+  ContentReader,
   ContentWriter,
   RunLocation,
   StoredRun,
