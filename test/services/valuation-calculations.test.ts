@@ -7,7 +7,7 @@ import {
   validateJsonSchemaValue,
   type ToolRunContext,
 } from "@deepseek-ai/dsh-tools";
-import { afterEach, expect, it } from "vitest";
+import { afterEach, expect, it, vi } from "vitest";
 import catalogue from "../../src/valuation/methods.json" with { type: "json" };
 import type {
   OpenRunInput,
@@ -28,6 +28,7 @@ import { NumberService } from "../../src/services/numbers.js";
 import { assembleAgentArtifact } from "../../src/services/agent-artifacts.js";
 import type { AgentReport } from "../../src/contracts/agent-reports.js";
 import type { NumberTarget } from "../../src/contracts/numbers.js";
+import type { ResearchArtifactInput } from "../../src/contracts/artifact-payloads.js";
 import { calculateValuation } from "../../src/services/valuation-calculations.js";
 import {
   materializeTargetPrice,
@@ -169,7 +170,7 @@ function setup(
 
 function calculationClaims(
   records: readonly { calculationId: string; value: number }[],
-): NumberTarget {
+): Extract<NumberTarget, { kind: "pending" }> {
   return {
     kind: "pending",
     contentId: "valuation-claims",
@@ -192,6 +193,70 @@ function calculationClaims(
     },
   };
 }
+
+it("shares calculation citation reads across one submission and observes later invalidation", () => {
+  const f = setup([roleTask("analysis.fundamentals")]);
+  const input = request();
+  input.inputs.multiples = [0.5];
+  const first = calculateValuation(f.runs, f.operation, input, "first");
+  const second = calculateValuation(
+    f.runs,
+    f.operation,
+    {
+      ...input,
+      inputs: { ...input.inputs, revenue: 900 },
+    },
+    "second",
+  );
+  const target = calculationClaims([
+    { calculationId: first.calculationId, value: 22.5 },
+    { calculationId: second.calculationId, value: 45 },
+    { calculationId: first.calculationId, value: 22.5 },
+    { calculationId: second.calculationId, value: 45 },
+  ]);
+  const content: ResearchArtifactInput = {
+    ...target.content,
+    kind: "analysis",
+    payload: {
+      findings: [
+        {
+          text: "Synthetic estimates",
+          evidence: [],
+          numbers: [{ kind: "local", claimId: "value-0" }],
+        },
+      ],
+      risks: [],
+      gaps: [],
+    },
+  };
+  const service = new ArtifactService(f.runs, new NumberService(f.runs));
+  const before = f.runs.numberContext(f.operation.runId);
+  const read = vi.spyOn(fs, "readFileSync");
+  try {
+    expect(
+      service.validateArtifact(f.operation, [content, content], "draft")
+        .contents,
+    ).toEqual([content, content]);
+    const calculationReads = read.mock.calls.filter(([path]) =>
+      [first.calculationId, second.calculationId].some((id) =>
+        String(path).endsWith(`/inputs/${id}.json`),
+      ),
+    );
+    // Two citation records, plus each artifact's independent numeric validation.
+    expect(calculationReads).toHaveLength(6);
+  } finally {
+    read.mockRestore();
+  }
+  expect(f.runs.numberContext(f.operation.runId)).toEqual(before);
+  f.runs.redo(
+    { runId: f.operation.runId, identity: "coordinator" },
+    f.operation.taskId,
+    "redo-citations",
+  );
+  expect(() =>
+    service.validateArtifact(f.operation, [content], "next-draft"),
+  ).toThrow(/superseded|unsuccessful/);
+});
 
 it("checks each value when distinct claims share immutable calculations", () => {
   const f = setup();

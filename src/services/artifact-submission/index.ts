@@ -29,7 +29,7 @@ import {
   selectDecisionInputs,
 } from "../decision-basics.js";
 import { checkDecisionRequirements } from "./requirements.js";
-import { readValuationCalculation } from "../valuation-records.js";
+import { createValuationReader } from "../valuation-records.js";
 import {
   validateCalculatedReport,
   validateCalculatedTarget,
@@ -212,6 +212,7 @@ export class ArtifactService {
     const artifacts = new Map<string, ArtifactVersion>();
     const evidence = new Map<string, RegisteredEvidenceRecord<EvidenceData>>();
     const checkedSources = new Set<string>();
+    let calculations: ReturnType<typeof createValuationReader> | undefined;
     const sourceRecord = (ref: SourceRef) => {
       if (ref.runId !== context.runId)
         invalid("Payload evidence must belong to the authorized run.");
@@ -263,7 +264,10 @@ export class ArtifactService {
         invalid("Malformed body number placeholder.");
       const refs = artifactReferences(content);
       for (const id of refs.calculations)
-        readValuationCalculation(this.runs, operation.runId, id);
+        (calculations ??= createValuationReader(
+          this.runs,
+          operation.runId,
+        )).read(id);
       for (const ref of refs.artifacts) allowArtifact(ref);
       if (content.kind === "digest") {
         const upstream = new Set(content.payload.upstreamRefs.map(artifactKey));

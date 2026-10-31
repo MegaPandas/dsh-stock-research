@@ -11,9 +11,8 @@ const core =
   process.argv[2] === undefined
     ? "@megapandas/dsh-stock-research/core"
     : pathToFileURL(resolve(process.argv[2])).href;
-const { DataRoot, RunStore, createRunService, NumberService } = await import(
-  core
-);
+const { DataRoot, RunStore, createRunService, NumberService, ArtifactService } =
+  await import(core);
 const directory = fs.mkdtempSync(join(tmpdir(), "dsh-valuation-read-bench-"));
 const samples = 20;
 let root;
@@ -104,6 +103,7 @@ try {
     return { ...registration, value };
   });
   const numbers = new NumberService(runs);
+  const artifacts = new ArtifactService(runs, numbers);
   const before = store.read(runId);
   const measurements = [];
   for (const calculationCount of [1, 2]) {
@@ -129,36 +129,74 @@ try {
               evidence: [],
             };
           }),
-          payload: {},
+          payload: {
+            findings: [
+              { text: "Synthetic estimates", evidence: [], numbers: [] },
+            ],
+            risks: [],
+            gaps: [],
+          },
         },
       };
-      assert.equal(numbers.checkNumbers(operation, target).passed, true);
-      const read = fs.readFileSync;
-      let manifestReads = 0;
-      fs.readFileSync = function (path, ...args) {
-        if (String(path).endsWith("/manifest.json")) manifestReads++;
-        return read.call(this, path, ...args);
-      };
-      const timings = [];
-      try {
-        for (let sample = 0; sample < samples; sample++) {
-          const start = performance.now();
-          const checked = numbers.checkNumbers(operation, target);
-          timings.push(performance.now() - start);
-          assert.equal(checked.passed, true);
-          assert.equal(checked.claims.length, count);
+      for (const [action, run, verify] of [
+        [
+          "number_check",
+          () => numbers.checkNumbers(operation, target),
+          (checked) => {
+            assert.equal(checked.passed, true);
+            assert.equal(checked.claims.length, count);
+          },
+        ],
+        [
+          "artifact_validation",
+          () =>
+            artifacts.validateArtifact(
+              operation,
+              [target.content],
+              target.contentId,
+            ),
+          (checked) => {
+            assert.deepEqual(checked.contents, [target.content]);
+          },
+        ],
+      ]) {
+        verify(run());
+        const read = fs.readFileSync;
+        let manifestReads = 0;
+        let calculationReads = 0;
+        fs.readFileSync = function (path, ...args) {
+          const filename = String(path);
+          if (filename.endsWith("/manifest.json")) manifestReads++;
+          if (
+            calculations.some(({ calculationId }) =>
+              filename.endsWith(`/inputs/${calculationId}.json`),
+            )
+          )
+            calculationReads++;
+          return read.call(this, path, ...args);
+        };
+        const timings = [];
+        try {
+          for (let sample = 0; sample < samples; sample++) {
+            const start = performance.now();
+            const checked = run();
+            timings.push(performance.now() - start);
+            verify(checked);
+          }
+        } finally {
+          fs.readFileSync = read;
         }
-      } finally {
-        fs.readFileSync = read;
+        timings.sort((a, b) => a - b);
+        measurements.push({
+          action,
+          claims: count,
+          calculations: Math.min(calculationCount, count),
+          manifestReadsPerCheck: manifestReads / samples,
+          calculationReadsPerCheck: calculationReads / samples,
+          medianMs: timings[Math.floor(samples / 2)],
+          p95Ms: timings[Math.ceil(samples * 0.95) - 1],
+        });
       }
-      timings.sort((a, b) => a - b);
-      measurements.push({
-        claims: count,
-        calculations: Math.min(calculationCount, count),
-        manifestReadsPerCheck: manifestReads / samples,
-        medianMs: timings[Math.floor(samples / 2)],
-        p95Ms: timings[Math.ceil(samples * 0.95) - 1],
-      });
     }
   }
   assert.deepEqual(store.read(runId), before);
