@@ -1,8 +1,6 @@
 import z from "@deepseek-ai/schemastery";
 import { ResearchError } from "../contracts/errors.js";
-import type { QueryRequest } from "../contracts/query.js";
 import type { RunReader } from "../contracts/run-access.js";
-import type { DataToolName } from "../tools/query-inputs.js";
 import {
   QUICK_SNAPSHOTS_INPUT,
   type QuickQuerySnapshot,
@@ -129,26 +127,4 @@ export function readQuickSnapshots(
       { cause },
     );
   }
-}
-
-const TOOL_NAMES: Record<QueryRequest["dataset"], DataToolName> = {
-  market: "stock_get_market",
-  fundamentals: "stock_get_fundamentals",
-  macro: "stock_get_macro",
-  returns: "stock_get_returns",
-  research: "stock_research",
-};
-
-export function queryToolCall(request: QueryRequest): {
-  name: DataToolName;
-  arguments: Record<string, unknown>;
-} {
-  const parameters: Record<string, unknown> = { ...request.parameters };
-  delete parameters.maxAgeMs;
-  delete parameters.cik;
-  delete parameters.comparable;
-  return {
-    name: TOOL_NAMES[request.dataset],
-    arguments: { provider: request.provider, ...parameters },
-  };
 }

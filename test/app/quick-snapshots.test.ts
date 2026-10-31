@@ -2,17 +2,13 @@ import fs from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import {
-  queryToolCall,
-  readQuickSnapshots,
-} from "../../src/app/quick-snapshots.js";
+import { readQuickSnapshots } from "../../src/app/quick-snapshots.js";
 import {
   QUICK_SNAPSHOTS_INPUT,
   type QuickQuerySnapshot,
 } from "../../src/app/plan/protocol.js";
 import { captureQuickSnapshots } from "../../src/app/plan/snapshots.js";
 import type { JsonValue } from "../../src/contracts/json.js";
-import type { QueryRequest } from "../../src/contracts/query.js";
 import type { RunState } from "../../src/contracts/runs.js";
 import { RunStore } from "../../src/runs/store.js";
 import { createRunService } from "../../src/services/run/index.js";
@@ -149,147 +145,5 @@ describe("fixed quick query inputs", () => {
     expect(() => readQuickSnapshots(c.runs, c.runId)).toThrowError(
       expect.objectContaining({ code: "STORAGE_FAILED" }),
     );
-  });
-
-  it("builds each data tool recipe with only its actual model-facing fields", () => {
-    const cases: {
-      request: QueryRequest;
-      expected: { name: string; arguments: Record<string, unknown> };
-    }[] = [
-      {
-        request: {
-          dataset: "market",
-          provider: "yahoo",
-          parameters: {
-            startDate: "2024-01-02",
-            maxAgeMs: 100,
-            indicators: [{ kind: "sma", period: 2 }],
-          },
-        },
-        expected: {
-          name: "stock_get_market",
-          arguments: {
-            provider: "yahoo",
-            startDate: "2024-01-02",
-            indicators: [{ kind: "sma", period: 2 }],
-          },
-        },
-      },
-      {
-        request: {
-          dataset: "fundamentals",
-          provider: "sec",
-          parameters: {
-            cik: "0001045810",
-            field: "revenue",
-            periodEndFrom: "2023-01-01",
-            maxAgeMs: 100,
-          },
-        },
-        expected: {
-          name: "stock_get_fundamentals",
-          arguments: {
-            provider: "sec",
-            field: "revenue",
-            periodEndFrom: "2023-01-01",
-          },
-        },
-      },
-      {
-        request: {
-          dataset: "fundamentals",
-          provider: "eastmoney",
-          parameters: {
-            fields: ["netIncomeToParent"],
-            periodEndFrom: "2023-01-01",
-            periodEndTo: "2023-12-31",
-            maxAgeMs: 100,
-          },
-        },
-        expected: {
-          name: "stock_get_fundamentals",
-          arguments: {
-            provider: "eastmoney",
-            fields: ["netIncomeToParent"],
-            periodEndFrom: "2023-01-01",
-            periodEndTo: "2023-12-31",
-          },
-        },
-      },
-      {
-        request: {
-          dataset: "fundamentals",
-          provider: "sina",
-          parameters: { fields: ["revenue"], maxAgeMs: 100 },
-        },
-        expected: {
-          name: "stock_get_fundamentals",
-          arguments: { provider: "sina", fields: ["revenue"] },
-        },
-      },
-      {
-        request: {
-          dataset: "macro",
-          provider: "fred",
-          parameters: {
-            seriesId: "DGS10",
-            startDate: "2024-01-02",
-            endDate: "2024-01-08",
-            maxAgeMs: 100,
-          },
-        },
-        expected: {
-          name: "stock_get_macro",
-          arguments: {
-            provider: "fred",
-            seriesId: "DGS10",
-            startDate: "2024-01-02",
-            endDate: "2024-01-08",
-          },
-        },
-      },
-      {
-        request: {
-          dataset: "returns",
-          provider: "tencent",
-          parameters: {
-            historyStartDate: "2023-12-01",
-            startDate: "2024-01-02",
-            endDate: "2024-01-08",
-            maxAgeMs: 100,
-            comparable: false,
-          },
-        },
-        expected: {
-          name: "stock_get_returns",
-          arguments: {
-            provider: "tencent",
-            historyStartDate: "2023-12-01",
-            startDate: "2024-01-02",
-            endDate: "2024-01-08",
-          },
-        },
-      },
-      {
-        request: {
-          dataset: "research",
-          provider: "dsh-web",
-          parameters: { query: "Company results", maxResults: 3 },
-        },
-        expected: {
-          name: "stock_research",
-          arguments: {
-            provider: "dsh-web",
-            query: "Company results",
-            maxResults: 3,
-          },
-        },
-      },
-    ];
-    for (const { request, expected } of cases) {
-      const before = structuredClone(request);
-      expect(queryToolCall(request)).toEqual(expected);
-      expect(request).toEqual(before);
-    }
   });
 });
