@@ -8,7 +8,7 @@ import { vi } from "vitest";
 import * as Ask from "../../src/ask.js";
 import type { CollectionSnapshot } from "../../src/contracts/collection.js";
 import type { ResearchScope } from "../../src/contracts/data.js";
-import type { CollectionService } from "../../src/services/collection.js";
+import type { CollectionService } from "../../src/services/collection/index.js";
 import type { SourceId } from "../../src/runtime.js";
 import { runtimeHost } from "./runtime-host.js";
 import { toolCall } from "./quick-host.js";

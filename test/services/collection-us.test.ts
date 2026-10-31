@@ -3,7 +3,7 @@ import { createUsCollectionTasks } from "../../src/data/collection-us.js";
 import { createCollectionTaskFactory } from "../../src/data/collection-tasks.js";
 import type { ReadSource } from "../../src/contracts/query.js";
 import { ResearchError } from "../../src/contracts/errors.js";
-import { CollectionService } from "../../src/services/collection.js";
+import { CollectionService } from "../../src/services/collection/index.js";
 import { HttpClient } from "../../src/data/http.js";
 import type { SqliteCache } from "../../src/cache/index.js";
 import { US_SECURITY } from "../fixtures/market.js";

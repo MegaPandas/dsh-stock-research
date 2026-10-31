@@ -6,7 +6,7 @@ import type {
 import type { ResearchScope } from "../../src/contracts/data.js";
 import { HttpClient } from "../../src/data/http.js";
 import { createCollectionTaskFactory } from "../../src/data/collection-tasks.js";
-import { createCollectionPlans } from "../../src/services/collection-plan.js";
+import { createCollectionPlans } from "../../src/services/collection/plan.js";
 import type { ReadSource } from "../../src/contracts/query.js";
 import { CN_SECURITY, US_SECURITY } from "../fixtures/market.js";
 

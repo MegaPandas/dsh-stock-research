@@ -1,4 +1,4 @@
-import type { CollectionError } from "../contracts/collection.js";
+import type { CollectionError } from "../../contracts/collection.js";
 
 export function collectionError(cause: unknown): CollectionError {
   if (!(cause instanceof Error))

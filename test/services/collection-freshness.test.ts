@@ -11,9 +11,9 @@ import {
   applyCollectionFreshness,
   collectionFreshnessMs,
   rebaseCollectionEnvelope,
-} from "../../src/services/collection-freshness.js";
-import { CollectionCache } from "../../src/services/collection-cache.js";
-import { CollectionService } from "../../src/services/collection.js";
+} from "../../src/services/collection/freshness.js";
+import { CollectionCache } from "../../src/services/collection/cache.js";
+import { CollectionService } from "../../src/services/collection/index.js";
 import { CN_SECURITY } from "../fixtures/market.js";
 
 const scope = {

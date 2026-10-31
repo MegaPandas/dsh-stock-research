@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { SqliteCache } from "../../src/cache/index.js";
 import { HttpClient } from "../../src/data/http.js";
 import { createCollectionTaskFactory } from "../../src/data/collection-tasks.js";
-import { CollectionService } from "../../src/services/collection.js";
+import { CollectionService } from "../../src/services/collection/index.js";
 import { CN_SECURITY } from "../fixtures/market.js";
 
 const scope = {

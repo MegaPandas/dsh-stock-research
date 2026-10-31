@@ -10,7 +10,7 @@ import type { ReplayEvidenceSource } from "../contracts/replay.js";
 import type { TaskOperation } from "../contracts/runs.js";
 import type { RunCommands, RunReader } from "../contracts/run-access.js";
 import { extractCandidates } from "../services/candidates.js";
-import { collectionSummary } from "../services/collection-view.js";
+import { collectionSummary } from "../services/collection/view.js";
 import { readQuickSnapshots } from "./quick-snapshots.js";
 import { COLLECTION_INPUT } from "./collection-snapshot.js";
 

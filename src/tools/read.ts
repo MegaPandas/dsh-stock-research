@@ -20,7 +20,7 @@ import type { RunReadOperations } from "../host/run-reading.js";
 import {
   collectionGaps,
   collectionRowSelectors,
-} from "../services/collection-view.js";
+} from "../services/collection/view.js";
 import { researchTool } from "./errors.js";
 import { createDataHealthTool } from "./data-health.js";
 import { createRecallTool } from "./recall.js";

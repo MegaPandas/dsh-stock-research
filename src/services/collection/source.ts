@@ -3,11 +3,11 @@ import type {
   CollectionAttempt,
   CollectionFailure,
   CollectionTask,
-} from "../contracts/collection.js";
-import type { DataEnvelope } from "../contracts/data.js";
-import { ResearchError } from "../contracts/errors.js";
-import { getHttpRequestMetadata, HttpStatusError } from "../data/http.js";
-import { collectionError, collectionErrorDetail } from "./collection-errors.js";
+} from "../../contracts/collection.js";
+import type { DataEnvelope } from "../../contracts/data.js";
+import { ResearchError } from "../../contracts/errors.js";
+import { getHttpRequestMetadata, HttpStatusError } from "../../data/http.js";
+import { collectionError, collectionErrorDetail } from "./errors.js";
 
 const ENDPOINT_FAILURE_THRESHOLD = 2;
 const ENDPOINT_DEPRIORITIZE_MS = 60_000;

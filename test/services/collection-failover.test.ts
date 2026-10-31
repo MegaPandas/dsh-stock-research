@@ -11,7 +11,7 @@ import type { DataEnvelope } from "../../src/contracts/data.js";
 import { ResearchError } from "../../src/contracts/errors.js";
 import { HttpClient } from "../../src/data/http.js";
 import { parseSourceJson } from "../../src/data/source.js";
-import { CollectionService } from "../../src/services/collection.js";
+import { CollectionService } from "../../src/services/collection/index.js";
 import { CN_SECURITY } from "../fixtures/market.js";
 
 const scope = {

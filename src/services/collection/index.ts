@@ -1,6 +1,6 @@
-import { deriveFinancialMetrics } from "../data/financial-metrics.js";
-import type { SqliteCache } from "../cache/index.js";
-import { serializeJson } from "../json/serialize.js";
+import { deriveFinancialMetrics } from "../../data/financial-metrics.js";
+import type { SqliteCache } from "../../cache/index.js";
+import { serializeJson } from "../../json/serialize.js";
 import type {
   CollectionDiagnostics,
   CollectionOptions,
@@ -10,19 +10,19 @@ import type {
   CollectionRecord,
   CollectionDataset,
   CollectionTaskFactory,
-} from "../contracts/collection.js";
-import type { ResearchScope } from "../contracts/data.js";
-import type { CollectionSnapshotStore } from "../storage/collection-snapshots.js";
-import { collectionError } from "./collection-errors.js";
-import { createCollectionPlans } from "./collection-plan.js";
-import { CollectionCache } from "./collection-cache.js";
-import { CollectionSourceRunner } from "./collection-source.js";
-import { CollectionTableRunner } from "./collection-table.js";
-import { SharedQueries } from "./shared-queries.js";
+} from "../../contracts/collection.js";
+import type { ResearchScope } from "../../contracts/data.js";
+import type { CollectionSnapshotStore } from "../../storage/collection-snapshots.js";
+import { collectionError } from "./errors.js";
+import { createCollectionPlans } from "./plan.js";
+import { CollectionCache } from "./cache.js";
+import { CollectionSourceRunner } from "./source.js";
+import { CollectionTableRunner } from "./table.js";
+import { SharedQueries } from "../shared-queries.js";
 import {
   collectionFreshnessBudget,
   rebaseCollectionEnvelope,
-} from "./collection-freshness.js";
+} from "./freshness.js";
 
 interface ProgressObservers {
   waiters: number;

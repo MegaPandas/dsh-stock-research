@@ -7,19 +7,19 @@ import type {
   CollectionPlan,
   CollectionProgress,
   CollectionTask,
-} from "../contracts/collection.js";
-import type { DataEnvelope, ResearchScope } from "../contracts/data.js";
-import { CollectionCache } from "./collection-cache.js";
-import { CollectionSourceRunner } from "./collection-source.js";
+} from "../../contracts/collection.js";
+import type { DataEnvelope, ResearchScope } from "../../contracts/data.js";
+import { CollectionCache } from "./cache.js";
+import { CollectionSourceRunner } from "./source.js";
 import {
   collectionCoverageIssue,
   improvesCollectionCoverage,
-} from "./collection-quality.js";
-import { collectionError, collectionErrorDetail } from "./collection-errors.js";
+} from "./quality.js";
+import { collectionError, collectionErrorDetail } from "./errors.js";
 import {
   applyCollectionFreshness,
   collectionFreshnessBudget,
-} from "./collection-freshness.js";
+} from "./freshness.js";
 
 const MAX_ROUNDS = 2;
 const RETRY_DELAY_MS = 2_000;

@@ -3,7 +3,7 @@ import type {
   CollectionOptions,
   CollectionPlan,
   CollectionTask,
-} from "../contracts/collection.js";
+} from "../../contracts/collection.js";
 
 const REQUIRED_DATA_TIMEOUT_MS = 45_000;
 const TABLE_TIMEOUT_MS = 120_000;

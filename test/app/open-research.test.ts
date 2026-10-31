@@ -8,7 +8,7 @@ import type { QueryPolicy } from "../../src/contracts/query.js";
 import type { RunState } from "../../src/contracts/runs.js";
 import { DataRoot } from "../../src/storage/data-root.js";
 import { RunStore } from "../../src/runs/store.js";
-import { CollectionService } from "../../src/services/collection.js";
+import { CollectionService } from "../../src/services/collection/index.js";
 import { createRunService } from "../../src/services/create-run-service.js";
 import {
   openResearch,

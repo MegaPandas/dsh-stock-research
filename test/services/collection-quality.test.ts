@@ -4,7 +4,7 @@ import type { DataEnvelope } from "../../src/contracts/data.js";
 import {
   collectionCoverageIssue,
   improvesCollectionCoverage,
-} from "../../src/services/collection-quality.js";
+} from "../../src/services/collection/quality.js";
 
 function envelope(
   table: string,

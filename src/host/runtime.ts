@@ -28,7 +28,7 @@ import { MemoryService } from "../services/memory.js";
 import { NumberService } from "../services/numbers.js";
 import { QueryService } from "../services/query/index.js";
 import { TaskQueryService } from "../services/task-query.js";
-import { CollectionService } from "../services/collection.js";
+import { CollectionService } from "../services/collection/index.js";
 import { CollectionSnapshotStore } from "../storage/collection-snapshots.js";
 import { selectQuerySnapshot } from "../services/query-snapshot.js";
 import { createRunService } from "../services/create-run-service.js";

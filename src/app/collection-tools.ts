@@ -9,7 +9,7 @@ import {
   isCollectionRowField,
   readCollectionData,
   readCollectionTable,
-} from "../services/collection-view.js";
+} from "../services/collection/view.js";
 import { researchTool } from "../tools/errors.js";
 import {
   invalid,

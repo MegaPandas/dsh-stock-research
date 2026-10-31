@@ -4,7 +4,7 @@ import type {
   CollectionTask,
 } from "../../src/contracts/collection.js";
 import type { DataEnvelope } from "../../src/contracts/data.js";
-import { CollectionSourceRunner } from "../../src/services/collection-source.js";
+import { CollectionSourceRunner } from "../../src/services/collection/source.js";
 import { deferred } from "../fixtures/runtime-host.js";
 
 describe("collection source scheduling", () => {

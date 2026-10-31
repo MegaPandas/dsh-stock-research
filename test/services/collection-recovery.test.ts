@@ -10,7 +10,7 @@ import type {
 import type { ResearchScope } from "../../src/contracts/data.js";
 import { HttpClient } from "../../src/data/http.js";
 import { createCollectionTaskFactory } from "../../src/data/collection-tasks.js";
-import { CollectionService } from "../../src/services/collection.js";
+import { CollectionService } from "../../src/services/collection/index.js";
 import type { ReadSource } from "../../src/contracts/query.js";
 import { CollectionSnapshotStore } from "../../src/storage/collection-snapshots.js";
 import { DataRoot } from "../../src/storage/data-root.js";

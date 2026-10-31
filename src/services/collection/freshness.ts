@@ -2,14 +2,14 @@ import type {
   CollectedTableData,
   CollectionDataset,
   CollectionOptions,
-} from "../contracts/collection.js";
+} from "../../contracts/collection.js";
 import type {
   DataEnvelope,
   ISOTime,
   ResearchScope,
-} from "../contracts/data.js";
-import { marketFreshnessMs } from "../data/market-calendar.js";
-import { sessionEnd } from "../data/market-session.js";
+} from "../../contracts/data.js";
+import { marketFreshnessMs } from "../../data/market-calendar.js";
+import { sessionEnd } from "../../data/market-session.js";
 
 const DAY_MS = 86_400_000;
 const DAYS_PER_WEEK = 7;

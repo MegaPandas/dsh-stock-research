@@ -3,12 +3,12 @@ import type {
   CollectionReadRequest,
   CollectionReadSource,
   CollectionSummary,
-} from "../contracts/collection.js";
+} from "../../contracts/collection.js";
 import type {
   CandidateClaim,
   DataEnvelope,
   DataGap,
-} from "../contracts/data.js";
+} from "../../contracts/data.js";
 
 export function collectionSummary(
   id: string,

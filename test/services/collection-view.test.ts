@@ -20,7 +20,7 @@ import type {
 } from "../../src/contracts/data.js";
 import type { RunState } from "../../src/contracts/runs.js";
 import { RunStore } from "../../src/runs/store.js";
-import { collectionSummary } from "../../src/services/collection-view.js";
+import { collectionSummary } from "../../src/services/collection/view.js";
 import { NumberService } from "../../src/services/numbers.js";
 import { createRunService } from "../../src/services/create-run-service.js";
 import { DataRoot } from "../../src/storage/data-root.js";

@@ -5,7 +5,7 @@ import {
   xueqiuDate,
   xueqiuTimestamp,
 } from "../../src/data/xueqiu.js";
-import { collectionError } from "../../src/services/collection-errors.js";
+import { collectionError } from "../../src/services/collection/errors.js";
 
 afterEach(() => vi.restoreAllMocks());
 

@@ -258,7 +258,7 @@ export type {
 export type { QueryHealth, SourceHealth } from "./contracts/sources.js";
 export { QueryService } from "./services/query/index.js";
 export { TaskQueryService } from "./services/task-query.js";
-export { CollectionService } from "./services/collection.js";
+export { CollectionService } from "./services/collection/index.js";
 export { createCollectionTaskFactory } from "./data/collection-tasks.js";
 export type {
   CollectionOptions,

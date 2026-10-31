@@ -57,6 +57,10 @@ export default defineConfig(
             directory: "src/services/query",
             publicEntries: ["index.js", "calculations.js"],
           },
+          {
+            directory: "src/services/collection",
+            publicEntries: ["index.js", "view.js"],
+          },
         ],
       ],
     },
@@ -122,7 +126,7 @@ export default defineConfig(
   {
     files: [
       "src/{indicators,json,report,valuation}/**/*.ts",
-      "src/services/collection-plan.ts",
+      "src/services/collection/{plan,quality,view,errors}.ts",
       "src/services/query/calculations.ts",
     ],
     rules: {
@@ -158,7 +162,10 @@ export default defineConfig(
     },
   },
   {
-    files: ["src/services/query/calculations.ts"],
+    files: [
+      "src/services/query/calculations.ts",
+      "src/services/collection/{plan,quality,view,errors}.ts",
+    ],
     rules: {
       "no-restricted-imports": [
         "error",
@@ -167,7 +174,7 @@ export default defineConfig(
             {
               group: [...pureImports, "./*.js", "../*.js"],
               message:
-                "Query calculations must depend on contracts and pure computations instead of query execution or services.",
+                "Pure rules must depend on contracts and pure computations instead of stateful services.",
             },
           ],
         },

@@ -1,15 +1,15 @@
-import type { SqliteCache } from "../cache/index.js";
+import type { SqliteCache } from "../../cache/index.js";
 import type {
   CollectedTableData,
   CollectionOptions,
   CollectionTask,
-} from "../contracts/collection.js";
-import type { DataEnvelope, ResearchScope } from "../contracts/data.js";
-import { COLLECTION_VERSION } from "../data/versions.js";
+} from "../../contracts/collection.js";
+import type { DataEnvelope, ResearchScope } from "../../contracts/data.js";
+import { COLLECTION_VERSION } from "../../data/versions.js";
 import {
   collectionFreshnessBudget,
   rebaseCollectionEnvelope,
-} from "./collection-freshness.js";
+} from "./freshness.js";
 
 const CHINA_REUSABLE_TABLES = new Set([
   "market.daily",
