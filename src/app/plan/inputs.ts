@@ -1,40 +1,31 @@
-import packageMetadata from "../../package.json" with { type: "json" };
-import type { OpenRunInput, RunVersions } from "../contracts/runs.js";
-import type { RunDefinition, TaskDefinition } from "../contracts/workflow.js";
+import type { OpenRunInput } from "../../contracts/runs.js";
+import type {
+  RunDefinition,
+  TaskDefinition,
+} from "../../contracts/workflow.js";
 import type {
   SourceDescription,
   SourceCodeVersions,
-} from "../contracts/sources.js";
-import type { QueryPolicy } from "../contracts/query.js";
-import { DIGEST_HANDOFF_VERSION } from "../contracts/digests.js";
-import {
-  APPLICATION_INPUT_NAME,
-  captureApplicationInput,
-} from "./research-input-capture.js";
-import { ROLE_PROMPT_VERSION } from "./research-prompts.js";
-import {
-  VALUATION_ENGINE_VERSION,
-  VALUATION_METHODS_INPUT,
-} from "../contracts/valuation.js";
-import VALUATION_METHODS from "../valuation/methods.json" with { type: "json" };
+} from "../../contracts/sources.js";
+import type { QueryPolicy } from "../../contracts/query.js";
+import { captureApplicationInput } from "./capture.js";
+import { VALUATION_METHODS_INPUT } from "../../contracts/valuation.js";
+import VALUATION_METHODS from "../../valuation/methods.json" with { type: "json" };
 import {
   PUBLIC_ANALYST_PROMPT,
   PUBLIC_RESEARCH_BRIEF,
   PUBLIC_RESEARCH_PROMPT_INPUT,
   PUBLIC_RESEARCH_TASK,
   PUBLIC_SEARCH_LIMITS,
-} from "./public-research.js";
+} from "../public-research.js";
+import { COORDINATOR_PROMPT } from "../coordinator-prompt.js";
+import { captureQuickSnapshots } from "./snapshots.js";
 import {
-  COORDINATOR_PROMPT,
-  COORDINATOR_PROMPT_VERSION,
-} from "./coordinator-prompt.js";
-import {
-  captureQuickSnapshots,
+  APPLICATION_INPUT_NAME,
   QUICK_SNAPSHOTS_INPUT,
   type QuickQuerySnapshot,
-} from "./query-snapshots.js";
-
-const PLUGIN_VERSION = packageMetadata.version;
+} from "./protocol.js";
+import { researchVersions } from "./versions.js";
 
 export const DIGEST_RISK_RULE =
   "riskSummaries must cover each issueId in context.requiredRisks exactly once; return [] when that list is empty. Analyst-stage risks have no risk-review issueId; do not invent identifiers. Preserve their meaning, handoff questions and upstream attribution in keyPoints or openQuestions.";
@@ -74,32 +65,6 @@ export function researchTask(
         ? [{ dataset: "market", fields: ["close"], requiredForDecision: true }]
         : [],
     instructionVersion: id.startsWith("digest.") ? 3 : 2,
-  };
-}
-
-export function researchVersions(
-  modeVersion: string,
-  sources: Readonly<Record<string, SourceCodeVersions>>,
-): RunVersions {
-  const adapters: Record<string, string> = {};
-  const normalization: Record<string, string> = {};
-  for (const [key, source] of Object.entries(sources)) {
-    adapters[key] = source.adapterVersion;
-    normalization[key] = source.normalizationVersion;
-  }
-  return {
-    plugin: PLUGIN_VERSION,
-    mode: modeVersion,
-    prompts: {
-      roles: ROLE_PROMPT_VERSION,
-      digest: DIGEST_HANDOFF_VERSION,
-      coordinator: COORDINATOR_PROMPT_VERSION,
-      valuationMethods: VALUATION_METHODS.version,
-      valuationEngine: VALUATION_ENGINE_VERSION,
-    },
-    skills: {},
-    adapters,
-    normalization,
   };
 }
 

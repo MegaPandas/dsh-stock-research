@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import * as Review from "../../src/review.js";
 import type { ResearchScope } from "../../src/contracts/data.js";
 import type { ResearchArtifactInput } from "../../src/contracts/artifact-payloads.js";
-import { researchTask } from "../../src/app/research-plan.js";
+import { researchTask } from "../../src/app/plan/inputs.js";
 import type {
   PriceReturnsQuery,
   QueryResponse,

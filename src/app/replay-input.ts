@@ -5,9 +5,9 @@ import {
 } from "../data/versions.js";
 import type { RunReader } from "../contracts/run-access.js";
 import { savedCoordinator } from "./coordinator-input.js";
-import { DEEP_MODE_VERSION } from "./deep-plan.js";
-import { QUICK_MODE_VERSION } from "./quick-plan.js";
-import { researchVersions } from "./research-plan.js";
+import { DEEP_MODE_VERSION } from "./plan/deep.js";
+import { QUICK_MODE_VERSION } from "./plan/quick.js";
+import { researchVersions } from "./plan/versions.js";
 import { VALUATION_ENGINE_VERSION } from "../contracts/valuation.js";
 import { ResearchError } from "../contracts/errors.js";
 

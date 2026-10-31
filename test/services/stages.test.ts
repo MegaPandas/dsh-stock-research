@@ -21,11 +21,11 @@ import { attachResearchStages } from "../../src/app/research-stages.js";
 import {
   createQuickInput,
   QUICK_RESEARCH_STAGES,
-} from "../../src/app/quick-plan.js";
+} from "../../src/app/plan/quick.js";
 import {
   createDeepInput,
   DEEP_RESEARCH_STAGES,
-} from "../../src/app/deep-plan.js";
+} from "../../src/app/plan/deep.js";
 import { US_SECURITY } from "../fixtures/market.js";
 
 const roots: DataRoot[] = [];

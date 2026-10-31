@@ -1,6 +1,6 @@
 import { ToolCallId, type StreamChunk } from "@deepseek-ai/dsh-llm";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { createQuickInput } from "../../src/app/quick-plan.js";
+import { createQuickInput } from "../../src/app/plan/quick.js";
 import { isApplicationBusy } from "../../src/app/activity.js";
 import { quickHost, toolCall } from "../fixtures/quick-host.js";
 import { workflowModel } from "../fixtures/research-workflow.js";

@@ -3,8 +3,8 @@ import { describe, expect, it } from "vitest";
 import {
   createQuickInput,
   QUICK_MODE_VERSION,
-} from "../../src/app/quick-plan.js";
-import { APPLICATION_INPUT_NAME } from "../../src/app/research-input-capture.js";
+} from "../../src/app/plan/quick.js";
+import { APPLICATION_INPUT_NAME } from "../../src/app/plan/protocol.js";
 import { ROLE_PROMPTS } from "../../src/app/research-prompts.js";
 import { marketCapability } from "../../src/data/market.js";
 import type { SourceDescription } from "../../src/contracts/sources.js";

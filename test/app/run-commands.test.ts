@@ -11,7 +11,7 @@ import {
 } from "@deepseek-ai/dsh-llm";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import * as Quick from "../../src/quick.js";
-import { createQuickInput } from "../../src/app/quick-plan.js";
+import { createQuickInput } from "../../src/app/plan/quick.js";
 import type { ResearchScope } from "../../src/contracts/data.js";
 import type { OpenRunInput } from "../../src/contracts/runs.js";
 import { ArtifactService } from "../../src/services/artifact-submission/index.js";

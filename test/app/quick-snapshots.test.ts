@@ -7,10 +7,10 @@ import {
   readQuickSnapshots,
 } from "../../src/app/quick-snapshots.js";
 import {
-  captureQuickSnapshots,
   QUICK_SNAPSHOTS_INPUT,
   type QuickQuerySnapshot,
-} from "../../src/app/query-snapshots.js";
+} from "../../src/app/plan/protocol.js";
+import { captureQuickSnapshots } from "../../src/app/plan/snapshots.js";
 import type { JsonValue } from "../../src/contracts/json.js";
 import type { QueryRequest } from "../../src/contracts/query.js";
 import type { RunState } from "../../src/contracts/runs.js";

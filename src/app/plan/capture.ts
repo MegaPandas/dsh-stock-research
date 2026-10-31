@@ -1,15 +1,13 @@
-import type { JsonValue } from "../contracts/json.js";
-import type { QueryPolicy } from "../contracts/query.js";
-import type { SourceDescription } from "../contracts/sources.js";
-import { serializeJson } from "../json/serialize.js";
+import type { JsonValue } from "../../contracts/json.js";
+import type { QueryPolicy } from "../../contracts/query.js";
+import type { SourceDescription } from "../../contracts/sources.js";
+import { serializeJson } from "../../json/serialize.js";
 import {
   ARTIFACT_GUIDES,
   CALCULATION_RULES,
   ROLE_PROMPTS,
-} from "./research-prompts.js";
-import { PUBLIC_SEARCH_LIMITS } from "./public-research.js";
-
-export const APPLICATION_INPUT_NAME = "stock-research:application";
+} from "../research-prompts.js";
+import { PUBLIC_SEARCH_LIMITS } from "../public-research.js";
 
 export function captureApplicationInput(
   policy: QueryPolicy,

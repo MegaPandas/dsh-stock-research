@@ -9,7 +9,7 @@ import ApprovalService from "@deepseek-ai/dsh-user-approval";
 import { SessionId } from "@deepseek-ai/dsh-session";
 import type { ToolDefinition } from "@deepseek-ai/dsh-tools";
 import { describe, expect, it, vi } from "vitest";
-import { createQuickInput } from "../../src/app/quick-plan.js";
+import { createQuickInput } from "../../src/app/plan/quick.js";
 import { attachResearchStages } from "../../src/app/research-stages.js";
 import { prepareResearchRole } from "../../src/app/prepare-role.js";
 import { RESEARCH_MODELS_INPUT } from "../../src/app/research-models.js";

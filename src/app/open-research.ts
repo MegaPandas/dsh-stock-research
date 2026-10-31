@@ -12,8 +12,8 @@ import {
   attachCollection,
   requireCollectionData,
 } from "./collection-snapshot.js";
-import { createQuickInput, QUICK_RESEARCH_STAGES } from "./quick-plan.js";
-import { createDeepInput, DEEP_RESEARCH_STAGES } from "./deep-plan.js";
+import { createQuickInput, QUICK_RESEARCH_STAGES } from "./plan/quick.js";
+import { createDeepInput, DEEP_RESEARCH_STAGES } from "./plan/deep.js";
 import { attachResearchStages } from "./research-stages.js";
 
 export interface OpenResearchRequest {

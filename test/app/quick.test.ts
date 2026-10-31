@@ -7,7 +7,7 @@ import {
   type StreamChunk,
 } from "@deepseek-ai/dsh-llm";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { createQuickInput } from "../../src/app/quick-plan.js";
+import { createQuickInput } from "../../src/app/plan/quick.js";
 import type { CollectionRecord } from "../../src/contracts/collection.js";
 import { readCollection } from "../../src/app/collection-input.js";
 import { attachCollection } from "../../src/app/collection-snapshot.js";

@@ -65,6 +65,15 @@ export default defineConfig(
             publicEntries: ["index.js"],
           },
           {
+            directory: "src/app/plan",
+            publicEntries: [
+              "quick.js",
+              "deep.js",
+              "versions.js",
+              "protocol.js",
+            ],
+          },
+          {
             directory: "src/evidence",
             publicEntries: ["fields.js", "checks.js", "price-basis.js"],
           },
@@ -150,6 +159,7 @@ export default defineConfig(
       "src/services/query/calculations.ts",
       "src/services/digest/{draft,handoff}.ts",
       "src/services/memory/state.ts",
+      "src/app/plan/**/*.ts",
     ],
     rules: {
       "no-restricted-imports": [
@@ -290,9 +300,7 @@ export default defineConfig(
     },
   },
   {
-    files: [
-      "src/app/{quick-plan,deep-plan,research-plan,research-input-capture,query-snapshots,collection-snapshot,open-research}.ts",
-    ],
+    files: ["src/app/{collection-snapshot,open-research}.ts"],
     rules: {
       "no-restricted-imports": [
         "error",

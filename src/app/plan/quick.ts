@@ -1,16 +1,19 @@
-import type { ResearchScope } from "../contracts/data.js";
-import type { OpenRunInput } from "../contracts/runs.js";
-import type { StageDefinition, TaskDefinition } from "../contracts/workflow.js";
-import type { SourceDescription } from "../contracts/sources.js";
-import type { QueryPolicy } from "../contracts/query.js";
-import type { QuickQuerySnapshot } from "./query-snapshots.js";
-import { PUBLIC_SEARCH_LIMITS } from "./public-research.js";
+import type { ResearchScope } from "../../contracts/data.js";
+import type { OpenRunInput } from "../../contracts/runs.js";
+import type {
+  StageDefinition,
+  TaskDefinition,
+} from "../../contracts/workflow.js";
+import type { SourceDescription } from "../../contracts/sources.js";
+import type { QueryPolicy } from "../../contracts/query.js";
+import type { QuickQuerySnapshot } from "./protocol.js";
+import { PUBLIC_SEARCH_LIMITS } from "../public-research.js";
 import {
   captureResearchInput,
   DIGEST_RISK_RULE,
   researchTask as task,
   SHARED_BRIEFS,
-} from "./research-plan.js";
+} from "./inputs.js";
 
 export const QUICK_MODE_VERSION = "quick/10";
 const ANALYSTS = [

@@ -6,7 +6,7 @@ import type { DataToolName } from "../tools/query-inputs.js";
 import {
   QUICK_SNAPSHOTS_INPUT,
   type QuickQuerySnapshot,
-} from "./query-snapshots.js";
+} from "./plan/protocol.js";
 
 const text = z.string().pattern(/\S/).required();
 const dataset = z

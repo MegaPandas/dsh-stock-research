@@ -4,7 +4,7 @@ import fs from "node:fs";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import * as Application from "../../src/plugin.js";
-import { createQuickInput } from "../../src/app/quick-plan.js";
+import { createQuickInput } from "../../src/app/plan/quick.js";
 import {
   analysisReport,
   agentAnalysisReport,

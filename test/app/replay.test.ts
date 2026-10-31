@@ -2,7 +2,7 @@ import fs from "node:fs";
 import { join } from "node:path";
 import type { GenerateOptions, StreamChunk } from "@deepseek-ai/dsh-llm";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { createQuickInput } from "../../src/app/quick-plan.js";
+import { createQuickInput } from "../../src/app/plan/quick.js";
 import { createReplayInput } from "../../src/app/replay-input.js";
 import type { ReportPayload } from "../../src/contracts/artifact-payloads.js";
 import type {

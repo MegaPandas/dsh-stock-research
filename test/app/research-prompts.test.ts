@@ -5,7 +5,7 @@ import {
   PUBLIC_ANALYST_PROMPT,
   PUBLIC_RESEARCH_BRIEF,
 } from "../../src/app/public-research.js";
-import { SHARED_BRIEFS } from "../../src/app/research-plan.js";
+import { SHARED_BRIEFS } from "../../src/app/plan/inputs.js";
 import { ROLE_PROMPTS } from "../../src/app/research-prompts.js";
 import { REVIEW_PROMPT } from "../../src/app/review-prompt.js";
 

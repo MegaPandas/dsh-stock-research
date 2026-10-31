@@ -5,8 +5,8 @@ import {
   type ToolRunContext,
 } from "@deepseek-ai/dsh-tools";
 import { afterEach, describe, expect, it } from "vitest";
-import { createQuickInput } from "../../src/app/quick-plan.js";
-import { createDeepInput } from "../../src/app/deep-plan.js";
+import { createQuickInput } from "../../src/app/plan/quick.js";
+import { createDeepInput } from "../../src/app/plan/deep.js";
 import { createReplayInput } from "../../src/app/replay-input.js";
 import { attachCollection } from "../../src/app/collection-snapshot.js";
 import type { CollectionSnapshot } from "../../src/contracts/collection.js";

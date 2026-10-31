@@ -3,7 +3,7 @@ import {
   attachCollection,
   requireCollectionData,
 } from "../../src/app/collection-snapshot.js";
-import { createQuickInput } from "../../src/app/quick-plan.js";
+import { createQuickInput } from "../../src/app/plan/quick.js";
 import type { CollectionSnapshot } from "../../src/contracts/collection.js";
 import { CN_SECURITY } from "../fixtures/market.js";
 

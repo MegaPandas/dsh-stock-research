@@ -1,7 +1,7 @@
 import z from "@deepseek-ai/schemastery";
 import { ResearchError } from "../contracts/errors.js";
 import type { RunReader } from "../contracts/run-access.js";
-import { APPLICATION_INPUT_NAME } from "./research-input-capture.js";
+import { APPLICATION_INPUT_NAME } from "./plan/protocol.js";
 
 const text = z.string().pattern(/\S/).required();
 const policy = z

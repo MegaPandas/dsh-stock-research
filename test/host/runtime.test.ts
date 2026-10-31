@@ -10,7 +10,7 @@ import {
 import type { WebSearchRequest } from "@deepseek-ai/dsh-web";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DataRoot } from "../../src/storage/data-root.js";
-import { createQuickInput } from "../../src/app/quick-plan.js";
+import { createQuickInput } from "../../src/app/plan/quick.js";
 import {
   deferred,
   gate,
