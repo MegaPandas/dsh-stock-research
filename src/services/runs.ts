@@ -504,7 +504,7 @@ export class RunService implements RunAccess {
     const result = this.replay(run, receipt, {
       contents,
     }) as ArtifactCommitResult;
-    this.repairProjections(operation.runId);
+    this.project(run);
     return result;
   }
 
@@ -663,7 +663,7 @@ export class RunService implements RunAccess {
     };
     const receipt = findReceipt(run, taskScope(operation), action, requestId);
     if (receipt !== undefined) {
-      this.repairProjections(operation.runId);
+      this.project(run);
       return { result: receipt.result as ArtifactCommitResult, context };
     }
     currentAttempt(run, operation);
@@ -1088,12 +1088,15 @@ export class RunService implements RunAccess {
   }
 
   repairProjections(runId: string): void {
-    const run = this.read(runId);
+    this.project(this.read(runId));
+  }
+
+  private project(run: ResearchRun): void {
     const currentRefs = new Set(
       run.tasks.flatMap((task) => task.outputRefs.map(artifactKey)),
     );
     this.syncProjections({
-      runId,
+      runId: run.runId,
       revision: run.revision,
       artifactRefs: run.artifacts
         .filter((artifact) => currentRefs.has(artifactKey(artifact.ref)))
@@ -1323,18 +1326,18 @@ export class RunService implements RunAccess {
     const receipt = findReceipt(current, scope, action, requestId);
     if (receipt !== undefined) {
       const result = this.replay(current, receipt, request) as Result;
-      if (repairsViews) this.repairProjections(operation.runId);
+      if (repairsViews) this.project(current);
       return result;
     }
     let result: Result;
-    this.store.commit(operation.runId, (run, writer) => {
+    const committed = this.store.commit(operation.runId, (run, writer) => {
       run.updatedAt = this.now();
       result = apply(run, writer);
       const input = writer.input(() => request);
       run.receipts.push({ scope, action, requestId, request: input, result });
       return run;
     });
-    if (repairsViews) this.repairProjections(operation.runId);
+    if (repairsViews) this.project(committed);
     return result!;
   }
 

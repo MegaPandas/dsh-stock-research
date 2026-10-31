@@ -715,6 +715,57 @@ describe("run service transactions", () => {
     ).toThrowError(expect.objectContaining({ code: "STORAGE_FAILED" }));
   });
 
+  it("reuses the current projection snapshot within commits and receipt reads", () => {
+    const { service, store, path } = setup();
+    const { runId } = service.open("coordinator", input(), "open");
+    const op = claim(service, runId, "analysis");
+    const contents = [artifact("analysis")];
+    const reads = vi.spyOn(fs, "readFileSync");
+    const measured = <T>(action: () => T) => {
+      reads.mockClear();
+      const result = action();
+      return {
+        result,
+        manifests: reads.mock.calls.filter(([file]) =>
+          String(file).endsWith("/manifest.json"),
+        ).length,
+      };
+    };
+    const published = measured(() =>
+      service.commitArtifact(op, contents, "submit"),
+    );
+    expect(published.manifests).toBeLessThanOrEqual(4);
+    const canonical = store.read(runId);
+    const report = join(runDirectory(path, runId), "reports", "analysis.md");
+    for (const { action, limit } of [
+      {
+        action: () => service.commitArtifact(op, contents, "submit"),
+        limit: 4,
+      },
+      {
+        action: () => service.artifactForCall(op, contents, "submit"),
+        limit: 4,
+      },
+      {
+        action: () =>
+          service.serviceForCall(op, "submit", "commit_artifact").result,
+        limit: 3,
+      },
+    ]) {
+      fs.unlinkSync(report);
+      const replayed = measured(action);
+      expect(replayed.result).toEqual(published.result);
+      expect(replayed.manifests).toBeLessThanOrEqual(limit);
+      expect(store.read(runId)).toEqual(canonical);
+      expect(fs.readFileSync(report, "utf8")).toContain("analysis body");
+    }
+    fs.unlinkSync(report);
+    const repaired = measured(() => service.repairProjections(runId));
+    expect(repaired.manifests).toBeLessThanOrEqual(3);
+    expect(store.read(runId)).toEqual(canonical);
+    expect(fs.readFileSync(report, "utf8")).toContain("analysis body");
+  });
+
   it("discovers a creation receipt after manifest publication reports a sync failure", () => {
     const { service, store } = setup();
     const rename = fs.renameSync;
