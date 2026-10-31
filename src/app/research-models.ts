@@ -1,7 +1,8 @@
 import type { Agent, AgentOptions } from "@deepseek-ai/dsh-agent";
 import type { RunReader } from "../contracts/run-access.js";
 import { ResearchError } from "../contracts/errors.js";
-import { resolveModelOptions, type ModelConfig } from "./model-config.js";
+import { resolveModelOptions } from "./model-config.js";
+import type { ModelConfig } from "../contracts/settings.js";
 
 export const RESEARCH_MODELS_INPUT = "stock-research:models";
 

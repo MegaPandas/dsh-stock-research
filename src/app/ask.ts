@@ -16,14 +16,15 @@ import { renderAgentReport } from "../report/agent-report.js";
 import { parseAskInput, type AskInput } from "./ask-input.js";
 import { ASK_PROMPT, ASK_TOOL_NAMES } from "./ask-prompt.js";
 import { scopedQueryParameters } from "./query-scope.js";
-import { ModelConfig, resolveModelOptions } from "./model-config.js";
+import { ModelConfigSchema, resolveModelOptions } from "./model-config.js";
+import type { ModelConfig } from "../contracts/settings.js";
 import { researchCutoff } from "./ask-input.js";
 import { collectionReadTools } from "./collection-tools.js";
 import { collectionDirectory } from "./collection-input.js";
 import { requireCollectionData } from "./collection-snapshot.js";
 
 export type AskConfig = ModelConfig;
-export const Config = ModelConfig.required(false);
+export const Config = ModelConfigSchema.required(false);
 
 interface ActiveAsk {
   controller: AbortController;

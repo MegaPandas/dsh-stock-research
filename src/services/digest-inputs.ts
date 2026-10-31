@@ -9,7 +9,7 @@ import {
   type ResearchArtifactVersion,
 } from "./artifact-inputs.js";
 import { artifactReferences } from "./artifact-references.js";
-import { artifactKey } from "./run-dependencies.js";
+import { artifactKey } from "../contracts/artifact-identity.js";
 
 export function bindNumber(
   input: NumberInput,

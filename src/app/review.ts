@@ -28,7 +28,8 @@ import {
   opaqueObjectSchema,
 } from "../tools/parameters.js";
 import { parseDataRequest } from "../tools/query-inputs.js";
-import { ModelConfig, resolveModelOptions } from "./model-config.js";
+import { ModelConfigSchema, resolveModelOptions } from "./model-config.js";
+import type { ModelConfig } from "../contracts/settings.js";
 import { parseReviewInput, type ReviewInput } from "./review-input.js";
 import { REVIEW_PROMPT } from "./review-prompt.js";
 import { scopedQueryParameters } from "./query-scope.js";
@@ -355,7 +356,7 @@ class ReviewApplication {
   }
 }
 
-export const Config = ModelConfig.required(false);
+export const Config = ModelConfigSchema.required(false);
 export const name = "stock-review";
 export const inject = ["stockResearch", "commands", "systemPrompt"];
 export function apply(ctx: Context, config?: ModelConfig): void {

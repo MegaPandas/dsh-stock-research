@@ -14,14 +14,12 @@ import type {
   ConfigFormSnapshot,
 } from "@deepseek-ai/dsh-client-ui-settings/client";
 import { SettingsPage } from "../../src/client/SettingsPage.js";
-import type {
-  ModelCatalog,
-  SettingsValue,
-} from "../../src/client/settings-types.js";
+import type { ModelCatalog } from "../../src/client/settings-types.js";
+import type { ApplicationConfig } from "../../src/contracts/settings.js";
 
 afterEach(cleanup);
 
-function settings(): SettingsValue {
+function settings(): ApplicationConfig {
   return {
     runtime: {
       dataRoot: "/tmp/stock-settings-fixture",
@@ -78,9 +76,9 @@ const loadCatalog = async () => catalog;
 
 function fixture(
   value = settings(),
-  changes: Partial<ConfigFormSnapshot<SettingsValue>> = {},
+  changes: Partial<ConfigFormSnapshot<ApplicationConfig>> = {},
 ) {
-  let snapshot: ConfigFormSnapshot<SettingsValue> = {
+  let snapshot: ConfigFormSnapshot<ApplicationConfig> = {
     status: "ready",
     value,
     base: settings(),
@@ -90,8 +88,10 @@ function fixture(
     ...changes,
   };
   const listeners = new Set<() => void>();
-  const mutate = vi.fn<ConfigForm<SettingsValue>["mutate"]>(async () => true);
-  const form: ConfigForm<SettingsValue> = {
+  const mutate = vi.fn<ConfigForm<ApplicationConfig>["mutate"]>(
+    async () => true,
+  );
+  const form: ConfigForm<ApplicationConfig> = {
     getSnapshot: () => snapshot,
     subscribe: (listener) => {
       listeners.add(listener);
@@ -103,7 +103,7 @@ function fixture(
     set: async () => true,
     unset: async () => true,
   };
-  function update(changes: Partial<ConfigFormSnapshot<SettingsValue>>) {
+  function update(changes: Partial<ConfigFormSnapshot<ApplicationConfig>>) {
     snapshot = { ...snapshot, ...changes };
     for (const listener of listeners) listener();
   }

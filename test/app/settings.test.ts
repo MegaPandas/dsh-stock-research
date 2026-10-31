@@ -11,9 +11,9 @@ import { researchCommands } from "../fixtures/quick-host.js";
 import { readApplicationInput } from "../../src/app/research-input.js";
 import { askAnswerResponse, askCollection } from "../fixtures/ask-host.js";
 import * as Application from "../../src/plugin.js";
+import type { ApplicationConfig } from "../../src/contracts/settings.js";
 
 const { Config, Configuration } = Application;
-type ApplicationConfig = Application.ApplicationConfig;
 
 const cleanups: (() => Promise<void>)[] = [];
 afterEach(async () => {

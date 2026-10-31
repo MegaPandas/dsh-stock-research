@@ -81,7 +81,8 @@ import {
   resumeRun,
   taskState,
 } from "./run-control.js";
-import { artifactKey, assertFreshInputs } from "./run-dependencies.js";
+import { assertFreshInputs } from "./run-dependencies.js";
+import { artifactKey } from "../contracts/artifact-identity.js";
 import { persistEvidence, persistMemoryInput } from "./run-data.js";
 import { prepareReplay, type PreparedReplay } from "./replay-inputs.js";
 import {

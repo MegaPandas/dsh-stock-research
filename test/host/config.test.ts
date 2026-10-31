@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import z from "@deepseek-ai/schemastery";
-import { Config, type ResearchConfig } from "../../src/host/config.js";
+import { Config } from "../../src/host/config.js";
+import type { ResearchConfig } from "../../src/contracts/settings.js";
 import { ResearchError } from "../../src/contracts/errors.js";
 
 function parse(value: unknown): ResearchConfig {

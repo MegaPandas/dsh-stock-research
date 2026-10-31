@@ -3,21 +3,17 @@ import type { Agent, AgentOptions } from "@deepseek-ai/dsh-agent";
 import { ReasoningEffortId } from "@deepseek-ai/dsh-llm";
 import { parentAgentOptionsForDelegation } from "@deepseek-ai/dsh-subagent";
 import { ResearchError } from "../contracts/errors.js";
+import type { ModelConfig } from "../contracts/settings.js";
 
-export interface ModelConfig {
-  provider?: string;
-  model?: string;
-  reasoningEffort?: ReasoningEffortId | null;
-}
 const fields = {
   provider: z.string().pattern(/\S/),
   model: z.string().pattern(/\S/),
   reasoningEffort: z.union([
     z.const(null),
-    z.transform(z.string().pattern(/\S/).required(), ReasoningEffortId),
+    z.string().pattern(/\S/).required(),
   ]),
 };
-export const ModelConfig = z
+export const ModelConfigSchema = z
   .transform(z.object(fields).required(), (value): ModelConfig => {
     for (const key of Object.keys(value))
       if (!Object.hasOwn(fields, key))
@@ -57,6 +53,6 @@ export function overrideModelOptions(
   }
   if (config?.reasoningEffort === null) delete options.reasoningEffort;
   else if (config?.reasoningEffort !== undefined)
-    options.reasoningEffort = config.reasoningEffort;
+    options.reasoningEffort = ReasoningEffortId(config.reasoningEffort);
   return options;
 }

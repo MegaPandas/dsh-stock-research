@@ -2,7 +2,7 @@ import type { ArtifactVersion } from "../contracts/artifacts.js";
 import type { ArtifactRef } from "../contracts/data.js";
 import { ResearchError } from "../contracts/errors.js";
 import { reportMaterial } from "../report/material.js";
-import { artifactKey } from "../services/run-dependencies.js";
+import { artifactKey } from "../contracts/artifact-identity.js";
 import { researchTool } from "../tools/errors.js";
 import {
   object,

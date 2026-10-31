@@ -1,12 +1,7 @@
 import { ResearchError } from "../contracts/errors.js";
+import type { HttpClientOptions } from "../contracts/http.js";
 
 const MAX_TIMEOUT_MS = 2_147_483_647;
-
-export interface HttpClientOptions {
-  timeoutMs: number;
-  maxConcurrency: number;
-  minIntervalMs: number;
-}
 
 export interface HttpRequestOptions {
   signal?: AbortSignal;

@@ -3,7 +3,7 @@ import type {
   CommandInvocation,
   CommandResult,
 } from "@deepseek-ai/dsh-commands";
-import type { ModelConfig } from "./model-config.js";
+import type { ModelConfig } from "../contracts/settings.js";
 import type { ToolRunContext } from "@deepseek-ai/dsh-tools";
 import { withActivity } from "./activity.js";
 

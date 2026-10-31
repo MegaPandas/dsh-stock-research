@@ -7,12 +7,13 @@ import type {} from "@deepseek-ai/dsh-settings";
 import { interpolate } from "@deepseek-ai/cordis-plugin-loader";
 import z from "@deepseek-ai/schemastery";
 import { ResearchError } from "./contracts/errors.js";
-import { Config as RuntimeConfig, type ResearchConfig } from "./host/config.js";
+import { Config as RuntimeConfig } from "./host/config.js";
+import type { ApplicationConfig } from "./contracts/settings.js";
 import { createResearchPlugin } from "./host/runtime.js";
 import * as Ask from "./app/ask.js";
 import * as Quick from "./app/quick.js";
 import * as Review from "./app/review.js";
-import { ModelConfig } from "./app/model-config.js";
+import { ModelConfigSchema } from "./app/model-config.js";
 import { prepareResearchRole } from "./app/prepare-role.js";
 import {
   beginCleanup,
@@ -23,17 +24,12 @@ import type { ResearchSettings } from "./app/settings.js";
 import { DataRoot } from "./storage/data-root.js";
 import { PUBLIC_SEARCH_LIMITS } from "./app/public-research.js";
 
-export interface ApplicationConfig {
-  runtime: ResearchConfig;
-  model?: ModelConfig;
-  publicSearchLimit?: number;
-}
 export const Configuration = z
   .transform(
     z
       .object({
         runtime: RuntimeConfig,
-        model: ModelConfig.required(false),
+        model: ModelConfigSchema.required(false),
         publicSearchLimit: z
           .natural()
           .max(Number.MAX_SAFE_INTEGER)

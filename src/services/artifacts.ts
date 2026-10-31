@@ -15,7 +15,7 @@ import { artifactReferences } from "./artifact-references.js";
 import { EvidenceTimeError, verifyEvidence } from "./evidence-checks.js";
 import { readPointer, referenceField, SelectorError } from "./number-fields.js";
 import type { NumberService } from "./numbers.js";
-import { artifactKey } from "./run-dependencies.js";
+import { artifactKey } from "../contracts/artifact-identity.js";
 import type { RunCommands, RunReader } from "../contracts/run-access.js";
 import {
   ArtifactInputs,

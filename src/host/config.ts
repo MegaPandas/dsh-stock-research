@@ -1,32 +1,6 @@
 import z from "@deepseek-ai/schemastery";
-import type { QueryCachePolicy } from "../contracts/query.js";
 import { ResearchError } from "../contracts/errors.js";
-import type { HttpClientOptions } from "../data/http.js";
-import type { QueryPolicy } from "../contracts/query.js";
-
-export const SOURCE_IDS = [
-  "yahoo",
-  "eastmoney-market",
-  "tencent",
-  "sec",
-  "eastmoney-income",
-  "sina",
-  "xueqiu",
-  "fred",
-  "china-macro",
-  "benchmarks",
-  "dsh-web",
-] as const;
-export type SourceId = (typeof SOURCE_IDS)[number];
-export interface ResearchConfig {
-  dataRoot: string;
-  enabledSources: SourceId[];
-  http: HttpClientOptions;
-  cache: { maxEntries: number; ttl: QueryCachePolicy };
-  policy: QueryPolicy;
-  secUserAgent?: string;
-  xueqiuCookie?: string;
-}
+import { SOURCE_IDS, type ResearchConfig } from "../contracts/settings.js";
 
 const MAX_TIMER_MS = 2_147_483_647;
 const text = z.string().pattern(/\S/).required();

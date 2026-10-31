@@ -13,7 +13,7 @@ import type {
 import { ResearchError } from "../contracts/errors.js";
 import type { StageHandoff } from "../contracts/stage-handoff.js";
 import { parseAgentReport } from "./agent-reports.js";
-import { artifactKey } from "./run-dependencies.js";
+import { artifactKey } from "../contracts/artifact-identity.js";
 
 export const generateHandoffDigest: GenerateDigest = async (
   input,

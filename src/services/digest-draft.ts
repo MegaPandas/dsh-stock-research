@@ -4,7 +4,7 @@ import { ResearchError } from "../contracts/errors.js";
 import { numberText } from "../report/render.js";
 import { renderAgentReport } from "../report/agent-report.js";
 import { artifactRef, list, object, text } from "./artifact-schema.js";
-import { artifactKey } from "./run-dependencies.js";
+import { artifactKey } from "../contracts/artifact-identity.js";
 import { parseAgentReport } from "./agent-reports.js";
 
 function invalid(detail: string): never {

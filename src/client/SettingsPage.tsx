@@ -1,15 +1,11 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import type { ConfigForm } from "@deepseek-ai/dsh-client-ui-settings/client";
 import { ModelSelect } from "./ModelSelect.js";
-import type {
-  ModelCatalog,
-  ModelOverride,
-  ModelRoute,
-  SettingsValue,
-} from "./settings-types.js";
+import type { ModelCatalog, ModelRoute } from "./settings-types.js";
+import type { ApplicationConfig, ModelConfig } from "../contracts/settings.js";
 
 export interface SettingsPageProps {
-  form: ConfigForm<SettingsValue>;
+  form: ConfigForm<ApplicationConfig>;
   loadCatalog: () => Promise<ModelCatalog>;
   inheritedModel?: ModelRoute;
 }
@@ -19,13 +15,16 @@ type Value =
 type Operation =
   { op: "set"; path: string[]; value: Value } | { op: "unset"; path: string[] };
 interface RetainedDraft {
-  draft: SettingsValue;
-  original: SettingsValue;
+  draft: ApplicationConfig;
+  original: ApplicationConfig;
   revision: number | undefined;
   resets: string[];
 }
 // Settings navigation unmounts pages without a before-leave hook.
-const retainedDrafts = new WeakMap<ConfigForm<SettingsValue>, RetainedDraft>();
+const retainedDrafts = new WeakMap<
+  ConfigForm<ApplicationConfig>,
+  RetainedDraft
+>();
 const sources = [
   ["yahoo", "Yahoo 行情", "美股行情与部分市场基准"],
   ["eastmoney-market", "东方财富行情", "A 股行情、估值与固定采集"],
@@ -72,10 +71,10 @@ function at(value: unknown, path: string[]): unknown {
   );
 }
 function changed(
-  value: SettingsValue,
+  value: ApplicationConfig,
   path: string[],
   replacement: unknown,
-): SettingsValue {
+): ApplicationConfig {
   const copy = structuredClone(value);
   let node: Record<string, unknown> = copy as unknown as Record<
     string,
@@ -128,11 +127,11 @@ function ModelEditor({
   onReset,
 }: {
   label: string;
-  value: ModelOverride | undefined;
+  value: ModelConfig | undefined;
   inherited: ModelRoute | undefined;
   catalog: ModelCatalog | undefined;
   disabled: boolean;
-  onChange: (value: ModelOverride) => void;
+  onChange: (value: ModelConfig) => void;
   onReset: () => void;
 }) {
   const custom = value?.provider !== undefined;
@@ -266,10 +265,10 @@ export function SettingsPage({
     (listener) => form.subscribe(listener),
     () => form.getSnapshot(),
   );
-  const [draft, setDraft] = useState<SettingsValue | undefined>(
+  const [draft, setDraft] = useState<ApplicationConfig | undefined>(
     () => retainedDrafts.get(form)?.draft,
   );
-  const [original, setOriginal] = useState<SettingsValue | undefined>(
+  const [original, setOriginal] = useState<ApplicationConfig | undefined>(
     () => retainedDrafts.get(form)?.original,
   );
   const [revision, setRevision] = useState<number | undefined>(
@@ -328,7 +327,7 @@ export function SettingsPage({
   if (snapshot.status === "unavailable" || !draft)
     return <p role="status">当前宿主未提供股票研究设置。</p>;
   const disabled = saving || !snapshot.writable;
-  const base = snapshot.base as SettingsValue | undefined;
+  const base = snapshot.base as ApplicationConfig | undefined;
   const edit = (path: string[], value: unknown) => {
     setDraft((current) => changed(current!, path, value));
     setResets((current) =>

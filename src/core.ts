@@ -38,7 +38,14 @@ export {
   PRICE_RETURN_ALGORITHM_VERSION,
 } from "./indicators/returns.js";
 export { HttpClient, HttpStatusError } from "./data/http.js";
-export type { HttpClientOptions, HttpRequestOptions } from "./data/http.js";
+export type { HttpClientOptions } from "./contracts/http.js";
+export type { HttpRequestOptions } from "./data/http.js";
+export type {
+  ApplicationConfig,
+  ModelConfig,
+  ResearchConfig,
+  SourceId,
+} from "./contracts/settings.js";
 export type { JsonValue } from "./contracts/json.js";
 export type { QueryCacheKey } from "./contracts/cache.js";
 export { createCacheKey, SqliteCache } from "./cache/index.js";

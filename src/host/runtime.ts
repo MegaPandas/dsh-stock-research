@@ -50,7 +50,8 @@ import {
   createReportSubmission,
   type SubmitReport,
 } from "./report-submission.js";
-import { Config, type ResearchConfig } from "./config.js";
+import { Config } from "./config.js";
+import type { ResearchConfig } from "../contracts/settings.js";
 import { generateHandoffDigest } from "../services/handoff-digest.js";
 import { DispatchBridge, type PrepareRole } from "./dispatch.js";
 import { ResearchSessions } from "./sessions.js";

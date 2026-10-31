@@ -12,7 +12,7 @@ import {
   captureResearchModels,
   RESEARCH_MODELS_INPUT,
 } from "./research-models.js";
-import type { ModelConfig } from "./model-config.js";
+import type { ModelConfig } from "../contracts/settings.js";
 import { holdActivity } from "./activity.js";
 import { ResearchExecutions } from "./research-executions.js";
 import { createReplayInput } from "./replay-input.js";

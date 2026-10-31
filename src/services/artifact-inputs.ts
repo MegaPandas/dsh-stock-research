@@ -20,7 +20,7 @@ import { artifactReferences } from "./artifact-references.js";
 import { isStageReport } from "./analysis-report.js";
 import { aggregateArtifactGaps } from "./artifact-gaps.js";
 import { numberField, referenceField } from "./number-fields.js";
-import { artifactKey } from "./run-dependencies.js";
+import { artifactKey } from "../contracts/artifact-identity.js";
 import { verifyEvidence } from "./evidence-checks.js";
 import type { RunReader } from "../contracts/run-access.js";
 

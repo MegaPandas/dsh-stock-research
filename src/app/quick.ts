@@ -1,6 +1,7 @@
 import type { Context } from "@deepseek-ai/cordis";
 import type {} from "@deepseek-ai/dsh-system-prompt";
-import { ModelConfig } from "./model-config.js";
+import { ModelConfigSchema } from "./model-config.js";
+import type { ModelConfig } from "../contracts/settings.js";
 import { COORDINATOR_PROMPT } from "./coordinator-prompt.js";
 import { ResearchApplication } from "./research-application.js";
 import { createResearchCommands } from "./research-commands.js";
@@ -11,7 +12,7 @@ import {
 } from "./research-tools.js";
 import { createResearchReadTools } from "./research-read-tools.js";
 
-export const Config = ModelConfig.required(false);
+export const Config = ModelConfigSchema.required(false);
 export const name = "stock-quick";
 export const inject = [
   "stockResearch",

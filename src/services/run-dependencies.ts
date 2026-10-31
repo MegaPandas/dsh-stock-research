@@ -8,10 +8,7 @@ import type {
   ResearchRun,
 } from "../contracts/runs.js";
 import { artifactCalculationIds } from "./artifact-references.js";
-
-export function artifactKey(ref: ArtifactRef): string {
-  return JSON.stringify([ref.runId, ref.artifactId, ref.revision]);
-}
+import { artifactKey } from "../contracts/artifact-identity.js";
 
 export function affectedTaskIds(
   run: ResearchRun,

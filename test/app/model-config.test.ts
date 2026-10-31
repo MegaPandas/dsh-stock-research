@@ -8,9 +8,10 @@ import {
 } from "@deepseek-ai/dsh-llm";
 import { SessionId } from "@deepseek-ai/dsh-session";
 import {
-  ModelConfig,
+  ModelConfigSchema,
   resolveModelOptions,
 } from "../../src/app/model-config.js";
+import type { ModelConfig } from "../../src/contracts/settings.js";
 import { runtimeHost, textResponse } from "../fixtures/runtime-host.js";
 
 const cleanups: (() => Promise<void>)[] = [];
@@ -19,7 +20,7 @@ afterEach(async () => {
 });
 
 function parse(input: unknown): ModelConfig {
-  return z.resolve(input, ModelConfig, {})[0];
+  return z.resolve(input, ModelConfigSchema, {})[0];
 }
 
 async function parent() {
@@ -67,7 +68,7 @@ describe("research model configuration", () => {
   it.each([
     { config: undefined, effort: "high" },
     { config: {}, effort: "high" },
-    { config: { reasoningEffort: ReasoningEffortId("low") }, effort: "low" },
+    { config: { reasoningEffort: "low" }, effort: "low" },
     { config: { reasoningEffort: null }, effort: undefined },
   ])(
     "inherits the creation route with effort $effort before any request",

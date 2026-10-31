@@ -17,7 +17,7 @@ import type {
   MemoryInputSnapshot,
   RegisteredEvidenceRecord,
 } from "../contracts/task-data.js";
-import { artifactKey } from "./run-dependencies.js";
+import { artifactKey } from "../contracts/artifact-identity.js";
 
 export interface ReplayDataReader {
   artifact(ref: ArtifactRef): ArtifactVersion;
