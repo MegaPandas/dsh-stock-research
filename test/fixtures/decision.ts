@@ -11,7 +11,7 @@ import type { RunOperation, RunState } from "../../src/contracts/runs.js";
 import type { NumberTarget } from "../../src/contracts/numbers.js";
 import type { EvidenceInput } from "../../src/contracts/task-data.js";
 import type { TaskDefinition } from "../../src/contracts/workflow.js";
-import { ArtifactService } from "../../src/services/artifacts.js";
+import { ArtifactService } from "../../src/services/artifact-submission/index.js";
 import { NumberService } from "../../src/services/numbers.js";
 import { createRunService } from "../../src/services/run/index.js";
 import { RunStore } from "../../src/runs/store.js";

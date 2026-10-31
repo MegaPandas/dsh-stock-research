@@ -23,7 +23,7 @@ import {
 } from "../../src/app/valuation-methods.js";
 import { calculationRequest, valuationRecord } from "../fixtures/valuation.js";
 import { createResearchPlugin } from "../../src/runtime.js";
-import { ArtifactService } from "../../src/services/artifacts.js";
+import { ArtifactService } from "../../src/services/artifact-submission/index.js";
 import { NumberService } from "../../src/services/numbers.js";
 import { analysis } from "../fixtures/dispatch-host.js";
 import { MARKET_FIXTURE } from "../fixtures/market.js";

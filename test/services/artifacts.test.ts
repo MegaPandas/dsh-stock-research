@@ -16,7 +16,7 @@ import type { TaskDefinition } from "../../src/contracts/workflow.js";
 import {
   ArtifactNumberError,
   ArtifactService,
-} from "../../src/services/artifacts.js";
+} from "../../src/services/artifact-submission/index.js";
 import { NumberService } from "../../src/services/numbers.js";
 import { createRunService } from "../../src/services/run/index.js";
 import { RunStore } from "../../src/runs/store.js";

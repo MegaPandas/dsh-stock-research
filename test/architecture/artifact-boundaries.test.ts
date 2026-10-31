@@ -20,10 +20,10 @@ describe("artifact rule boundaries", () => {
     ["src/artifacts/gaps.ts", "../runs/store.js"],
     ["src/artifacts/risks.ts", "node:fs"],
     ["src/artifacts/references.ts", "../host/runtime.js"],
-    ["src/artifacts/schema.ts", "../services/artifacts.js"],
+    ["src/artifacts/schema.ts", "../services/artifact-submission/index.js"],
     ["src/artifacts/agent-reports.ts", "../storage/data-root.js"],
     ["src/artifacts/stage-handoff.ts", "@deepseek-ai/dsh-agent"],
-    ["src/artifacts/assembly.ts", "../services/artifacts.js"],
+    ["src/artifacts/assembly.ts", "../services/artifact-submission/index.js"],
   ])(
     "rejects an upper or I/O dependency from %s to %s",
     async (file, dependency) => {
@@ -39,7 +39,10 @@ describe("artifact rule boundaries", () => {
   it.each([
     ["src/artifacts/risks.ts", "node:util"],
     ["src/artifacts/gaps.ts", "../contracts/artifact-payloads.js"],
-    ["src/services/artifacts.ts", "../artifacts/references.js"],
+    [
+      "src/services/artifact-submission/index.ts",
+      "../../artifacts/references.js",
+    ],
     ["src/app/agent-role.ts", "../artifacts/risks.js"],
     ["src/services/digests.ts", "./digest-inputs.js"],
     ["src/tools/read.ts", "../artifacts/schema.js"],
@@ -64,7 +67,7 @@ describe("artifact rule boundaries", () => {
     'import { object } from "../artifacts/shape.js";',
     'const parser = import("../artifacts/nested/new-parser.js");',
   ])("keeps parsing implementation files private", async (source) => {
-    const errors = await boundaryErrors("src/services/artifacts.ts", source);
+    const errors = await boundaryErrors("src/services/numbers.ts", source);
     expect(errors).toHaveLength(1);
     expect(errors[0]!.messageId).toBe("privateEntry");
   });
@@ -80,6 +83,30 @@ describe("artifact rule boundaries", () => {
       expect(errors[0]!.message).toContain("Report rendering");
     },
   );
+
+  it.each([
+    [
+      "src/app/new-use-case.ts",
+      "../services/artifact-submission/requirements.js",
+    ],
+    ["src/services/decisions.ts", "./artifact-submission/nested/new-rule.js"],
+  ])("keeps submission rules private from %s", async (file, dependency) => {
+    const errors = await boundaryErrors(file, `export * from "${dependency}";`);
+    expect(errors).toHaveLength(1);
+    expect(errors[0]!.messageId).toBe("privateEntry");
+  });
+
+  it.each([
+    ["src/core.ts", "./services/artifact-submission/index.js"],
+    ["src/tools/errors.ts", "../services/artifact-submission/index.js"],
+    ["src/services/digests.ts", "./artifact-submission/index.js"],
+    ["src/services/artifact-submission/index.ts", "./requirements.js"],
+    ["src/services/artifact-submission/index.ts", "../decision-basics.js"],
+  ])("allows the submission boundary from %s", async (file, dependency) => {
+    expect(
+      await boundaryErrors(file, `import { Value } from "${dependency}";`),
+    ).toEqual([]);
+  });
 
   it.each([
     [

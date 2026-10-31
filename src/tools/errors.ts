@@ -1,7 +1,7 @@
 import { HarnessError } from "@deepseek-ai/dsh-llm";
 import type { ToolDefinition } from "@deepseek-ai/dsh-tools";
 import { ResearchError } from "../contracts/errors.js";
-import { ArtifactNumberError } from "../services/artifacts.js";
+import { ArtifactNumberError } from "../services/artifact-submission/index.js";
 
 /** DSH preserves structured error identity only for its HarnessError base class. */
 export function researchTool(tool: ToolDefinition): ToolDefinition {

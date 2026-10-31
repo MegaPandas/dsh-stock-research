@@ -1,6 +1,6 @@
 import { ResearchError } from "../contracts/errors.js";
 import type { ArtifactCommitResult } from "../contracts/runs.js";
-import type { ArtifactService } from "../services/artifacts.js";
+import type { ArtifactService } from "../services/artifact-submission/index.js";
 import {
   taskOperation,
   type SessionBindings,

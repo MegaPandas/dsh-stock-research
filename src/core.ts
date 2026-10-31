@@ -308,7 +308,10 @@ export type {
   SupportedStatement,
 } from "./contracts/artifact-payloads.js";
 export { parseArtifactInput } from "./artifacts/schema.js";
-export { ArtifactService, ArtifactNumberError } from "./services/artifacts.js";
+export {
+  ArtifactService,
+  ArtifactNumberError,
+} from "./services/artifact-submission/index.js";
 export { DecisionService } from "./services/decisions.js";
 export { renderDecisionReport } from "./report/decision.js";
 export type {

@@ -2,7 +2,7 @@ import type { ToolDefinition } from "@deepseek-ai/dsh-tools";
 import { ResearchError } from "../contracts/errors.js";
 import type { SessionBindings } from "../host/bindings.js";
 import { createReportSubmission } from "../host/report-submission.js";
-import type { ArtifactService } from "../services/artifacts.js";
+import type { ArtifactService } from "../services/artifact-submission/index.js";
 import type { MemoryService } from "../services/memory.js";
 import { researchTool } from "./errors.js";
 import {

@@ -1,12 +1,15 @@
-import type { DataEnvelope, ISOTime, SourceRef } from "../contracts/data.js";
-import type { EvidenceData, EvidenceEnvelope } from "../contracts/query.js";
-import type { TaskDefinition, DataRequirement } from "../contracts/workflow.js";
-import type { ResearchArtifactVersion } from "../contracts/artifact-payloads.js";
-import { ArtifactInputs } from "./artifact-inputs.js";
-import { ResearchError } from "../contracts/errors.js";
-import { numberField } from "../evidence/fields.js";
-import { EvidenceTimeError } from "../evidence/checks.js";
-import { isStageReport } from "../artifacts/analysis-report.js";
+import type { DataEnvelope, ISOTime, SourceRef } from "../../contracts/data.js";
+import type { EvidenceData, EvidenceEnvelope } from "../../contracts/query.js";
+import type {
+  TaskDefinition,
+  DataRequirement,
+} from "../../contracts/workflow.js";
+import type { ResearchArtifactVersion } from "../../contracts/artifact-payloads.js";
+import { ArtifactInputs } from "../artifact-inputs.js";
+import { ResearchError } from "../../contracts/errors.js";
+import { numberField } from "../../evidence/fields.js";
+import { EvidenceTimeError } from "../../evidence/checks.js";
+import { isStageReport } from "../../artifacts/analysis-report.js";
 
 interface Observation {
   ref: SourceRef;

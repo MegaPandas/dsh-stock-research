@@ -21,7 +21,7 @@ import { HttpClient } from "../data/http.js";
 import { createCollectionTaskFactory } from "../data/collection-tasks.js";
 import { MemoryStore } from "../memory/store.js";
 import { RunStore } from "../runs/store.js";
-import { ArtifactService } from "../services/artifacts.js";
+import { ArtifactService } from "../services/artifact-submission/index.js";
 import { DecisionService } from "../services/decisions.js";
 import { DigestService } from "../services/digests.js";
 import { MemoryService } from "../services/memory.js";

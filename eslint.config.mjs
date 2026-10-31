@@ -60,6 +60,10 @@ export default defineConfig(
             publicEntries: ["index.js"],
           },
           {
+            directory: "src/services/artifact-submission",
+            publicEntries: ["index.js"],
+          },
+          {
             directory: "src/evidence",
             publicEntries: ["fields.js", "checks.js", "price-basis.js"],
           },

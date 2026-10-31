@@ -15,7 +15,7 @@ import type {
   TaskOperation,
 } from "../../src/contracts/runs.js";
 import { RunStore } from "../../src/runs/store.js";
-import { ArtifactService } from "../../src/services/artifacts.js";
+import { ArtifactService } from "../../src/services/artifact-submission/index.js";
 import { DigestService } from "../../src/services/digests.js";
 import { NumberService } from "../../src/services/numbers.js";
 import { createRunService } from "../../src/services/run/index.js";

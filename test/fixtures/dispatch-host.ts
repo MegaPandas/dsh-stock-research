@@ -41,7 +41,7 @@ import type { RunReader } from "../../src/contracts/run-access.js";
 import { ResearchSessions } from "../../src/host/sessions.js";
 import { MemoryStore } from "../../src/memory/store.js";
 import { RunStore } from "../../src/runs/store.js";
-import { ArtifactService } from "../../src/services/artifacts.js";
+import { ArtifactService } from "../../src/services/artifact-submission/index.js";
 import { DecisionService } from "../../src/services/decisions.js";
 import { DigestService } from "../../src/services/digests.js";
 import { MemoryService } from "../../src/services/memory.js";

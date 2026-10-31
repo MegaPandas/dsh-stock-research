@@ -15,7 +15,7 @@ import type { ResearchData } from "../../src/contracts/research.js";
 import type { SinaIncomeData } from "../../src/contracts/sina-income.js";
 import type { TaskDefinition } from "../../src/contracts/workflow.js";
 import { ArtifactInputs } from "../../src/services/artifact-inputs.js";
-import { checkDecisionRequirements } from "../../src/services/decision-requirements.js";
+import { checkDecisionRequirements } from "../../src/services/artifact-submission/requirements.js";
 import {
   decisionFixture,
   type DecisionFixtureOptions,

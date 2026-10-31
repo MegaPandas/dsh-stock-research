@@ -10,7 +10,7 @@ import type {
   TaskOperation,
 } from "../contracts/runs.js";
 import { ArtifactInputs } from "./artifact-inputs.js";
-import type { ArtifactService } from "./artifacts.js";
+import type { ArtifactService } from "./artifact-submission/index.js";
 import { assembleDigest } from "./digest-draft.js";
 import { digestNumbers } from "./digest-inputs.js";
 import { inheritRisks } from "../artifacts/risks.js";

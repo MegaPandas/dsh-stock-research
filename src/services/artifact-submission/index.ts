@@ -1,37 +1,40 @@
 import type {
   ArtifactVersion,
   DecisionDraftValidation,
-} from "../contracts/artifacts.js";
+} from "../../contracts/artifacts.js";
 import type {
   ResearchArtifactInput,
   ResearchArtifactVersion,
-} from "../contracts/artifact-payloads.js";
-import type { ArtifactRef, SourceRef } from "../contracts/data.js";
-import { ResearchError } from "../contracts/errors.js";
-import type { NumberCheck } from "../contracts/numbers.js";
-import type { EvidenceData } from "../contracts/query.js";
-import type { ArtifactCommitResult, TaskOperation } from "../contracts/runs.js";
-import type { RegisteredEvidenceRecord } from "../contracts/task-data.js";
-import { parseArtifactInput } from "../artifacts/schema.js";
-import { isStageReport } from "../artifacts/analysis-report.js";
-import { artifactReferences } from "../artifacts/references.js";
-import { EvidenceTimeError, verifyEvidence } from "../evidence/checks.js";
-import { readPointer, SelectorError } from "../json/pointer.js";
-import { referenceField } from "../evidence/fields.js";
-import type { NumberService } from "./numbers.js";
-import { artifactKey } from "../contracts/artifact-identity.js";
-import type { RunCommands, RunReader } from "../contracts/run-access.js";
-import { ArtifactInputs } from "./artifact-inputs.js";
+} from "../../contracts/artifact-payloads.js";
+import type { ArtifactRef, SourceRef } from "../../contracts/data.js";
+import { ResearchError } from "../../contracts/errors.js";
+import type { NumberCheck } from "../../contracts/numbers.js";
+import type { EvidenceData } from "../../contracts/query.js";
+import type {
+  ArtifactCommitResult,
+  TaskOperation,
+} from "../../contracts/runs.js";
+import type { RegisteredEvidenceRecord } from "../../contracts/task-data.js";
+import { parseArtifactInput } from "../../artifacts/schema.js";
+import { isStageReport } from "../../artifacts/analysis-report.js";
+import { artifactReferences } from "../../artifacts/references.js";
+import { EvidenceTimeError, verifyEvidence } from "../../evidence/checks.js";
+import { readPointer, SelectorError } from "../../json/pointer.js";
+import { referenceField } from "../../evidence/fields.js";
+import type { NumberService } from "../numbers.js";
+import { artifactKey } from "../../contracts/artifact-identity.js";
+import type { RunCommands, RunReader } from "../../contracts/run-access.js";
+import { ArtifactInputs } from "../artifact-inputs.js";
 import {
   assessDecisionBasics,
   selectDecisionInputs,
-} from "./decision-basics.js";
-import { checkDecisionRequirements } from "./decision-requirements.js";
-import { readValuationCalculation } from "./valuation-records.js";
+} from "../decision-basics.js";
+import { checkDecisionRequirements } from "./requirements.js";
+import { readValuationCalculation } from "../valuation-records.js";
 import {
   validateCalculatedReport,
   validateCalculatedTarget,
-} from "./valuation-reports.js";
+} from "../valuation-reports.js";
 
 function invalid(detail: string): never {
   throw new ResearchError("INVALID_ARTIFACT", detail);
