@@ -308,6 +308,30 @@ export default defineConfig(
     },
   },
   {
+    files: ["src/app/activity.ts"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: [
+                "**/host/**",
+                "../runtime.js",
+                "@megapandas/dsh-stock-research/runtime",
+                "@deepseek-ai/*",
+                "**/services/**",
+                "**/storage/**",
+              ],
+              message:
+                "Activity tracking must use the owner's busy capability without owning runtime or storage lifecycle.",
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
     files: ["src/app/research-application.ts"],
     rules: {
       "no-restricted-imports": [

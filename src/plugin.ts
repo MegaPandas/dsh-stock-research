@@ -1,6 +1,4 @@
 import type { Context } from "@deepseek-ai/cordis";
-import fs from "node:fs";
-import { join } from "node:path";
 import { isDeepStrictEqual } from "node:util";
 import type { CommandInvocation } from "@deepseek-ai/dsh-commands";
 import type {} from "@deepseek-ai/dsh-settings";
@@ -21,7 +19,7 @@ import {
   withActivity,
 } from "./app/activity.js";
 import type { ResearchSettings } from "./app/settings.js";
-import { DataRoot } from "./storage/data-root.js";
+import { clearResearchData } from "./storage/cleanup.js";
 import { PUBLIC_SEARCH_LIMITS } from "./app/public-research.js";
 
 export const Configuration = z
@@ -253,25 +251,7 @@ export async function apply(
           await quick.dispose();
           await runtime.dispose();
           try {
-            const root = new DataRoot(applied.runtime.dataRoot);
-            try {
-              for (const name of [
-                "cache.sqlite",
-                "cache.sqlite-wal",
-                "cache.sqlite-shm",
-                "cache.sqlite-journal",
-                "runs",
-                "memory",
-                "drafts",
-                "reviews",
-              ])
-                fs.rmSync(join(root.path, name), {
-                  recursive: true,
-                  force: true,
-                });
-            } finally {
-              root.close();
-            }
+            clearResearchData(applied.runtime.dataRoot);
           } finally {
             await reopen(structuredClone(configuration.get()));
           }

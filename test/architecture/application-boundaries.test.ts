@@ -57,3 +57,18 @@ it.each(["src/app/ask-request.ts", "src/app/review-request.ts"])(
     }
   },
 );
+
+it.each(["../host/runtime.js", "../runtime.js", "../storage/cleanup.js"])(
+  "keeps activity tracking independent of resource owner %s",
+  async (dependency) => {
+    const [result] = await eslint.lintText(
+      `import type { Value } from "${dependency}";`,
+      { filePath: "src/app/activity.ts" },
+    );
+    expect(
+      result!.messages.filter(
+        ({ ruleId }) => ruleId === "no-restricted-imports",
+      ),
+    ).toHaveLength(1);
+  },
+);

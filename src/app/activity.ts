@@ -1,12 +1,15 @@
 import { ResearchError } from "../contracts/errors.js";
-import type { ResearchRuntime } from "../host/runtime.js";
+
+interface ActivityOwner {
+  isBusy(): boolean;
+}
 
 const activities = new WeakMap<
-  ResearchRuntime,
+  ActivityOwner,
   { count: number; cleaning: boolean }
 >();
 
-function state(runtime: ResearchRuntime) {
+function state(runtime: ActivityOwner) {
   let value = activities.get(runtime);
   if (value === undefined) {
     value = { count: 0, cleaning: false };
@@ -16,7 +19,7 @@ function state(runtime: ResearchRuntime) {
 }
 
 export async function withActivity<T>(
-  runtime: ResearchRuntime,
+  runtime: ActivityOwner,
   run: () => Promise<T>,
 ): Promise<T> {
   const release = holdActivity(runtime);
@@ -27,7 +30,7 @@ export async function withActivity<T>(
   }
 }
 
-export function holdActivity(runtime: ResearchRuntime): () => void {
+export function holdActivity(runtime: ActivityOwner): () => void {
   const value = state(runtime);
   if (value.cleaning)
     throw new ResearchError(
@@ -40,7 +43,7 @@ export function holdActivity(runtime: ResearchRuntime): () => void {
   };
 }
 
-export function beginCleanup(runtime: ResearchRuntime): void {
+export function beginCleanup(runtime: ActivityOwner): void {
   const value = state(runtime);
   if (value.cleaning || value.count > 0 || runtime.isBusy())
     throw new ResearchError(
@@ -50,7 +53,7 @@ export function beginCleanup(runtime: ResearchRuntime): void {
   value.cleaning = true;
 }
 
-export function isApplicationBusy(runtime: ResearchRuntime): boolean {
+export function isApplicationBusy(runtime: ActivityOwner): boolean {
   const value = state(runtime);
   return value.cleaning || value.count > 0 || runtime.isBusy();
 }
