@@ -2,9 +2,12 @@ import { ESLint } from "eslint";
 import { expect, it } from "vitest";
 
 const eslint = new ESLint();
-async function boundaryErrors(source: string) {
+async function boundaryErrors(
+  source: string,
+  filePath = "src/app/research-application.ts",
+) {
   const [result] = await eslint.lintText(source, {
-    filePath: "src/app/research-application.ts",
+    filePath,
   });
   return result!.messages.filter(
     ({ ruleId }) => ruleId === "no-restricted-imports",
@@ -34,6 +37,18 @@ it.each([
 ])("allows an explicit research capability", async (source) => {
   expect(await boundaryErrors(source)).toEqual([]);
 });
+
+it.each(["./plan/quick.js", "./plan/deep.js", "./plan/versions.js"])(
+  "keeps execution ownership independent of research policy %s",
+  async (dependency) => {
+    const errors = await boundaryErrors(
+      `import type { Value } from "${dependency}";`,
+      "src/app/research-executions.ts",
+    );
+    expect(errors).toHaveLength(1);
+    expect(errors[0]!.message).toContain("Execution ownership");
+  },
+);
 
 it.each(["src/app/ask-request.ts", "src/app/review-request.ts"])(
   "keeps %s independent of Context and commands",

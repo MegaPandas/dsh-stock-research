@@ -338,7 +338,7 @@ export default defineConfig(
                 "./research-tools.js",
                 "./research-read-tools.js",
                 "./open-research.js",
-                "./*-plan.js",
+                "./plan/**",
                 "./research-models.js",
               ],
               message:
