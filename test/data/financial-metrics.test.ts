@@ -453,7 +453,7 @@ describe("snapshot financial metrics", () => {
       code: "missing",
       field: "/data/rows/0/values/NET_INCOME_TTM",
       detail:
-        "Missing matching fiscal annual/prior-year cumulative, or four contiguous non-overlapping quarters.",
+        "Missing matching fiscal annual/prior-year cumulative PARENT_NETPROFIT, or four contiguous non-overlapping quarters.",
     });
     expect(source).toEqual(original);
   });
