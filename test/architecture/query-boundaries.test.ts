@@ -15,7 +15,10 @@ async function boundaryErrors(
 
 describe("query module boundaries", () => {
   it.each([
-    ["src/app/research-application.ts", "../services/query/source-queries.js"],
+    [
+      "src/app/research-control/index.ts",
+      "../../services/query/source-queries.js",
+    ],
     ["src/tools/read.ts", "../services/query/source-queries.js"],
     ["src/services/numbers.ts", "./query/source-queries.js"],
     ["src/host/runtime.ts", "../services/query/source-queries.js"],

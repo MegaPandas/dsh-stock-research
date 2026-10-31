@@ -13,7 +13,7 @@ import { createRunService } from "../../src/services/run/index.js";
 import {
   openResearch,
   type OpenResearchRequest,
-} from "../../src/app/open-research.js";
+} from "../../src/app/research-control/open.js";
 import { COLLECTION_INPUT } from "../../src/app/collection-snapshot.js";
 import { CN_SECURITY } from "../fixtures/market.js";
 

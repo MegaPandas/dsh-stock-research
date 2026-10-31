@@ -1,8 +1,8 @@
 import type { Agent } from "@deepseek-ai/dsh-agent";
-import type { ResearchScope } from "../contracts/data.js";
-import type { RunReader, RunLifecycle } from "../contracts/run-access.js";
-import type { QueryPolicy } from "../contracts/query.js";
-import type { SourceDescription } from "../contracts/sources.js";
+import type { ResearchScope } from "../../contracts/data.js";
+import type { RunReader, RunLifecycle } from "../../contracts/run-access.js";
+import type { QueryPolicy } from "../../contracts/query.js";
+import type { SourceDescription } from "../../contracts/sources.js";
 import type {
   AttemptTarget,
   OpenRunInput,
@@ -10,29 +10,29 @@ import type {
   RedoTaskResult,
   RunOperation,
   RunView,
-} from "../contracts/runs.js";
-import type { BoundCaller, ResearchCaller } from "../host/bindings.js";
-import type { ResearchOperations } from "../host/research-operations.js";
-import { ResearchError } from "../contracts/errors.js";
-import { serializeJson } from "../json/serialize.js";
-import { readCollection } from "./collection-input.js";
-import { savedCoordinator } from "./coordinator-input.js";
-import { openResearch, type OpenResearchPorts } from "./open-research.js";
+} from "../../contracts/runs.js";
+import type { BoundCaller, ResearchCaller } from "../../host/bindings.js";
+import type { ResearchOperations } from "../../host/research-operations.js";
+import { ResearchError } from "../../contracts/errors.js";
+import { serializeJson } from "../../json/serialize.js";
+import { readCollection } from "../collection-input.js";
+import { savedCoordinator } from "../coordinator-input.js";
+import { openResearch, type OpenResearchPorts } from "./open.js";
 import {
   captureResearchModels,
   RESEARCH_MODELS_INPUT,
-} from "./research-models.js";
-import type { ModelConfig } from "../contracts/settings.js";
+} from "../research-models.js";
+import type { ModelConfig } from "../../contracts/settings.js";
 import {
   ResearchExecutions,
   type ResearchExecutionPorts,
-} from "./research-executions.js";
-import { createReplayInput } from "./replay-input.js";
+} from "../research-executions.js";
+import { createReplayInput } from "../replay-input.js";
 import {
   researchStartLabel,
   researchContinueLabel,
-} from "./research-job-view.js";
-import { PUBLIC_SEARCH_LIMITS } from "./public-research.js";
+} from "../research-job-view.js";
+import { PUBLIC_SEARCH_LIMITS } from "../public-research.js";
 import type {
   ResearchActions,
   StartResearchRequest,
@@ -40,7 +40,7 @@ import type {
   ResearchContext,
   ResearchControl,
   ResearchControlResult,
-} from "./research-actions.js";
+} from "../research-actions.js";
 
 interface ResearchCoordinator {
   bind(owner: Agent): () => void;

@@ -14,7 +14,7 @@ async function boundaryErrors(
 
 describe("run capability boundaries", () => {
   it.each([
-    ["src/app/research-application.ts", "../services/run/service.js"],
+    ["src/app/research-control/index.ts", "../../services/run/service.js"],
     ["src/tools/read.ts", "../services/run/service.js"],
     ["src/services/numbers.ts", "./run/service.js"],
     ["src/host/runtime.ts", "../services/run/service.js"],

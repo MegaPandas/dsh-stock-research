@@ -4,7 +4,7 @@ import { expect, it } from "vitest";
 const eslint = new ESLint();
 async function boundaryErrors(
   source: string,
-  filePath = "src/app/research-application.ts",
+  filePath = "src/app/research-control/index.ts",
 ) {
   const [result] = await eslint.lintText(source, {
     filePath,
@@ -15,12 +15,12 @@ async function boundaryErrors(
 }
 it.each([
   "@deepseek-ai/cordis",
-  "../host/runtime.js",
-  "../runtime.js",
+  "../../host/runtime.js",
+  "../../runtime.js",
   "@megapandas/dsh-stock-research/runtime",
-  "./settings.js",
-  "./activity.js",
-  "../tools/read.js",
+  "../settings.js",
+  "../activity.js",
+  "../../tools/read.js",
   "@deepseek-ai/dsh-commands",
 ])(
   "keeps research actions independent of Context or adapter %s",
@@ -31,15 +31,20 @@ it.each([
   },
 );
 it.each([
-  'import type { RunReader, RunLifecycle } from "../contracts/run-access.js";',
-  'import type { ResearchExecutionPorts } from "./research-executions.js";',
-  'import type { ResearchCaller } from "../host/bindings.js";',
+  'import type { RunReader, RunLifecycle } from "../../contracts/run-access.js";',
+  'import type { ResearchExecutionPorts } from "../research-executions.js";',
+  'import type { ResearchCaller } from "../../host/bindings.js";',
 ])("allows an explicit research capability", async (source) => {
   expect(await boundaryErrors(source)).toEqual([]);
 });
 
-it.each(["./plan/quick.js", "./plan/deep.js", "./plan/versions.js"])(
-  "keeps execution ownership independent of research policy %s",
+it.each([
+  "./plan/quick.js",
+  "./plan/deep.js",
+  "./plan/versions.js",
+  "./research-control/index.js",
+])(
+  "keeps execution ownership independent of research policy or control %s",
   async (dependency) => {
     const errors = await boundaryErrors(
       `import type { Value } from "${dependency}";`,

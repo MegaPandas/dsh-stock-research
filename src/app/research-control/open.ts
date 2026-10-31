@@ -1,20 +1,20 @@
 import type {
   CollectionProgress,
   CollectionSnapshot,
-} from "../contracts/collection.js";
-import type { ResearchScope } from "../contracts/data.js";
-import type { QueryPolicy } from "../contracts/query.js";
-import type { OpenRunInput, RunInput, RunView } from "../contracts/runs.js";
-import type { SourceDescription } from "../contracts/sources.js";
-import type { RunDefinition } from "../contracts/workflow.js";
-import { researchCutoff } from "./ask-input.js";
+} from "../../contracts/collection.js";
+import type { ResearchScope } from "../../contracts/data.js";
+import type { QueryPolicy } from "../../contracts/query.js";
+import type { OpenRunInput, RunInput, RunView } from "../../contracts/runs.js";
+import type { SourceDescription } from "../../contracts/sources.js";
+import type { RunDefinition } from "../../contracts/workflow.js";
+import { researchCutoff } from "../ask-input.js";
 import {
   attachCollection,
   requireCollectionData,
-} from "./collection-snapshot.js";
-import { createQuickInput, QUICK_RESEARCH_STAGES } from "./plan/quick.js";
-import { createDeepInput, DEEP_RESEARCH_STAGES } from "./plan/deep.js";
-import { attachResearchStages } from "./research-stages.js";
+} from "../collection-snapshot.js";
+import { createQuickInput, QUICK_RESEARCH_STAGES } from "../plan/quick.js";
+import { createDeepInput, DEEP_RESEARCH_STAGES } from "../plan/deep.js";
+import { attachResearchStages } from "../research-stages.js";
 
 export interface OpenResearchRequest {
   scope: ResearchScope;

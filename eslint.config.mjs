@@ -78,6 +78,10 @@ export default defineConfig(
             publicEntries: ["index.js"],
           },
           {
+            directory: "src/app/research-control",
+            publicEntries: ["index.js"],
+          },
+          {
             directory: "src/evidence",
             publicEntries: ["fields.js", "checks.js", "price-basis.js"],
           },
@@ -304,7 +308,10 @@ export default defineConfig(
     },
   },
   {
-    files: ["src/app/{collection-snapshot,open-research}.ts"],
+    files: [
+      "src/app/collection-snapshot.ts",
+      "src/app/research-control/open.ts",
+    ],
     rules: {
       "no-restricted-imports": [
         "error",
@@ -333,11 +340,10 @@ export default defineConfig(
                 "**/host/**",
                 "@deepseek-ai/dsh-commands",
                 "./quick.js",
-                "./research-application.js",
+                "./research-control/**",
                 "./research-commands.js",
                 "./research-tools.js",
                 "./research-read-tools.js",
-                "./open-research.js",
                 "./plan/**",
                 "./research-models.js",
               ],
@@ -374,7 +380,7 @@ export default defineConfig(
     },
   },
   {
-    files: ["src/app/research-application.ts"],
+    files: ["src/app/research-control/index.ts"],
     rules: {
       "no-restricted-imports": [
         "error",
@@ -385,20 +391,20 @@ export default defineConfig(
                 "**/tools/**",
                 "@deepseek-ai/cordis",
                 "**/host/runtime.js",
-                "../runtime.js",
+                "../../runtime.js",
                 "@megapandas/dsh-stock-research/runtime",
                 "@deepseek-ai/dsh-tools",
                 "@deepseek-ai/dsh-commands",
                 "@deepseek-ai/dsh-jobs",
                 "@deepseek-ai/dsh-llm",
-                "./quick.js",
-                "./research-commands.js",
-                "./research-tools.js",
-                "./research-read-tools.js",
-                "./run-command-input.js",
-                "./run-view.js",
-                "./settings.js",
-                "./activity.js",
+                "../quick.js",
+                "../research-commands.js",
+                "../research-tools.js",
+                "../research-read-tools.js",
+                "../run-command-input.js",
+                "../run-view.js",
+                "../settings.js",
+                "../activity.js",
               ],
               message:
                 "Research actions must use typed requests and coordinator ports instead of command/tool adapters or output formatting.",
@@ -417,7 +423,7 @@ export default defineConfig(
           patterns: [
             {
               group: [
-                "./research-application.js",
+                "./research-control/**",
                 "./research-executions.js",
                 "**/services/**",
                 "**/storage/**",

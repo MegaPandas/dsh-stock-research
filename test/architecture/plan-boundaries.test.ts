@@ -17,7 +17,7 @@ describe("research plan boundaries", () => {
     ["src/application.ts", "./app/plan/inputs.js"],
     ["src/app/research-input.ts", "./plan/capture.js"],
     ["src/app/quick-snapshots.ts", "./plan/snapshots.js"],
-    ["src/app/open-research.ts", "./plan/nested/new-internal.js"],
+    ["src/app/research-control/open.ts", "../plan/nested/new-internal.js"],
   ])("keeps plan implementation private from %s", async (file, dependency) => {
     const errors = await boundaryErrors(file, `export * from "${dependency}";`);
     expect(errors).toHaveLength(1);
@@ -27,7 +27,7 @@ describe("research plan boundaries", () => {
   it.each([
     ["src/application.ts", "./app/plan/quick.js"],
     ["src/application.ts", "./app/plan/deep.js"],
-    ["src/app/open-research.ts", "./plan/quick.js"],
+    ["src/app/research-control/open.ts", "../plan/quick.js"],
     ["src/app/replay-input.ts", "./plan/versions.js"],
     ["src/app/research-input.ts", "./plan/protocol.js"],
     ["src/app/quick-snapshots.ts", "./plan/protocol.js"],
