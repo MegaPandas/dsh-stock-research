@@ -43,7 +43,7 @@ describe("artifact rule boundaries", () => {
       "src/services/artifact-submission/index.ts",
       "../../artifacts/references.js",
     ],
-    ["src/app/agent-role.ts", "../artifacts/risks.js"],
+    ["src/app/role-preparation/role.ts", "../../artifacts/risks.js"],
     ["src/services/digest/index.ts", "./inputs.js"],
     ["src/tools/read.ts", "../artifacts/schema.js"],
     ["src/host/report-draft.ts", "../artifacts/agent-reports.js"],
@@ -52,7 +52,7 @@ describe("artifact rule boundaries", () => {
     ["src/services/digest/draft.ts", "../../artifacts/schema.js"],
     ["src/artifacts/schema.ts", "./shape.js"],
     ["src/artifacts/agent-reports.ts", "../valuation/report-policy.js"],
-    ["src/app/agent-role.ts", "../artifacts/assembly.js"],
+    ["src/app/role-preparation/role.ts", "../../artifacts/assembly.js"],
     ["src/artifacts/assembly.ts", "../report/agent-report.js"],
   ])(
     "allows the declared dependency from %s to %s",

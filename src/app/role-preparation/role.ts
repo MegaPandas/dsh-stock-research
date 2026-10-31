@@ -3,51 +3,51 @@ import type { ToolRunContext } from "@deepseek-ai/dsh-tools";
 import type {
   RoleDispatchContext,
   TaskInstructionSnapshot,
-} from "../contracts/runs.js";
-import type { EvidenceData } from "../contracts/query.js";
-import type { ResearchData } from "../contracts/research.js";
-import { ResearchError } from "../contracts/errors.js";
-import { agentInput } from "../host/agent-execution.js";
-import { createReportDraft } from "../host/report-draft.js";
-import type { AgentReport } from "../contracts/agent-reports.js";
-import type { StageHandoff } from "../contracts/stage-handoff.js";
-import type { RoleProvision } from "../host/dispatch.js";
-import { reportMaterial } from "../report/material.js";
-import { ArtifactInputs } from "../services/artifact-inputs.js";
-import { assembleAgentArtifact } from "../artifacts/assembly.js";
-import { inheritRisks } from "../artifacts/risks.js";
-import type { RoleServices } from "./prepare-role.js";
-import type { readApplicationInput } from "./research-input.js";
+} from "../../contracts/runs.js";
+import type { EvidenceData } from "../../contracts/query.js";
+import type { ResearchData } from "../../contracts/research.js";
+import { ResearchError } from "../../contracts/errors.js";
+import { agentInput } from "../../host/agent-execution.js";
+import { createReportDraft } from "../../host/report-draft.js";
+import type { AgentReport } from "../../contracts/agent-reports.js";
+import type { StageHandoff } from "../../contracts/stage-handoff.js";
+import type { RoleProvision } from "../../host/dispatch.js";
+import { reportMaterial } from "../../report/material.js";
+import { ArtifactInputs } from "../../services/artifact-inputs.js";
+import { assembleAgentArtifact } from "../../artifacts/assembly.js";
+import { inheritRisks } from "../../artifacts/risks.js";
+import type { RoleServices } from "./index.js";
+import type { readApplicationInput } from "../research-input.js";
 import {
   readCollection,
   registerCollectionSources,
-} from "./collection-input.js";
-import { collectionDataTools } from "./collection-tools.js";
-import { createReportReader } from "./report-reader.js";
+} from "../collection-input.js";
+import { collectionDataTools } from "../collection-tools.js";
+import { createReportReader } from "../report-reader.js";
 import {
   PUBLIC_RESEARCH_PROMPT_INPUT,
   PUBLIC_RESEARCH_TASK,
   PUBLIC_SEARCH_LIMITS,
-} from "./public-research.js";
-import { createPublicSearchSession } from "./public-search.js";
-import { referencePrice, type RegisteredTable } from "./reference-price.js";
-import { decisionPolicy } from "../contracts/rating-policy.js";
-import { researchStageFeedback } from "./research-stages.js";
+} from "../public-research.js";
+import { createPublicSearchSession } from "../public-search.js";
+import { referencePrice, type RegisteredTable } from "../reference-price.js";
+import { decisionPolicy } from "../../contracts/rating-policy.js";
+import { researchStageFeedback } from "../research-stages.js";
 import {
   createValuationMethodTool,
   financialMetricContext,
   readValuationMethods,
   usesValuationMethods,
   valuationMethodContext,
-} from "./valuation-methods.js";
-import { validateRoleValuation } from "../valuation/report-policy.js";
-import { valuationCalculationCatalog } from "../services/valuation-records.js";
+} from "../valuation-methods.js";
+import { validateRoleValuation } from "../../valuation/report-policy.js";
+import { valuationCalculationCatalog } from "../../services/valuation-records.js";
 import { valuationDraftInput } from "./valuation-draft.js";
-import { readResearchModels } from "./research-models.js";
+import { readResearchModels } from "../research-models.js";
 import {
   createValuationCalculationTool,
   createValuationCalculationReader,
-} from "../tools/valuation.js";
+} from "../../tools/valuation.js";
 
 export function prepareUnifiedRole(
   services: RoleServices,

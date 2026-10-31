@@ -10,7 +10,7 @@ import {
   type StreamChunk,
 } from "@deepseek-ai/dsh-llm";
 import * as Quick from "../../src/quick.js";
-import { prepareResearchRole } from "../../src/app/prepare-role.js";
+import { prepareResearchRole } from "../../src/app/role-preparation/index.js";
 import { createResearchPlugin } from "../../src/runtime.js";
 import { runtimeHost } from "./runtime-host.js";
 

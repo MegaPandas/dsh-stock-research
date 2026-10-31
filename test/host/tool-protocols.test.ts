@@ -6,7 +6,7 @@ import { collectionDataTools } from "../../src/app/collection-tools.js";
 import { createPublicSearchSession } from "../../src/app/public-search.js";
 import { createReportReader } from "../../src/app/report-reader.js";
 import { createReportDraft } from "../../src/host/report-draft.js";
-import { valuationDraftInput } from "../../src/app/valuation-draft.js";
+import { valuationDraftInput } from "../../src/app/role-preparation/valuation-draft.js";
 import { createValuationCalculationReader } from "../../src/tools/valuation.js";
 import {
   createValuationMethodTool,

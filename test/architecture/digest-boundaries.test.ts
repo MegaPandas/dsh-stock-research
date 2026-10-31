@@ -15,8 +15,8 @@ async function boundaryErrors(filePath: string, source: string) {
 describe("digest boundaries", () => {
   it.each([
     [
-      "src/app/agent-role.ts",
-      'import { digestNumbers } from "../services/digest/inputs.js";',
+      "src/app/role-preparation/role.ts",
+      'import { digestNumbers } from "../../services/digest/inputs.js";',
     ],
     ["src/core.ts", 'export * from "./services/digest/draft.js";'],
     [

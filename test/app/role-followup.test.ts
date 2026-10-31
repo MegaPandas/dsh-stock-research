@@ -11,7 +11,7 @@ import type { ToolDefinition } from "@deepseek-ai/dsh-tools";
 import { describe, expect, it, vi } from "vitest";
 import { createQuickInput } from "../../src/app/plan/quick.js";
 import { attachResearchStages } from "../../src/app/research-stages.js";
-import { prepareResearchRole } from "../../src/app/prepare-role.js";
+import { prepareResearchRole } from "../../src/app/role-preparation/index.js";
 import { RESEARCH_MODELS_INPUT } from "../../src/app/research-models.js";
 import type { DispatchResult } from "../../src/host/dispatch.js";
 import { createResearchPlugin } from "../../src/runtime.js";

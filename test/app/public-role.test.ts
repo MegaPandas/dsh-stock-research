@@ -6,7 +6,7 @@ import { bindScopeParent, createScope } from "@deepseek-ai/dsh-scope";
 import type { Context } from "@deepseek-ai/cordis";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createQuickInput } from "../../src/app/plan/quick.js";
-import { prepareResearchRole } from "../../src/app/prepare-role.js";
+import { prepareResearchRole } from "../../src/app/role-preparation/index.js";
 import { PUBLIC_RESEARCH_PROMPT_INPUT } from "../../src/app/public-research.js";
 import { readApplicationInput } from "../../src/app/research-input.js";
 import { APPLICATION_INPUT_NAME } from "../../src/app/plan/protocol.js";

@@ -1,19 +1,19 @@
 import type { Agent } from "@deepseek-ai/dsh-agent";
 import type { ToolRunContext } from "@deepseek-ai/dsh-tools";
-import type { DataEnvelope } from "../contracts/data.js";
-import type { ResearchData } from "../contracts/research.js";
+import type { DataEnvelope } from "../../contracts/data.js";
+import type { ResearchData } from "../../contracts/research.js";
 import type {
   RoleDispatchContext,
   TaskInstructionSnapshot,
-} from "../contracts/runs.js";
-import { ResearchError } from "../contracts/errors.js";
-import type { RoleProvision } from "../host/dispatch.js";
-import type { SubmitReport } from "../host/report-submission.js";
-import type { ValuationOperations } from "../host/valuation-operations.js";
-import type { RunCommands, RunReader } from "../contracts/run-access.js";
-import { prepareUnifiedRole } from "./agent-role.js";
-import { readApplicationInput } from "./research-input.js";
-import { ROLE_PROMPT_VERSION } from "./research-prompts.js";
+} from "../../contracts/runs.js";
+import { ResearchError } from "../../contracts/errors.js";
+import type { RoleProvision } from "../../host/dispatch.js";
+import type { SubmitReport } from "../../host/report-submission.js";
+import type { ValuationOperations } from "../../host/valuation-operations.js";
+import type { RunCommands, RunReader } from "../../contracts/run-access.js";
+import { prepareUnifiedRole } from "./role.js";
+import { readApplicationInput } from "../research-input.js";
+import { ROLE_PROMPT_VERSION } from "../research-prompts.js";
 
 export interface RoleServices {
   runs: Pick<

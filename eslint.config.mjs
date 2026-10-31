@@ -74,6 +74,10 @@ export default defineConfig(
             ],
           },
           {
+            directory: "src/app/role-preparation",
+            publicEntries: ["index.js"],
+          },
+          {
             directory: "src/evidence",
             publicEntries: ["fields.js", "checks.js", "price-basis.js"],
           },

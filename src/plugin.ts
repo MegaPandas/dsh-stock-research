@@ -12,7 +12,7 @@ import * as Ask from "./app/ask.js";
 import * as Quick from "./app/quick.js";
 import * as Review from "./app/review.js";
 import { ModelConfigSchema } from "./app/model-config.js";
-import { prepareResearchRole } from "./app/prepare-role.js";
+import { prepareResearchRole } from "./app/role-preparation/index.js";
 import {
   beginCleanup,
   isApplicationBusy,

@@ -11,7 +11,7 @@ import { createReplayInput } from "../../src/app/replay-input.js";
 import { attachCollection } from "../../src/app/collection-snapshot.js";
 import type { CollectionSnapshot } from "../../src/contracts/collection.js";
 import type { ResearchScope } from "../../src/contracts/data.js";
-import { prepareResearchRole } from "../../src/app/prepare-role.js";
+import { prepareResearchRole } from "../../src/app/role-preparation/index.js";
 import { RESEARCH_MODELS_INPUT } from "../../src/app/research-models.js";
 import {
   CALCULATION_RULES,

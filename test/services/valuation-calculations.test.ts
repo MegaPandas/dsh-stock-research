@@ -45,7 +45,7 @@ import {
 } from "../../src/tools/valuation.js";
 import { createValuationOperations } from "../../src/host/valuation-operations.js";
 import { createReportDraft } from "../../src/host/report-draft.js";
-import { valuationDraftInput } from "../../src/app/valuation-draft.js";
+import { valuationDraftInput } from "../../src/app/role-preparation/valuation-draft.js";
 import { agentAnalysisReport } from "../fixtures/analysis-report.js";
 import { US_SECURITY } from "../fixtures/market.js";
 import { renderValuation } from "../../src/report/valuation.js";
