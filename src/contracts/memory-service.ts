@@ -11,7 +11,35 @@ import type {
   PriceReturnsQuery,
   QueryResponse,
 } from "./query.js";
-import type { RunOperation } from "./runs.js";
+import type { RunOperation, TaskOperation } from "./runs.js";
+import type {
+  MemoryInputRegistration,
+  MemoryInputSnapshot,
+  MemorySnapshotEntry,
+} from "./task-data.js";
+
+export interface MemoryAccess {
+  read(ref: MemoryRef): MemoryEntry;
+  remember(
+    operation: RememberOperation,
+    input: RememberInput,
+    requestId: string,
+    signal?: AbortSignal,
+    capturedReturns?: Awaited<ReturnType<QueryMemoryReturns>>,
+  ): Promise<MemoryRef>;
+  recall(
+    scope: ResearchScope,
+    query: RecallQuery,
+    signal?: AbortSignal,
+  ): MemorySnapshotEntry<MemoryEntry>[];
+  recallForTask(
+    operation: TaskOperation,
+    query: RecallQuery,
+    callId: string,
+    signal?: AbortSignal,
+    source?: MemoryInputRegistration | null,
+  ): MemoryInputSnapshot<MemoryEntry>;
+}
 
 export interface RememberOperation extends RunOperation {
   /** Authorized review scope; its security must match the linked run. */

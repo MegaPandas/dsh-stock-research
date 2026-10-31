@@ -3,7 +3,7 @@ import { ResearchError } from "../contracts/errors.js";
 import type { SessionBindings } from "../host/bindings.js";
 import { createReportSubmission } from "../host/report-submission.js";
 import type { ArtifactService } from "../services/artifact-submission/index.js";
-import type { MemoryService } from "../services/memory/index.js";
+import type { MemoryAccess } from "../contracts/memory-service.js";
 import { researchTool } from "./errors.js";
 import {
   artifactCommitOutput,
@@ -24,7 +24,7 @@ import { saveReportParameters } from "./artifact-inputs.js";
 
 export interface WriteToolServices {
   artifacts: Pick<ArtifactService, "submitArtifact">;
-  memory: Pick<MemoryService, "remember">;
+  memory: Pick<MemoryAccess, "remember">;
 }
 export function createWriteTools(
   services: WriteToolServices,

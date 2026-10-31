@@ -2,6 +2,7 @@ import { serializeJson } from "../../json/serialize.js";
 import type { ISOTime, ResearchScope } from "../../contracts/data.js";
 import { ResearchError } from "../../contracts/errors.js";
 import type {
+  MemoryAccess,
   MemoryEntry,
   MemoryState,
   QueryMemoryReturns,
@@ -29,7 +30,7 @@ function inputQuery(query: RecallQuery): MemoryInputQuery {
     parameters: { text: query.text, limit: query.limit },
   };
 }
-export class MemoryService {
+export class MemoryService implements MemoryAccess {
   readonly #writes = new SharedQueries<MemoryRef>();
   constructor(
     private readonly store: MemoryStore<MemoryState>,

@@ -14,7 +14,7 @@ import type {
 import type { ToolDefinition, ToolRunContext } from "@deepseek-ai/dsh-tools";
 import { SqliteCache } from "../cache/index.js";
 import { ResearchError } from "../contracts/errors.js";
-import type { MemoryState } from "../contracts/memory-service.js";
+import type { MemoryAccess, MemoryState } from "../contracts/memory-service.js";
 import type { QuerySnapshot } from "../contracts/query.js";
 import type { OpenRunInput, RunState, RunView } from "../contracts/runs.js";
 import { HttpClient } from "../data/http.js";
@@ -78,7 +78,7 @@ export interface ResearchRuntime {
   readonly reads: RunReadOperations;
   readonly queries: QueryService;
   readonly collection: CollectionService;
-  readonly memory: MemoryService;
+  readonly memory: MemoryAccess;
   readonly dispatch: DispatchBridge;
   readonly operations: ResearchOperations;
   readonly policy: QueryPolicy;

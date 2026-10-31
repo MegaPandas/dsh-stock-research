@@ -3,12 +3,12 @@ import type { ArtifactRef } from "../contracts/data.js";
 import { ResearchError } from "../contracts/errors.js";
 import type { MemoryRef } from "../contracts/memory.js";
 import type {
+  MemoryAccess,
   QueryMemoryReturns,
   RememberInput,
 } from "../contracts/memory-service.js";
 import type { PriceReturnsQuery, QueryResponse } from "../contracts/query.js";
 import { renderAgentReport } from "../report/agent-report.js";
-import type { MemoryService } from "../services/memory/index.js";
 import type { ReviewInput } from "./review-input.js";
 
 interface ReturnsAttempt {
@@ -19,7 +19,7 @@ interface ReturnsAttempt {
     | { kind: "failed"; cause: unknown };
 }
 export interface ReviewSessionPorts {
-  memory: Pick<MemoryService, "read" | "remember">;
+  memory: Pick<MemoryAccess, "read" | "remember">;
   queryReturns: QueryMemoryReturns;
 }
 

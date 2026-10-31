@@ -11,7 +11,7 @@ import {
   checkNumbersParameters,
   checkPendingNumbersParameters,
 } from "./artifact-inputs.js";
-import type { MemoryService } from "../services/memory/index.js";
+import type { MemoryAccess } from "../contracts/memory-service.js";
 import type { NumberChecker } from "../contracts/numbers.js";
 import { readPointer, SelectorError } from "../json/pointer.js";
 import type { QueryService } from "../services/query/index.js";
@@ -40,7 +40,7 @@ export interface ReadToolServices {
   runs: Pick<RunReader, "view" | "readEvidence">;
   reads: RunReadOperations;
   queries: Pick<QueryService, "health">;
-  memory: Pick<MemoryService, "recall" | "recallForTask">;
+  memory: Pick<MemoryAccess, "recall" | "recallForTask">;
   numbers: NumberChecker;
 }
 const opaqueObject: JsonSchemaNode = {

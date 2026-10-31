@@ -106,6 +106,7 @@ export type {
 } from "./contracts/memory.js";
 export { MemoryStore } from "./memory/store.js";
 export type {
+  MemoryAccess,
   MemoryEntry,
   MemoryReceipt,
   MemoryReturnSnapshot,

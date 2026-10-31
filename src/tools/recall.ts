@@ -2,7 +2,7 @@ import type { ToolDefinition } from "@deepseek-ai/dsh-tools";
 import { ResearchError } from "../contracts/errors.js";
 import type { MemoryInputRegistration } from "../contracts/task-data.js";
 import { taskOperation, type SessionBindings } from "../host/bindings.js";
-import type { MemoryService } from "../services/memory/index.js";
+import type { MemoryAccess } from "../contracts/memory-service.js";
 import { researchTool } from "./errors.js";
 import { scopedQueryParameters } from "./query-scope.js";
 import {
@@ -18,7 +18,7 @@ import {
 
 const kind = (value: string) => ({ type: "string" as const, const: value });
 export function createRecallTool(
-  memory: Pick<MemoryService, "recall" | "recallForTask">,
+  memory: Pick<MemoryAccess, "recall" | "recallForTask">,
   bindings: SessionBindings,
   includeReplaySource = true,
 ): ToolDefinition {
