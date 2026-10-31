@@ -84,7 +84,7 @@ export function deriveFinancialMetrics(
       for (const [name, fields] of Object.entries(FINANCIAL_FLOW_FIELDS[id])) {
         const field =
           fields.find(
-            (f) =>
+            (f: string) =>
               input.row.values[f] !== undefined && input.row.values[f] !== null,
           ) ?? fields[0];
         const column = input.packet.envelope.data.columns[field];
