@@ -245,6 +245,7 @@ export default defineConfig(
             {
               group: [
                 "**/app/**",
+                "@megapandas/dsh-stock-research",
                 "@megapandas/dsh-stock-research/application",
                 "@megapandas/dsh-stock-research/quick",
                 "@megapandas/dsh-stock-research/ask",
@@ -253,6 +254,12 @@ export default defineConfig(
               ],
               message:
                 "Host adapters must consume supplied execution contracts instead of application internals.",
+            },
+            {
+              regex:
+                "^(?:\\.\\./)+(?:index|plugin|application|quick|ask|review|role)\\.js$",
+              message:
+                "Host adapters must not access application composition through public entry points.",
             },
           ],
         },
@@ -488,9 +495,17 @@ export default defineConfig(
                 "**/storage/**",
                 "**/runs/**",
                 "**/tools/**",
+                "@megapandas/dsh-stock-research",
+                "@megapandas/dsh-stock-research/*",
               ],
               message:
                 "Client presentation must consume shared contracts and native client APIs instead of server or application internals.",
+            },
+            {
+              regex:
+                "^(?:\\.\\./)+(?:index|plugin|core|tools|runtime|application|quick|ask|review|role)\\.js$",
+              message:
+                "Client presentation must not access server composition through public entry points.",
             },
           ],
         },
