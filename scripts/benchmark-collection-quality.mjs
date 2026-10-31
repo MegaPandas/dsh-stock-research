@@ -123,7 +123,7 @@ try {
       ["improving_partials", partial, 2],
       ["reject_stale_partials", rejected, 0],
     ]) {
-      const original = structuredClone(candidates);
+      const original = globalThis.structuredClone(candidates);
       assert.equal(select(candidates), expected);
       assert.deepEqual(candidates, original);
       for (let i = 0; i < 50; i++) select(candidates);
