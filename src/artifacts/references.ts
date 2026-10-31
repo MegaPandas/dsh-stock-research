@@ -7,6 +7,15 @@ import type {
 import type { NumberInput } from "../contracts/artifacts.js";
 import type { ArtifactRef, SourceRef } from "../contracts/data.js";
 
+export function bindArtifactNumber(
+  input: NumberInput,
+  local: ArtifactRef,
+): Extract<NumberInput, { kind: "artifact" }> {
+  return input.kind === "artifact"
+    ? input
+    : { kind: "artifact", artifact: local, claimId: input.claimId };
+}
+
 export function artifactCalculationIds(
   content: ResearchArtifactInput,
 ): string[] {

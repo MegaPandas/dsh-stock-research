@@ -15,7 +15,7 @@ import type { RoleProvision } from "../host/dispatch.js";
 import { reportMaterial } from "../report/material.js";
 import { ArtifactInputs } from "../services/artifact-inputs.js";
 import { assembleAgentArtifact } from "../services/business-reports.js";
-import { digestRisks } from "../services/digest-inputs.js";
+import { inheritRisks } from "../artifacts/risks.js";
 import type { RoleServices } from "./prepare-role.js";
 import type { readApplicationInput } from "./research-input.js";
 import {
@@ -313,7 +313,9 @@ export function prepareUnifiedRole(
           ),
         ),
         reportCatalog: reader.catalog,
-        requiredRisks: digestRisks(reports).map(({ issueId }) => ({ issueId })),
+        requiredRisks: inheritRisks(reports).map(({ issueId }) => ({
+          issueId,
+        })),
         referencePrice:
           price === null
             ? null

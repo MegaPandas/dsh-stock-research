@@ -2,7 +2,10 @@ import type {
   ArtifactVersion,
   DecisionDraftValidation,
 } from "../contracts/artifacts.js";
-import type { ResearchArtifactInput } from "../contracts/artifact-payloads.js";
+import type {
+  ResearchArtifactInput,
+  ResearchArtifactVersion,
+} from "../contracts/artifact-payloads.js";
 import type { ArtifactRef, SourceRef } from "../contracts/data.js";
 import { ResearchError } from "../contracts/errors.js";
 import type { NumberCheck } from "../contracts/numbers.js";
@@ -11,17 +14,14 @@ import type { ArtifactCommitResult, TaskOperation } from "../contracts/runs.js";
 import type { RegisteredEvidenceRecord } from "../contracts/task-data.js";
 import { parseArtifactInput } from "./artifact-schema.js";
 import { isStageReport } from "./analysis-report.js";
-import { artifactReferences } from "./artifact-references.js";
+import { artifactReferences } from "../artifacts/references.js";
 import { EvidenceTimeError, verifyEvidence } from "./evidence-checks.js";
 import { readPointer, SelectorError } from "../json/pointer.js";
 import { referenceField } from "./number-fields.js";
 import type { NumberService } from "./numbers.js";
 import { artifactKey } from "../contracts/artifact-identity.js";
 import type { RunCommands, RunReader } from "../contracts/run-access.js";
-import {
-  ArtifactInputs,
-  type ResearchArtifactVersion,
-} from "./artifact-inputs.js";
+import { ArtifactInputs } from "./artifact-inputs.js";
 import {
   assessDecisionBasics,
   selectDecisionInputs,

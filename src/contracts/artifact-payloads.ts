@@ -1,4 +1,9 @@
-import type { ArtifactInput, ArtifactKind, NumberInput } from "./artifacts.js";
+import type {
+  ArtifactInput,
+  ArtifactKind,
+  ArtifactVersion,
+  NumberInput,
+} from "./artifacts.js";
 import type { AgentReport } from "./agent-reports.js";
 import type { StageHandoff } from "./stage-handoff.js";
 import type {
@@ -158,3 +163,7 @@ export type ResearchArtifactInput = {
     payload: ArtifactPayloads[Kind];
   };
 }[ArtifactKind];
+
+export type ResearchArtifactVersion = Omit<ArtifactVersion, "content"> & {
+  content: ResearchArtifactInput;
+};

@@ -7,7 +7,7 @@ import type {
   RedoTaskResult,
   ResearchRun,
 } from "../contracts/runs.js";
-import { artifactCalculationIds } from "./artifact-references.js";
+import { artifactCalculationIds } from "../artifacts/references.js";
 import { artifactKey } from "../contracts/artifact-identity.js";
 
 export function affectedTaskIds(

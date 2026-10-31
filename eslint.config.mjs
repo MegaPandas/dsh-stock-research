@@ -36,6 +36,12 @@ const queryPrivateRestriction = {
   message:
     "Query consumers must use the public query or calculation entry instead of source execution internals.",
 };
+const digestPrivateRestriction = {
+  selector:
+    ":matches(ImportDeclaration, ExportNamedDeclaration, ExportAllDeclaration)[source.value=/(^|\\u002F)digest-(inputs|draft)\\.js$/]",
+  message:
+    "Digest consumers must use the digest service or shared artifact rules instead of digest assembly internals.",
+};
 
 export default defineConfig(
   globalIgnores(["dist/", "coverage/"]),
@@ -51,7 +57,7 @@ export default defineConfig(
   },
   {
     files: [
-      "src/{cache,data,indicators,json,memory,report,runs,storage,valuation}/**/*.ts",
+      "src/{artifacts,cache,data,indicators,json,memory,report,runs,storage,valuation}/**/*.ts",
     ],
     rules: {
       "no-restricted-imports": [
@@ -129,6 +135,23 @@ export default defineConfig(
     },
   },
   {
+    files: ["src/artifacts/**/*.ts"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: [...pureImports, "!node:util"],
+              message:
+                "Artifact rules must not depend on I/O, persistence, services, or integration layers.",
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
     files: ["src/services/query/calculations.ts"],
     rules: {
       "no-restricted-imports": [
@@ -157,12 +180,30 @@ export default defineConfig(
     },
   },
   {
+    files: ["src/{app,tools,host,client,services}/**/*.{ts,tsx}", "src/*.ts"],
+    ignores: [
+      "src/services/digests.ts",
+      "src/services/digest-inputs.ts",
+      "src/services/digest-draft.ts",
+      "src/services/create-run-service.ts",
+    ],
+    rules: {
+      "no-restricted-syntax": [
+        "error",
+        runConsumerRestriction,
+        queryPrivateRestriction,
+        digestPrivateRestriction,
+      ],
+    },
+  },
+  {
     files: ["src/services/{numbers,valuation-records,valuation-reports}.ts"],
     rules: {
       "no-restricted-syntax": [
         "error",
         runConsumerRestriction,
         queryPrivateRestriction,
+        digestPrivateRestriction,
         {
           selector:
             ":matches(ImportDeclaration, ExportNamedDeclaration, ExportAllDeclaration)[source.value=/(^|\\u002F)valuation-calculations\\.js$/]",

@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import type {
   ReportedGap,
   ResearchArtifactInput,
+  ResearchArtifactVersion,
   RiskIssue,
 } from "../../src/contracts/artifact-payloads.js";
 import type {
@@ -10,15 +11,10 @@ import type {
   SourceRef,
 } from "../../src/contracts/data.js";
 import type { TaskDefinition } from "../../src/contracts/workflow.js";
-import { aggregateArtifactGaps } from "../../src/services/artifact-gaps.js";
-import {
-  ArtifactInputs,
-  type ResearchArtifactVersion,
-} from "../../src/services/artifact-inputs.js";
-import {
-  digestNumbers,
-  digestRisks,
-} from "../../src/services/digest-inputs.js";
+import { aggregateArtifactGaps } from "../../src/artifacts/gaps.js";
+import { ArtifactInputs } from "../../src/services/artifact-inputs.js";
+import { digestNumbers } from "../../src/services/digest-inputs.js";
+import { inheritRisks } from "../../src/artifacts/risks.js";
 import {
   decisionFixture,
   type DecisionFixtureOptions,
@@ -210,7 +206,7 @@ describe("fixed digest risk inputs", () => {
     const version = commitRisk(fixture, "risk-extra");
     const before = structuredClone(version);
     const calls = fixture.numbers.calls;
-    expect(digestRisks([version])).toEqual([
+    expect(inheritRisks([version])).toEqual([
       {
         issueId: "liquidity",
         description: "Liquidity uncertainty",
@@ -246,7 +242,7 @@ describe("fixed digest risk inputs", () => {
         kind: "artifact",
       },
     ]);
-    const risks = digestRisks([first, second, first]);
+    const risks = inheritRisks([first, second, first]);
     expect(risks).toHaveLength(1);
     expect(risks[0]).toMatchObject({
       issueId: "liquidity",
@@ -264,7 +260,7 @@ describe("fixed digest risk inputs", () => {
     });
     const first = commitRisk(fixture, "risk-a");
     const second = commitRisk(fixture, "risk-b", "Avoid the position");
-    expect(() => digestRisks([first, second])).toThrowError(
+    expect(() => inheritRisks([first, second])).toThrowError(
       expect.objectContaining({
         code: "DATA_INSUFFICIENT",
         message: "Conflicting inherited risk issue liquidity.",

@@ -1,12 +1,8 @@
 import type {
-  ResearchArtifactInput,
+  ResearchArtifactVersion,
   ReportedGap,
 } from "../contracts/artifact-payloads.js";
-import type {
-  ArtifactVersion,
-  NumberInput,
-  NumericClaim,
-} from "../contracts/artifacts.js";
+import type { NumberInput, NumericClaim } from "../contracts/artifacts.js";
 import type {
   ArtifactRef,
   DataGap,
@@ -16,17 +12,14 @@ import type {
 import type { EvidenceData } from "../contracts/query.js";
 import type { NumberContext } from "../contracts/numbers.js";
 import type { RegisteredEvidenceRecord } from "../contracts/task-data.js";
-import { artifactReferences } from "./artifact-references.js";
+import { artifactReferences } from "../artifacts/references.js";
 import { isStageReport } from "./analysis-report.js";
-import { aggregateArtifactGaps } from "./artifact-gaps.js";
+import { aggregateArtifactGaps } from "../artifacts/gaps.js";
 import { numberField, referenceField } from "./number-fields.js";
 import { artifactKey } from "../contracts/artifact-identity.js";
 import { verifyEvidence } from "./evidence-checks.js";
 import type { RunReader } from "../contracts/run-access.js";
 
-export type ResearchArtifactVersion = Omit<ArtifactVersion, "content"> & {
-  content: ResearchArtifactInput;
-};
 export interface ArtifactNumber {
   artifact: ArtifactRef;
   claim: NumericClaim;

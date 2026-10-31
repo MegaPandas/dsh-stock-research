@@ -1,7 +1,7 @@
 import type { DataEnvelope, ISOTime, SourceRef } from "../contracts/data.js";
 import type { EvidenceData, EvidenceEnvelope } from "../contracts/query.js";
 import type { TaskDefinition, DataRequirement } from "../contracts/workflow.js";
-import type { ResearchArtifactVersion } from "./artifact-inputs.js";
+import type { ResearchArtifactVersion } from "../contracts/artifact-payloads.js";
 import { ArtifactInputs } from "./artifact-inputs.js";
 import { ResearchError } from "../contracts/errors.js";
 import { numberField } from "./number-fields.js";

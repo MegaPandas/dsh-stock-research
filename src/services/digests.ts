@@ -12,7 +12,8 @@ import type {
 import { ArtifactInputs } from "./artifact-inputs.js";
 import type { ArtifactService } from "./artifacts.js";
 import { assembleDigest } from "./digest-draft.js";
-import { digestNumbers, digestRisks } from "./digest-inputs.js";
+import { digestNumbers } from "./digest-inputs.js";
+import { inheritRisks } from "../artifacts/risks.js";
 import type { RunCommands, RunReader } from "../contracts/run-access.js";
 
 interface PendingDigest {
@@ -190,7 +191,7 @@ export class DigestService {
         reports: versions,
         references: versions.map((version) => version.ref),
         numbers: digestNumbers(versions, inputs),
-        risks: digestRisks(versions),
+        risks: inheritRisks(versions),
         gaps: inputs.reportedGaps(versions),
       };
       return await this.generate(

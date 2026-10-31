@@ -1,6 +1,8 @@
-import type { ReportedGap } from "../contracts/artifact-payloads.js";
+import type {
+  ReportedGap,
+  ResearchArtifactVersion,
+} from "../contracts/artifact-payloads.js";
 import type { DataGap, SourceRef } from "../contracts/data.js";
-import type { ResearchArtifactVersion } from "./artifact-inputs.js";
 
 /** Exact duplicates share an origin; equal field names from different origins remain distinct. */
 export function aggregateArtifactGaps(

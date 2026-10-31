@@ -1,11 +1,11 @@
-import type { DigestPayload } from "../contracts/artifact-payloads.js";
+import type {
+  DigestPayload,
+  ResearchArtifactVersion,
+} from "../contracts/artifact-payloads.js";
 import type { NumericClaim } from "../contracts/artifacts.js";
 import type { ResearchScope } from "../contracts/data.js";
 import { ResearchError } from "../contracts/errors.js";
-import {
-  ArtifactInputs,
-  type ResearchArtifactVersion,
-} from "./artifact-inputs.js";
+import { ArtifactInputs } from "./artifact-inputs.js";
 import { PriceBasisError, verifyPriceBasis } from "./price-basis.js";
 import {
   decisionPolicy,
