@@ -506,7 +506,8 @@ try {
     "buy",
   );
   assert.equal(
-    service.readArtifact(decided.refs[1]).content.payload.gaps.length,
+    service.readArtifact(decided.refs[1]).content.payload.decision.validation
+      .dataQuality.length,
     0,
   );
   const operation = { runId, identity: "package" };

@@ -286,12 +286,16 @@ describe("stock-quick real command boundary", () => {
     });
     expect(report).toMatchObject({
       payload: {
-        gaps: expect.arrayContaining([
-          expect.objectContaining({
-            kind: "source",
-            gap: expect.objectContaining({ code: "unverified_time" }),
-          }),
-        ]),
+        decision: {
+          validation: {
+            dataQuality: expect.arrayContaining([
+              expect.objectContaining({
+                kind: "source",
+                gap: expect.objectContaining({ code: "unverified_time" }),
+              }),
+            ]),
+          },
+        },
       },
     });
     const market = h.runtime.runs.readArtifact(model.state.marketRef!).content;
