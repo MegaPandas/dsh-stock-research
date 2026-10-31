@@ -35,12 +35,13 @@ function request<Result>(result: () => Result): SubmittedAgentRequest<Result> {
     result,
   };
 }
-const agent = {
+const agentMethods: Pick<Agent, "id" | "followup" | "whenIdle" | "cancel"> = {
   id: SessionId("submitted-agent"),
   followup() {},
   async whenIdle() {},
   cancel() {},
-} as Agent;
+};
+const agent = agentMethods as Agent;
 
 it("retains setup commit and both execution and release failures", async () => {
   const primary = new Error("Submission failed");
