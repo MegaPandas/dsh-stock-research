@@ -302,6 +302,7 @@ export type {
   DecisionProposal,
   DecisionResult,
   DigestPayload,
+  GapSummary,
   PlanPayload,
   Rating,
   ReportPayload,

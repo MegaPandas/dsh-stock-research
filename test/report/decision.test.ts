@@ -48,14 +48,18 @@ function result(): DecisionResult {
     ],
     invalidationConditions: ["需求恢复"],
     limitations: ["缺少最新披露"],
-    schemaVersion: 1,
+    schemaVersion: 2,
     runId: "run",
     securityId: "US:EXAMPLE",
     cutoff: "2024-06-30T20:00:00.000Z",
     draftRef: ref,
     inputRefs: [],
     computedReturn: 0.2,
-    validation: { checkedRefs: [ref], warnings: ["时点未经验证"] },
+    validation: {
+      checkedRefs: [ref],
+      warnings: ["时点未经验证"],
+      dataQuality: [],
+    },
     finalizedAt: "2024-07-01T00:00:00.000Z",
   };
 }

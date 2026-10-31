@@ -49,14 +49,14 @@ function proposal(rating: Rating = "hold"): DecisionProposal {
 function decision(): DecisionResult {
   return {
     ...proposal(),
-    schemaVersion: 1,
+    schemaVersion: 2,
     runId: "run",
     securityId: "US:EXAMPLE",
     cutoff: "2024-06-30T20:00:00.000Z",
     draftRef: ref,
     inputRefs: [ref],
     computedReturn: null,
-    validation: { checkedRefs: [ref], warnings: [] },
+    validation: { checkedRefs: [ref], warnings: [], dataQuality: [] },
     finalizedAt: "2024-07-01T00:00:00.000Z",
   };
 }
@@ -185,6 +185,69 @@ describe("parseArtifactInput payload boundary", () => {
     invalid(
       artifact("report", { ...payloads().report, decision: proposal() }),
       "artifact/payload/decision/schemaVersion",
+    );
+  });
+  it.each(["source", "artifact"] as const)(
+    "accepts a quality summary with %s provenance",
+    (kind) => {
+      const input = decision();
+      input.validation.dataQuality = [
+        {
+          ...(kind === "source" ? { kind, source } : { kind, artifact: ref }),
+          gap: {
+            code: "missing",
+            field: "/data/rows/0/values/amount",
+            detail: "Amount unavailable",
+          },
+          fieldPattern: "/data/rows/*/values/amount",
+          count: 60,
+        },
+      ];
+      expect(parseArtifactInput(artifact("decision", input)).payload).toEqual(
+        input,
+      );
+    },
+  );
+  it.each([0, -1, 1.5, Number.MAX_SAFE_INTEGER + 1, "1"])(
+    "rejects an invalid quality record count %j",
+    (count) => {
+      const input = decision();
+      invalid(
+        artifact("decision", {
+          ...input,
+          validation: {
+            ...input.validation,
+            dataQuality: [
+              {
+                kind: "source",
+                source,
+                gap: {
+                  code: "missing",
+                  field: "/data",
+                  detail: "Missing data",
+                },
+                fieldPattern: "/data",
+                count,
+              },
+            ],
+          },
+        }),
+        "/validation/dataQuality/0/count",
+      );
+    },
+  );
+  it("requires the quality summary in the current decision schema", () => {
+    const input = decision();
+    invalid(
+      artifact("decision", {
+        ...input,
+        validation: { checkedRefs: [], warnings: [] },
+      }),
+      "/validation/dataQuality",
+    );
+    invalid(
+      artifact("decision", { ...input, schemaVersion: 1 }),
+      "/schemaVersion",
     );
   });
   it.each([

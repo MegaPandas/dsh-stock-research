@@ -12,6 +12,7 @@ import type {
 import { renderDecisionReport } from "../report/decision.js";
 import { selectDecisionInputs } from "./decision-basics.js";
 import { ArtifactInputs } from "./artifact-inputs.js";
+import { summarizeArtifactGaps } from "../artifacts/gaps.js";
 import type { RunCommands, RunReader } from "../contracts/run-access.js";
 
 export class DecisionService {
@@ -72,15 +73,6 @@ export class DecisionService {
           ? null
           : inputs.number(proposal.targetPrice, selected.draft.ref).claim;
       const gaps = inputs.reportedGaps(versions);
-      const warnings = [
-        ...new Set([
-          ...validated.warnings,
-          ...gaps.map(
-            (entry) =>
-              `${entry.kind === "source" ? entry.source.evidenceId : entry.artifact.artifactId}: ${entry.gap.code} ${entry.gap.field}: ${entry.gap.detail}`,
-          ),
-        ]),
-      ];
       const inputRefs = versions.map((version) => version.ref);
       const searchTimes = versions
         .flatMap((version) => inputs.artifactSources(version.ref))
@@ -90,14 +82,18 @@ export class DecisionService {
         .sort();
       const result: DecisionResult = {
         ...structuredClone(selected.draft.content.payload),
-        schemaVersion: 1,
+        schemaVersion: 2,
         runId: operation.runId,
         securityId: call.context.scope.security.id,
         cutoff: call.context.scope.cutoff,
         draftRef: selected.draft.ref,
         inputRefs,
         computedReturn: validated.computedReturn,
-        validation: { checkedRefs: inputRefs, warnings },
+        validation: {
+          checkedRefs: inputRefs,
+          warnings: validated.warnings,
+          dataQuality: summarizeArtifactGaps(gaps),
+        },
         finalizedAt: this.now(),
       };
       const sections = versions.filter(

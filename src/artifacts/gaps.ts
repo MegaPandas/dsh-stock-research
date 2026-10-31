@@ -1,8 +1,25 @@
 import type {
   ReportedGap,
+  GapSummary,
   ResearchArtifactVersion,
 } from "../contracts/artifact-payloads.js";
 import type { DataGap, SourceRef } from "../contracts/data.js";
+
+function originKey(entry: ReportedGap): readonly (string | number)[] {
+  return entry.kind === "source"
+    ? [
+        entry.kind,
+        entry.source.runId,
+        entry.source.evidenceId,
+        entry.source.selector,
+      ]
+    : [
+        entry.kind,
+        entry.artifact.runId,
+        entry.artifact.artifactId,
+        entry.artifact.revision,
+      ];
+}
 
 /** Exact duplicates share an origin; equal field names from different origins remain distinct. */
 export function aggregateArtifactGaps(
@@ -11,18 +28,9 @@ export function aggregateArtifactGaps(
 ): ReportedGap[] {
   const gaps = new Map<string, ReportedGap>();
   const add = (entry: ReportedGap) => {
-    const origin =
-      entry.kind === "source"
-        ? [entry.source.runId, entry.source.evidenceId, entry.source.selector]
-        : [
-            entry.artifact.runId,
-            entry.artifact.artifactId,
-            entry.artifact.revision,
-          ];
     gaps.set(
       JSON.stringify([
-        entry.kind,
-        ...origin,
+        ...originKey(entry),
         entry.gap.code,
         entry.gap.field,
         entry.gap.detail,
@@ -52,4 +60,27 @@ export function aggregateArtifactGaps(
         gap,
       });
   return [...gaps.values()];
+}
+
+/** Summarize the deduplicated gap records; raw fields and details remain in the report. */
+export function summarizeArtifactGaps(
+  gaps: readonly ReportedGap[],
+): GapSummary[] {
+  const groups = new Map<string, GapSummary>();
+  for (const entry of gaps) {
+    const fieldPattern = entry.gap.field.replace(
+      /\/(rows|bars|observations|items)\/\d+(?=\/|$)/g,
+      "/$1/*",
+    );
+    const key = JSON.stringify([
+      ...originKey(entry),
+      entry.gap.code,
+      fieldPattern,
+    ]);
+    const group = groups.get(key);
+    if (group === undefined)
+      groups.set(key, { ...entry, fieldPattern, count: 1 });
+    else group.count++;
+  }
+  return [...groups.values()];
 }

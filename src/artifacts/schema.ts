@@ -97,17 +97,32 @@ const gap: Check = (value, path) => {
   text(item.detail, `${path}/detail`);
 };
 const gaps: Check = (value, path) => list(value, path, gap);
-const reportedGap: Check = (value, location) => {
+function gapEntry(
+  value: unknown,
+  location: string,
+  extraKeys: readonly string[] = [],
+): ObjectValue {
   const kind = (value as ObjectValue | null)?.kind;
   choice(kind, `${location}/kind`, ["source", "artifact"]);
   const entry = object(value, location, [
     "kind",
     kind === "source" ? "source" : "artifact",
     "gap",
+    ...extraKeys,
   ]);
   if (kind === "source") sourceRef(entry.source, `${location}/source`);
   else artifactRef(entry.artifact, `${location}/artifact`);
   gap(entry.gap, `${location}/gap`);
+  return entry;
+}
+const reportedGap: Check = (value, location) => {
+  gapEntry(value, location);
+};
+const gapSummary: Check = (value, location) => {
+  const entry = gapEntry(value, location, ["fieldPattern", "count"]);
+  text(entry.fieldPattern, `${location}/fieldPattern`);
+  if (!Number.isSafeInteger(entry.count) || (entry.count as number) < 1)
+    invalid(`${location}/count`, "expected a positive record count");
 };
 const PROPOSAL_KEYS = [
   "rating",
@@ -193,7 +208,7 @@ const result: Check = (value, path) => {
     "stageHandoff",
   ]);
   proposal(item, path);
-  choice(item.schemaVersion, `${path}/schemaVersion`, [1]);
+  choice(item.schemaVersion, `${path}/schemaVersion`, [2]);
   text(item.runId, `${path}/runId`);
   text(item.securityId, `${path}/securityId`);
   date(item.cutoff, `${path}/cutoff`, true);
@@ -208,9 +223,11 @@ const result: Check = (value, path) => {
   const validation = object(item.validation, `${path}/validation`, [
     "checkedRefs",
     "warnings",
+    "dataQuality",
   ]);
   list(validation.checkedRefs, `${path}/validation/checkedRefs`, artifactRef);
   texts(validation.warnings, `${path}/validation/warnings`);
+  list(validation.dataQuality, `${path}/validation/dataQuality`, gapSummary);
 };
 function payload(kind: unknown, value: unknown, path: string): void {
   switch (kind) {

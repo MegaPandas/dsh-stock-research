@@ -477,9 +477,14 @@ describe("decision finalization", () => {
         },
       }),
     ]);
-    expect(values.decision.validation.warnings).toContainEqual(
-      expect.stringContaining("Optional volume missing"),
-    );
+    expect(values.decision.validation.warnings).toEqual([]);
+    expect(values.decision.validation.dataQuality).toEqual([
+      {
+        ...values.report.gaps[0]!,
+        fieldPattern: "/data/bars/*/volume",
+        count: 1,
+      },
+    ]);
     expect(values.report.limitations).toEqual(c.draft.payload.limitations);
   });
 
@@ -502,6 +507,53 @@ describe("decision finalization", () => {
     expect(output(c, result.refs).decision.validation.warnings).toContainEqual(
       expect.stringContaining("Cited field is stale"),
     );
+  });
+  it("preserves each applicable gap type when an earlier optional gap is present", () => {
+    const c = setup({
+      required: false,
+      frame: (frame) => {
+        frame.envelope.data.bars[1]!.volume = null;
+        frame.envelope.gaps.push(
+          {
+            code: "missing",
+            field: "/data/bars/1/volume",
+            detail: "Optional volume missing",
+          },
+          {
+            code: "stale",
+            field: "/asOf",
+            detail: "Adopted snapshot is stale",
+          },
+          {
+            code: "incomparable",
+            field: "/data/bars/1/close",
+            detail: "Adopted price basis is incomparable",
+          },
+        );
+      },
+      draft: (draft) => {
+        const base = draft.payload.basePrice!;
+        if (base.kind !== "artifact") throw new Error("Expected fixture base");
+        draft.payload.thesis[0]!.evidence = [base.artifact];
+      },
+    });
+    const result = output(
+      c,
+      new DecisionService(c.runs, c.now).decide(
+        c.operation,
+        "final",
+        "all-gap-types",
+      ).refs,
+    );
+    expect(result.decision.validation.warnings).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining("Optional volume missing"),
+        expect.stringContaining("Adopted snapshot is stale"),
+        expect.stringContaining("Adopted price basis is incomparable"),
+      ]),
+    );
+    expect(result.decision.validation.dataQuality).toHaveLength(3);
+    expect(result.report.gaps).toHaveLength(3);
   });
   it.each([false, true])(
     "checks gaps of an adopted whole-artifact premise (gap=%s)",

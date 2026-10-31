@@ -127,19 +127,28 @@ export type DecisionProposal = {
     | import("./agent-reports.js").LegacyDecisionAgentReport;
 };
 export type DecisionResult = DecisionProposal & {
-  schemaVersion: 1;
+  schemaVersion: 2;
   runId: string;
   securityId: string;
   cutoff: ISOTime;
   draftRef: ArtifactRef;
   inputRefs: ArtifactRef[];
   computedReturn: number | null;
-  validation: { checkedRefs: ArtifactRef[]; warnings: string[] };
+  validation: {
+    checkedRefs: ArtifactRef[];
+    warnings: string[];
+    dataQuality: GapSummary[];
+  };
   finalizedAt: ISOTime;
 };
 export type ReportedGap =
   | { kind: "source"; source: SourceRef; gap: DataGap }
   | { kind: "artifact"; artifact: ArtifactRef; gap: DataGap };
+/** One source/code/field group; gap is its first original record, not the entire group. */
+export type GapSummary = ReportedGap & {
+  fieldPattern: string;
+  count: number;
+};
 export type ReportPayload = {
   sections: ArtifactRef[];
   digests: ArtifactRef[];

@@ -3,7 +3,7 @@ import type {
   ResearchArtifactVersion,
 } from "../contracts/artifact-payloads.js";
 import type { NumericClaim } from "../contracts/artifacts.js";
-import type { ResearchScope } from "../contracts/data.js";
+import type { DataGap, ResearchScope } from "../contracts/data.js";
 import { ResearchError } from "../contracts/errors.js";
 import { ArtifactInputs } from "./artifact-inputs.js";
 import { PriceBasisError, verifyPriceBasis } from "../evidence/price-basis.js";
@@ -47,6 +47,22 @@ export function selectDecisionInputs(
 export interface DecisionBasics {
   computedReturn: number | null;
   warnings: string[];
+}
+
+function premiseWarnings(
+  kind: "numeric" | "evidence",
+  gaps: readonly DataGap[],
+): string[] {
+  const codes = new Set<DataGap["code"]>();
+  const warnings: string[] = [];
+  for (const gap of gaps) {
+    if (codes.has(gap.code)) continue;
+    codes.add(gap.code);
+    warnings.push(
+      `A decision ${kind} premise has a gap: ${gap.field}: ${gap.detail}`,
+    );
+  }
+  return warnings;
 }
 
 /** Checks correctable decision content before publication; data gaps remain warnings. */
@@ -130,10 +146,12 @@ export function assessDecisionBasics(
   ];
   for (const input of numericFacts) {
     const gaps = inputs.numberGaps(input, draft.ref, scope.cutoff);
-    if (gaps.length > 0)
-      warnings.push(
-        `A decision numeric premise has a gap: ${gaps[0]!.gap.field}: ${gaps[0]!.gap.detail}`,
-      );
+    warnings.push(
+      ...premiseWarnings(
+        "numeric",
+        gaps.map(({ gap }) => gap),
+      ),
+    );
   }
   for (const ref of proposal.thesis.flatMap((thesis) => thesis.evidence)) {
     const gaps =
@@ -142,10 +160,7 @@ export function assessDecisionBasics(
             .blockingReportedGaps(inputs.closure([ref]), scope.cutoff)
             .map((entry) => entry.gap)
         : inputs.blockingGaps(ref, false, scope.cutoff);
-    if (gaps.length > 0)
-      warnings.push(
-        `A decision evidence premise has a gap: ${gaps[0]!.field}: ${gaps[0]!.detail}`,
-      );
+    warnings.push(...premiseWarnings("evidence", gaps));
   }
   warnings.push(
     ...[...requiredRisks].flatMap((id) => {
