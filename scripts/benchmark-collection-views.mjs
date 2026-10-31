@@ -4,7 +4,7 @@ import { cpus } from "node:os";
 import { resolve } from "node:path";
 import { performance } from "node:perf_hooks";
 import process from "node:process";
-import { pathToFileURL } from "node:url";
+import { pathToFileURL, URL } from "node:url";
 
 const entry =
   process.argv[2] === undefined
