@@ -14,8 +14,7 @@ import type {} from "../host/runtime.js";
 import { agentInput, createSubmission } from "../host/agent-execution.js";
 import { renderAgentReport } from "../report/agent-report.js";
 import { parseAskInput, type AskInput } from "./ask-input.js";
-import { ASK_PROMPT, ASK_TOOL_NAMES } from "./ask-prompt.js";
-import { scopedQueryParameters } from "./query-scope.js";
+import { ASK_PROMPT } from "./ask-prompt.js";
 import { ModelConfigSchema, resolveModelOptions } from "./model-config.js";
 import type { ModelConfig } from "../contracts/settings.js";
 import { researchCutoff } from "./ask-input.js";
@@ -107,12 +106,7 @@ class AskApplication {
           },
         };
         runtime.collection.finalizeScope(collection, input.scope);
-        const tools = runtime.tools
-          .filter((tool) => ASK_TOOL_NAMES.has(tool.name))
-          .map((tool) => ({
-            ...tool,
-            parameters: scopedQueryParameters(tool.parameters, false),
-          }));
+        const tools = [runtime.createRecallTool()];
         const submission = createSubmission("ask", (report) =>
           renderAgentReport("ask", report).trimEnd(),
         );

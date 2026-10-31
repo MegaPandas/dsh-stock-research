@@ -1,11 +1,5 @@
 import { sharedResearchPrompt } from "./agent-prompt.js";
 
-export const ASK_TOOL_NAMES = new Set([
-  "stock_describe_collection",
-  "stock_read_collection",
-  "stock_recall",
-]);
-
 export const ASK_PROMPT =
   sharedResearchPrompt(`Answer single-stock research questions with a direct conclusion and the explanation needed.
 For a single-day price question, include the requested date, price and price basis. Include other dates or tables as the question requires.

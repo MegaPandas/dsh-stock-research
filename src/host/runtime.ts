@@ -38,6 +38,8 @@ import { createControlTools } from "../tools/control.js";
 import { createDataTools, type DataToolServices } from "../tools/data.js";
 import type { QueryPolicy } from "../contracts/query.js";
 import { createReadTools } from "../tools/read.js";
+import { createDataHealthTool } from "../tools/data-health.js";
+import { createRecallTool } from "../tools/recall.js";
 import { createWriteTools } from "../tools/write.js";
 import { createServiceTaskTools } from "../tools/service-tasks.js";
 import {
@@ -79,7 +81,6 @@ export interface ResearchRuntime {
   readonly memory: MemoryService;
   readonly dispatch: DispatchBridge;
   readonly operations: ResearchOperations;
-  readonly tools: readonly ToolDefinition[];
   readonly policy: QueryPolicy;
   readonly submitReport: SubmitReport;
   readonly valuations: ValuationOperations;
@@ -106,6 +107,8 @@ export interface ResearchRuntime {
     snapshots?: readonly QuerySnapshot[],
   ): ToolDefinition[];
   createCoordinatorTools(operations: ResearchOperations): ToolDefinition[];
+  createDataHealthTool(): ToolDefinition;
+  createRecallTool(): ToolDefinition;
   createAgent(
     options: CreateAgentOptions,
     binding: ResearchBinding,
@@ -165,7 +168,6 @@ class Runtime implements ResearchRuntime {
   readonly memory: MemoryService;
   readonly dispatch: DispatchBridge;
   readonly operations: ResearchOperations;
-  readonly tools: readonly ToolDefinition[];
   readonly submitReport: SubmitReport;
   readonly valuations: ValuationOperations;
   readonly #pending = new Set<PendingAgent>();
@@ -193,7 +195,6 @@ class Runtime implements ResearchRuntime {
       components.artifacts,
       components.bindings,
     );
-    this.tools = this.createTools(capturedPolicy);
     this.valuations = createValuationOperations(this.runs, components.bindings);
   }
 
@@ -317,6 +318,19 @@ class Runtime implements ResearchRuntime {
       ...createWriteTools({ artifacts, memory: this.memory }, bindings, policy),
       ...this.createCoordinatorTools(this.operations),
     ];
+  }
+
+  createDataHealthTool(): ToolDefinition {
+    return createDataHealthTool(
+      this.queries,
+      this.runs,
+      this.components.bindings,
+      false,
+    );
+  }
+
+  createRecallTool(): ToolDefinition {
+    return createRecallTool(this.memory, this.components.bindings, false);
   }
 
   createCoordinatorTools(operations: ResearchOperations): ToolDefinition[] {

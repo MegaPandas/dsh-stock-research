@@ -388,6 +388,36 @@ export default defineConfig(
     },
   },
   {
+    files: ["src/app/review-session.ts"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: [
+                "node:*",
+                "@deepseek-ai/*",
+                "**/host/**",
+                "**/tools/**",
+                "**/storage/**",
+                "**/runs/**",
+              ],
+              message:
+                "Review business state must use supplied capabilities instead of SDK, tools, or host execution.",
+            },
+            {
+              group: ["**/services/**"],
+              allowTypeImports: true,
+              message:
+                "Review business state must receive service capabilities instead of creating or locating services.",
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
     files: ["src/client/**/*.{ts,tsx}"],
     rules: {
       "no-restricted-imports": [

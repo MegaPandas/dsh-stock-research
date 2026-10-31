@@ -131,7 +131,10 @@ it.each(protocols)(
     ];
     const agent = await h.ctx.agents.create(h.agentOptions("protocol-tools"));
     const definitions = new Map(
-      [...h.runtime.tools, ...roleTools].map((tool) => [tool.name, tool]),
+      [...h.runtime.createTools(h.runtime.policy), ...roleTools].map((tool) => [
+        tool.name,
+        tool,
+      ]),
     );
     for (const tool of definitions.values())
       agent.agent.ctx.tools.register(tool);

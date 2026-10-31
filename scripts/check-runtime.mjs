@@ -81,7 +81,7 @@ try {
   await plugin;
   assert.deepEqual(await ctx.agentPresets.remoteExportList(), presetRoster);
   const runtime = ctx.stockResearch;
-  assert.equal(runtime.tools.length, 23);
+  assert.equal(runtime.createTools(runtime.policy).length, 23);
   assert.deepEqual(
     ctx.tools.schemas().filter(({ name }) => name.startsWith("stock_")),
     [],
@@ -101,7 +101,9 @@ try {
   const handle = await runtime.createAgent(
     { sessionId: SessionId("runtime-package") },
     { kind: "ask", scope },
-    runtime.tools.filter((tool) => tool.name === "stock_data_health"),
+    runtime
+      .createTools(runtime.policy)
+      .filter((tool) => tool.name === "stock_data_health"),
   );
   await ctx.plugin(CommandRuntime);
   const ask = ctx.plugin(Ask, { provider: "unused", model: "unused" });

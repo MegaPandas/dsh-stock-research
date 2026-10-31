@@ -107,7 +107,9 @@ describe("research runtime plugin with the real DSH host", () => {
       h.config({ enabledSources: ["sina", "fred", "dsh-web"] }),
     );
     expect(h.ctx.get("stockResearch")).toBeDefined();
-    expect(mounted.runtime.tools).toHaveLength(23);
+    expect(mounted.runtime.createTools(mounted.runtime.policy)).toHaveLength(
+      23,
+    );
     expect(stockNames(h)).toEqual([]);
     const health = mounted.runtime.queries.health(h.scope);
     expect(
@@ -158,9 +160,9 @@ describe("research runtime plugin with the real DSH host", () => {
       },
     });
     const { runtime } = await h.mount();
-    const health = runtime.tools.find(
-      (tool) => tool.name === "stock_data_health",
-    )!;
+    const health = runtime
+      .createTools(runtime.policy)
+      .find((tool) => tool.name === "stock_data_health")!;
     const handle = await runtime.createAgent(
       h.agentOptions("research-ask"),
       { kind: "ask", scope: h.scope },
@@ -264,9 +266,9 @@ describe("research runtime plugin with the real DSH host", () => {
       },
     });
     const { runtime } = await h.mount();
-    const health = runtime.tools.find(
-      (tool) => tool.name === "stock_data_health",
-    )!;
+    const health = runtime
+      .createTools(runtime.policy)
+      .find((tool) => tool.name === "stock_data_health")!;
     const handle = await runtime.createAgent(
       h.agentOptions("research-arguments"),
       { kind: "ask", scope: h.scope },
@@ -305,9 +307,9 @@ describe("research runtime plugin with the real DSH host", () => {
   it("unloads only its owned Agents, closes idempotently and reinstalls without contributions leaking", async () => {
     const h = await host();
     const first = await h.mount();
-    const health = first.runtime.tools.find(
-      (tool) => tool.name === "stock_data_health",
-    )!;
+    const health = first.runtime
+      .createTools(first.runtime.policy)
+      .find((tool) => tool.name === "stock_data_health")!;
     const owned = await first.runtime.createAgent(
       h.agentOptions("owned"),
       { kind: "ask", scope: h.scope },
@@ -330,7 +332,7 @@ describe("research runtime plugin with the real DSH host", () => {
     ).rejects.toMatchObject({ code: "ACCESS_DENIED" });
     reacquire(h.directory);
     const second = await h.mount();
-    expect(second.runtime.tools).toHaveLength(23);
+    expect(second.runtime.createTools(second.runtime.policy)).toHaveLength(23);
     expect(stockNames(h)).toEqual([]);
     await second.fiber.dispose();
     expect(stockNames(h)).toEqual([]);
@@ -346,9 +348,9 @@ describe("research runtime plugin with the real DSH host", () => {
     cleanups.push(async () => {
       release.resolve();
     });
-    const health = runtime.tools.find(
-      (tool) => tool.name === "stock_data_health",
-    )!;
+    const health = runtime
+      .createTools(runtime.policy)
+      .find((tool) => tool.name === "stock_data_health")!;
     let setupFinished = false;
     let committed = false;
     const options = h.agentOptions("pending-setup");
@@ -430,9 +432,9 @@ describe("research runtime plugin with the real DSH host", () => {
       model.released.resolve();
       search.released.resolve();
     });
-    const health = mounted.runtime.tools.find(
-      (tool) => tool.name === "stock_data_health",
-    )!;
+    const health = mounted.runtime
+      .createTools(mounted.runtime.policy)
+      .find((tool) => tool.name === "stock_data_health")!;
     const owned = await mounted.runtime.createAgent(
       h.agentOptions("model-owner"),
       { kind: "ask", scope: h.scope },
@@ -483,7 +485,9 @@ describe("research runtime plugin with the real DSH host", () => {
     const mounted = await h.mount();
     expect(h.ctx.tools.get(existing.name)).toBe(existing);
     expect(
-      mounted.runtime.tools.find(({ name }) => name === existing.name),
+      mounted.runtime
+        .createTools(mounted.runtime.policy)
+        .find(({ name }) => name === existing.name),
     ).not.toBe(existing);
     await mounted.fiber.dispose();
     expect(h.ctx.tools.get(existing.name)).toBe(existing);
@@ -522,7 +526,9 @@ describe("research runtime plugin with the real DSH host", () => {
       if (problem === "corrupt-cache")
         fs.rmSync(join(h.directory, "cache.sqlite"));
       const recovered = await h.mount();
-      expect(recovered.runtime.tools).toHaveLength(23);
+      expect(
+        recovered.runtime.createTools(recovered.runtime.policy),
+      ).toHaveLength(23);
       expect(fetch).not.toHaveBeenCalled();
       await recovered.fiber.dispose();
       expect(stockNames(h)).toEqual([]);

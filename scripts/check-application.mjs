@@ -103,7 +103,10 @@ try {
   for (const name of commands)
     assert.equal(ctx.commands.find(outside.agent, name).name, name);
   assert.deepEqual(await ctx.agentPresets.remoteExportList(), userPresets);
-  assert.equal(ctx.stockResearch.tools.length, 23);
+  assert.equal(
+    ctx.stockResearch.createTools(ctx.stockResearch.policy).length,
+    23,
+  );
   const mainAgentTools = [
     "stock_start_research",
     "stock_resume_research",

@@ -111,9 +111,9 @@ try {
       [],
     );
     try {
-      const calculate = runtime.tools.find(
-        ({ name }) => name === "stock_calculate_valuation",
-      );
+      const calculate = runtime
+        .createTools(runtime.policy)
+        .find(({ name }) => name === "stock_calculate_valuation");
       const request = {
         methodId: "comparable_multiples",
         purpose: "valuation",

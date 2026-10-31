@@ -115,10 +115,12 @@ describe("main Agent research lifecycle", () => {
     });
     cleanups.push(h.close);
     expect((await h.executeAndWait())?.result.kind).toBe("error");
-    const dispatch = h.runtime.tools.find(
-      ({ name }) => name === "stock_dispatch_task",
-    )!;
-    const read = h.runtime.tools.find(({ name }) => name === "stock_read_run")!;
+    const dispatch = h.runtime
+      .createTools(h.runtime.policy)
+      .find(({ name }) => name === "stock_dispatch_task")!;
+    const read = h.runtime
+      .createTools(h.runtime.policy)
+      .find(({ name }) => name === "stock_read_run")!;
     expect(h.ctx.tools.get(dispatch.name, h.outside.agent)).toBeDefined();
     expect(h.ctx.tools.get(read.name, h.outside.agent)).toBeDefined();
     expect(h.ctx.tools.get(dispatch.name, h.outside.agent)).not.toBe(dispatch);

@@ -9,37 +9,17 @@ import type {
 import { createUserMessage } from "@deepseek-ai/dsh-llm";
 import { SessionId } from "@deepseek-ai/dsh-session";
 import { ResearchError } from "../contracts/errors.js";
-import type { MemoryRef } from "../contracts/memory.js";
-import type { RememberInput } from "../contracts/memory-service.js";
-import type { PriceReturnsQuery, QueryResponse } from "../contracts/query.js";
 import type {} from "../host/runtime.js";
 import { agentInput, createSubmission } from "../host/agent-execution.js";
-import { renderAgentReport } from "../report/agent-report.js";
 import { ArtifactInputs } from "../services/artifact-inputs.js";
-import { researchTool } from "../tools/errors.js";
-import {
-  invalid,
-  object,
-  objectSchema,
-  stringSchema,
-  text,
-  positive,
-  resultOutput,
-  opaqueObjectSchema,
-} from "../tools/parameters.js";
-import { parseDataRequest } from "../tools/query-inputs.js";
 import { ModelConfigSchema, resolveModelOptions } from "./model-config.js";
 import type { ModelConfig } from "../contracts/settings.js";
 import { parseReviewInput, type ReviewInput } from "./review-input.js";
 import { REVIEW_PROMPT } from "./review-prompt.js";
-import { scopedQueryParameters } from "./query-scope.js";
 import { createReportReader } from "./report-reader.js";
+import { ReviewSession } from "./review-session.js";
+import { createReviewTools } from "./review-tools.js";
 
-const REVIEW_TOOLS = new Set([
-  "stock_data_health",
-  "stock_recall",
-  "stock_get_returns",
-]);
 interface ActiveReview {
   controller: AbortController;
   drained: Promise<unknown[]>;
@@ -130,14 +110,20 @@ class ReviewApplication {
         referencePrice = { value: claim.value, unit: claim.unit };
       }
     }
-    let previous: MemoryRef | null = null;
-    let lastReturns:
-      | {
-          request: PriceReturnsQuery;
-          envelope?: QueryResponse<PriceReturnsQuery>;
-          failure?: unknown;
-        }
-      | undefined;
+    const session = new ReviewSession(
+      input,
+      currentReports
+        .filter(
+          ({ content }) =>
+            content.kind === "decision" || content.kind === "report",
+        )
+        .map(({ ref }) => ref),
+      {
+        memory: runtime.memory,
+        queryReturns: (scope, request, signal) =>
+          runtime.queries.query(scope, request, signal),
+      },
+    );
     let handle: AgentHandle | undefined;
     let failure: { cause: unknown } | undefined;
     const cancel = () =>
@@ -146,136 +132,19 @@ class ReviewApplication {
     const outcome = await Promise.resolve()
       .then(async (): Promise<CommandResult> => {
         signal.throwIfAborted();
-        const tools = runtime.tools
-          .filter((tool) => REVIEW_TOOLS.has(tool.name))
-          .map((tool) => {
-            if (tool.name === "stock_get_returns")
-              return researchTool({
-                ...tool,
-                parameters: scopedQueryParameters(tool.parameters, false),
-                async execute(value, exec) {
-                  exec.signal.throwIfAborted();
-                  const { request, source } = parseDataRequest(
-                    "stock_get_returns",
-                    value,
-                    input.scope,
-                    policy,
-                  );
-                  if (source !== null)
-                    invalid("A review cannot select a task replay source.");
-                  const attempt: NonNullable<typeof lastReturns> = { request };
-                  lastReturns = attempt;
-                  try {
-                    const envelope = await runtime.queries.query(
-                      input.scope,
-                      request,
-                      exec.signal,
-                    );
-                    attempt.envelope = envelope;
-                    return { kind: "ordinary", envelope };
-                  } catch (cause) {
-                    attempt.failure = cause;
-                    throw cause;
-                  }
-                },
-              });
-            return {
-              ...tool,
-              parameters: scopedQueryParameters(tool.parameters, false),
-            };
-          });
-        tools.push(
+        const tools = [
+          runtime.createDataHealthTool(),
+          runtime.createRecallTool(),
+          ...createReviewTools(session, input.scope, policy),
           reader.tool,
-          researchTool({
-            name: "stock_select_review",
-            description:
-              "Select an existing review of this run for a user-requested revision.",
-            parameters: objectSchema({
-              entryId: stringSchema,
-              revision: { type: "integer" },
-            }),
-            output: resultOutput(opaqueObjectSchema),
-            async execute(value, exec) {
-              exec.signal.throwIfAborted();
-              const item = object(value, ["entryId", "revision"]);
-              const selected = {
-                entryId: text(item.entryId, "entryId"),
-                revision: positive(item.revision, "revision"),
-              };
-              const entry = runtime.memory.read(selected);
-              if (
-                entry.runId !== input.runId ||
-                entry.securityId !== input.scope.security.id ||
-                Date.parse(entry.recordedAt) > Date.parse(input.scope.cutoff)
-              )
-                throw new ResearchError(
-                  "ACCESS_DENIED",
-                  "The selected review is outside this run or review cutoff.",
-                );
-              previous = selected;
-              return { previous, outcome: entry.outcome, note: entry.note };
-            },
-          }),
-        );
-        const submission = createSubmission("review", async (report, exec) => {
-          exec.signal.throwIfAborted();
+        ];
+        const submission = createSubmission("review", (report, exec) => {
           signal.throwIfAborted();
-          const note =
-            renderAgentReport("review", report, {
-              includeSummary: false,
-            }).trimEnd() || report.summary;
-          let returns: RememberInput["returns"];
-          if (lastReturns?.envelope !== undefined)
-            returns = { kind: "query", request: lastReturns.request };
-          else if (lastReturns?.failure !== undefined)
-            returns = {
-              kind: "unavailable",
-              gaps: [
-                {
-                  code: "missing",
-                  field: "returns",
-                  detail:
-                    lastReturns.failure instanceof Error
-                      ? lastReturns.failure.message
-                      : String(lastReturns.failure),
-                },
-              ],
-            };
-          else if (lastReturns !== undefined)
-            invalid("The explicit returns query has not completed.");
-          else
-            returns = {
-              kind: "unavailable",
-              gaps: [
-                {
-                  code: "missing",
-                  field: "returns",
-                  detail: "本次复盘未查询收益。",
-                },
-              ],
-            };
-          const evidence = currentReports
-            .filter(
-              ({ content }) =>
-                content.kind === "decision" || content.kind === "report",
-            )
-            .map(({ ref }) => ref);
-          return runtime.memory.remember(
-            {
-              runId: input.runId,
-              identity: exec.agent!.id,
-              scope: input.scope,
-            },
-            {
-              previous,
-              outcome: report.summary,
-              note,
-              evidence,
-              returns,
-            },
-            `review:${exec.callId}`,
+          return session.submit(
+            report,
+            exec.agent!.id,
+            exec.callId,
             exec.signal,
-            lastReturns?.envelope,
           );
         });
         tools.push(submission.tool);
