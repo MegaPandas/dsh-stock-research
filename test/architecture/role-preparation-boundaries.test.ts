@@ -15,6 +15,7 @@ async function boundaryErrors(filePath: string, source: string) {
 describe("role preparation boundaries", () => {
   it.each([
     ["src/application.ts", "./app/role-preparation/role.js"],
+    ["src/application.ts", "./app/role-preparation/services.js"],
     ["src/plugin.ts", "./app/role-preparation/valuation-draft.js"],
     ["src/app/ask-request.ts", "./role-preparation/nested/new-internal.js"],
   ])(

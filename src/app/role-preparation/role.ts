@@ -16,7 +16,7 @@ import { reportMaterial } from "../../report/material.js";
 import { ArtifactInputs } from "../../services/artifact-inputs.js";
 import { assembleAgentArtifact } from "../../artifacts/assembly.js";
 import { inheritRisks } from "../../artifacts/risks.js";
-import type { RoleServices } from "./index.js";
+import type { RoleServices } from "./services.js";
 import type { readApplicationInput } from "../research-input.js";
 import {
   readCollection,

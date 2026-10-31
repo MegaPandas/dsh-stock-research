@@ -34,8 +34,3 @@ export interface ReplaySnapshot {
   sourceRevision: number;
   tasks: ReplayTaskSnapshot[];
 }
-export interface RunLineage {
-  sourceRunId: string;
-  sourceRevision: number;
-  snapshotRef: ContentRef;
-}

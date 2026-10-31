@@ -1,5 +1,6 @@
 import type { HttpClientOptions } from "./http.js";
-import type { QueryCachePolicy, QueryPolicy } from "./query.js";
+import type { QueryCachePolicy } from "./cache.js";
+import type { QueryPolicy } from "./query.js";
 
 export const SOURCE_IDS = [
   "yahoo",

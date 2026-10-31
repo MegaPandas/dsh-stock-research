@@ -7,7 +7,7 @@ import type {
   ResearchScope,
   SourceRef,
 } from "./data.js";
-import type { QueryCachePolicy } from "./query.js";
+import type { QueryCachePolicy } from "./cache.js";
 
 export interface CollectionAccess {
   collect(

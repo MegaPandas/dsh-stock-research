@@ -1,9 +1,8 @@
 import { createCacheKey, type SqliteCache } from "../../cache/index.js";
-import type { QueryCacheKey } from "../../contracts/cache.js";
+import type { QueryCacheKey, QueryCachePolicy } from "../../contracts/cache.js";
 import type { ResearchScope } from "../../contracts/data.js";
 import { ResearchError } from "../../contracts/errors.js";
 import type {
-  QueryCachePolicy,
   SourceData,
   SourceEnvelope,
   SourceQuery,

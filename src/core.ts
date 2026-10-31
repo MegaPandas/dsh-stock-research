@@ -47,7 +47,7 @@ export type {
   SourceId,
 } from "./contracts/settings.js";
 export type { JsonValue } from "./contracts/json.js";
-export type { QueryCacheKey } from "./contracts/cache.js";
+export type { QueryCacheKey, QueryCachePolicy } from "./contracts/cache.js";
 export { createCacheKey, SqliteCache } from "./cache/index.js";
 export type { MarketCapability, MarketQuery } from "./contracts/market.js";
 export { YahooMarketAdapter } from "./data/yahoo-market.js";
@@ -206,8 +206,8 @@ export type {
   ReplayRunInput,
   ReplaySnapshot,
   ReplayTaskSnapshot,
-  RunLineage,
 } from "./contracts/replay.js";
+export type { RunLineage } from "./contracts/run-lineage.js";
 export type {
   CandidateSeed,
   EvidenceCall,
@@ -225,7 +225,6 @@ export type {
   EastmoneySourceQuery,
   FredSourceQuery,
   MarketSourceQuery,
-  QueryCachePolicy,
   QueryData,
   QueryEnvelope,
   QueryRequest,

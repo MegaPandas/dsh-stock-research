@@ -1,8 +1,8 @@
 import type { SqliteCache } from "../../cache/index.js";
+import type { QueryCachePolicy } from "../../contracts/cache.js";
 import type { ResearchScope } from "../../contracts/data.js";
 import { ResearchError } from "../../contracts/errors.js";
 import type {
-  QueryCachePolicy,
   QueryEnvelope,
   QueryRequest,
   QueryResponse,

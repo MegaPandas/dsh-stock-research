@@ -8,7 +8,7 @@ import type {
   StageDefinition,
   TaskDefinition,
 } from "./workflow.js";
-import type { RunLineage } from "./replay.js";
+import type { RunLineage } from "./run-lineage.js";
 
 export type RunStatus = "active" | "blocked" | "completed" | "cancelled";
 export type TaskStatus =

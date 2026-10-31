@@ -8,7 +8,7 @@ import type {
   SourceRef,
 } from "./data.js";
 import type { MemoryRef } from "./memory.js";
-import type { RunLineage } from "./replay.js";
+import type { RunLineage } from "./run-lineage.js";
 import type { ContentRef } from "./storage.js";
 
 export type EvidenceQuery = Omit<

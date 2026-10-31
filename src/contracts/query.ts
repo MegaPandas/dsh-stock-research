@@ -89,8 +89,6 @@ export interface TaskSourceResponse<Q extends SourceQuery> {
   sourceRef: SourceRef;
   envelope: RegisteredEvidenceRecord<SourceData<Q>>["envelope"];
 }
-export type QueryCachePolicy = Record<SourceDataset, number>;
-
 export interface MarketIndicatorsQuery {
   dataset: "market";
   provider: MarketSourceQuery["provider"];
