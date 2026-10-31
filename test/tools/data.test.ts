@@ -21,7 +21,7 @@ import {
   SessionBindings,
   type ResearchBinding,
 } from "../../src/host/bindings.js";
-import { QueryService } from "../../src/services/query.js";
+import { QueryService } from "../../src/services/query/index.js";
 import { TaskQueryService } from "../../src/services/task-query.js";
 import { createDataTools } from "../../src/tools/data.js";
 import { dataSchemas } from "../../src/tools/query-inputs.js";

@@ -10,7 +10,7 @@ import type { ReplayEvidenceSource } from "../contracts/replay.js";
 import type { TaskOperation } from "../contracts/runs.js";
 import type { EvidenceQuery } from "../contracts/task-data.js";
 import { extractCandidates } from "./candidates.js";
-import type { QueryService } from "./query.js";
+import type { QueryService } from "./query/index.js";
 import { adoptQuerySnapshot } from "./query-snapshot.js";
 import type { RunCommands, RunReader } from "../contracts/run-access.js";
 import { SharedQueries } from "./shared-queries.js";

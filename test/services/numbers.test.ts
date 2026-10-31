@@ -17,7 +17,7 @@ import { createRunService } from "../../src/services/create-run-service.js";
 import {
   withIndicators,
   withPriceReturn,
-} from "../../src/services/derived-queries.js";
+} from "../../src/services/query/calculations.js";
 import { US_SECURITY } from "../fixtures/market.js";
 
 // Synthetic availability witnesses exercise the gate; they do not describe a live vendor.

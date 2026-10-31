@@ -15,11 +15,26 @@ const foundationImports = [
   ...integrationImports,
   "@deepseek-ai/*",
 ];
+const pureImports = [
+  ...foundationImports,
+  "node:*",
+  "**/cache/**",
+  "**/data/**",
+  "**/memory/**",
+  "**/runs/**",
+  "**/storage/**",
+];
 const runConsumerRestriction = {
   selector:
     "ImportDeclaration[source.value='./runs.js'], ImportDeclaration[source.value='../services/runs.js']",
   message:
     "Consumers must select RunReader or RunCommands capabilities instead of depending on the RunService implementation.",
+};
+const queryPrivateRestriction = {
+  selector:
+    ":matches(ImportDeclaration, ExportNamedDeclaration, ExportAllDeclaration)[source.value=/query\\u002F(source-queries|source-selection)\\.js$/]",
+  message:
+    "Query consumers must use the public query or calculation entry instead of source execution internals.",
 };
 
 export default defineConfig(
@@ -27,6 +42,12 @@ export default defineConfig(
   {
     files: ["**/*.{ts,tsx,mjs}"],
     extends: [js.configs.recommended, tseslint.configs.recommended],
+  },
+  {
+    files: ["src/**/*.{ts,tsx}"],
+    rules: {
+      "no-restricted-syntax": ["error", queryPrivateRestriction],
+    },
   },
   {
     files: [
@@ -90,6 +111,7 @@ export default defineConfig(
     files: [
       "src/{indicators,json,report,valuation}/**/*.ts",
       "src/services/collection-plan.ts",
+      "src/services/query/calculations.ts",
     ],
     rules: {
       "no-restricted-imports": [
@@ -97,17 +119,26 @@ export default defineConfig(
         {
           patterns: [
             {
-              group: [
-                ...foundationImports,
-                "node:*",
-                "**/cache/**",
-                "**/data/**",
-                "**/memory/**",
-                "**/runs/**",
-                "**/storage/**",
-              ],
+              group: pureImports,
               message:
                 "Pure modules must not depend on I/O, persistence, services, or integration layers.",
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    files: ["src/services/query/calculations.ts"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: [...pureImports, "./*.js", "../*.js"],
+              message:
+                "Query calculations must depend on contracts and pure computations instead of query execution or services.",
             },
           ],
         },
@@ -118,7 +149,11 @@ export default defineConfig(
     files: ["src/{app,services,tools}/**/*.ts"],
     ignores: ["src/services/create-run-service.ts"],
     rules: {
-      "no-restricted-syntax": ["error", runConsumerRestriction],
+      "no-restricted-syntax": [
+        "error",
+        runConsumerRestriction,
+        queryPrivateRestriction,
+      ],
     },
   },
   {
@@ -127,6 +162,7 @@ export default defineConfig(
       "no-restricted-syntax": [
         "error",
         runConsumerRestriction,
+        queryPrivateRestriction,
         {
           selector:
             "ImportDeclaration[source.value='./valuation-calculations.js']",

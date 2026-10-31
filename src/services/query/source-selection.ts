@@ -1,11 +1,11 @@
-import type { ResearchScope } from "../contracts/data.js";
-import { ResearchError } from "../contracts/errors.js";
-import type { SourceEnvelope, SourceQuery } from "../contracts/query.js";
+import type { ResearchScope } from "../../contracts/data.js";
+import { ResearchError } from "../../contracts/errors.js";
+import type { SourceEnvelope, SourceQuery } from "../../contracts/query.js";
 import type {
   QuerySources,
   SourceCapability,
   SourceDescription,
-} from "../contracts/sources.js";
+} from "../../contracts/sources.js";
 export interface SourceSelection {
   capability: SourceCapability;
   fetch(signal: AbortSignal): Promise<SourceEnvelope>;

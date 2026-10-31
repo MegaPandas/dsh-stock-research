@@ -251,8 +251,8 @@ export type {
   SourceDescription,
   SourceCodeVersions,
 } from "./contracts/sources.js";
-export type { QueryHealth, SourceHealth } from "./services/query.js";
-export { QueryService } from "./services/query.js";
+export type { QueryHealth, SourceHealth } from "./contracts/sources.js";
+export { QueryService } from "./services/query/index.js";
 export { TaskQueryService } from "./services/task-query.js";
 export { CollectionService } from "./services/collection.js";
 export { createCollectionTaskFactory } from "./data/collection-tasks.js";

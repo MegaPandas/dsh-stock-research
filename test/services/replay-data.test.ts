@@ -20,7 +20,7 @@ import type {
 import { HttpClient } from "../../src/data/http.js";
 import { YahooMarketAdapter } from "../../src/data/yahoo-market.js";
 import { RunStore } from "../../src/runs/store.js";
-import { QueryService } from "../../src/services/query.js";
+import { QueryService } from "../../src/services/query/index.js";
 import { TaskQueryService } from "../../src/services/task-query.js";
 import { createRunService } from "../../src/services/create-run-service.js";
 import { DataRoot } from "../../src/storage/data-root.js";

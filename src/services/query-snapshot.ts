@@ -11,7 +11,7 @@ import type {
   QuerySnapshot,
 } from "../contracts/query.js";
 import { marketFreshnessMs } from "../data/market-calendar.js";
-import { withPriceReturn } from "./derived-queries.js";
+import { withPriceReturn } from "./query/calculations.js";
 
 export function selectQuerySnapshot(
   request: QueryRequest,

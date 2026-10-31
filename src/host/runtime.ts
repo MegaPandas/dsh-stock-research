@@ -26,7 +26,7 @@ import { DecisionService } from "../services/decisions.js";
 import { DigestService } from "../services/digests.js";
 import { MemoryService } from "../services/memory.js";
 import { NumberService } from "../services/numbers.js";
-import { QueryService } from "../services/query.js";
+import { QueryService } from "../services/query/index.js";
 import { TaskQueryService } from "../services/task-query.js";
 import { CollectionService } from "../services/collection.js";
 import { CollectionSnapshotStore } from "../storage/collection-snapshots.js";

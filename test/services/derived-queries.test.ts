@@ -17,7 +17,7 @@ import type {
 import type { RunState } from "../../src/contracts/runs.js";
 import { HttpClient } from "../../src/data/http.js";
 import { YahooMarketAdapter } from "../../src/data/yahoo-market.js";
-import { QueryService } from "../../src/services/query.js";
+import { QueryService } from "../../src/services/query/index.js";
 import { TaskQueryService } from "../../src/services/task-query.js";
 import { DataRoot } from "../../src/storage/data-root.js";
 import { RunStore } from "../../src/runs/store.js";

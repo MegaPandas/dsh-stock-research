@@ -17,7 +17,7 @@ import {
 import type { MemoryService } from "../services/memory.js";
 import type { NumberService } from "../services/numbers.js";
 import { readPointer, SelectorError } from "../services/number-fields.js";
-import type { QueryService } from "../services/query.js";
+import type { QueryService } from "../services/query/index.js";
 import type { RunReader } from "../contracts/run-access.js";
 import {
   collectionGaps,

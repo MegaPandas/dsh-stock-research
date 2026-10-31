@@ -6,7 +6,7 @@ import {
   type BoundCaller,
   type SessionBindings,
 } from "../host/bindings.js";
-import type { QueryService } from "../services/query.js";
+import type { QueryService } from "../services/query/index.js";
 import type { TaskQueryService } from "../services/task-query.js";
 import type { RunReader } from "../contracts/run-access.js";
 import { researchTool } from "./errors.js";

@@ -11,7 +11,7 @@ import type {
 } from "../../src/contracts/query.js";
 import type { RunState } from "../../src/contracts/runs.js";
 import { marketCapability } from "../../src/data/market.js";
-import { QueryService } from "../../src/services/query.js";
+import { QueryService } from "../../src/services/query/index.js";
 import { TaskQueryService } from "../../src/services/task-query.js";
 import { selectQuerySnapshot } from "../../src/services/query-snapshot.js";
 import { createRunService } from "../../src/services/create-run-service.js";

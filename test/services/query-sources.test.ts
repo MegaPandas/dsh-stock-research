@@ -23,7 +23,7 @@ import { YahooMarketAdapter } from "../../src/data/yahoo-market.js";
 import {
   describeSources,
   selectSource,
-} from "../../src/services/query-sources.js";
+} from "../../src/services/query/source-selection.js";
 
 const usScope: ResearchScope = {
   security: {

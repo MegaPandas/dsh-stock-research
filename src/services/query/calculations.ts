@@ -3,22 +3,22 @@ import type {
   DataGap,
   MarketBar,
   MarketData,
-} from "../contracts/data.js";
-import type { IndicatorRequest } from "../contracts/indicators.js";
+} from "../../contracts/data.js";
+import type { IndicatorRequest } from "../../contracts/indicators.js";
 import type {
   MarketIndicatorsData,
   PriceReturnsData,
   PriceReturnsQuery,
   ReturnObservation,
-} from "../contracts/query.js";
+} from "../../contracts/query.js";
 import {
   calculateIndicators,
   INDICATORS_ALGORITHM_VERSION,
-} from "../indicators/index.js";
+} from "../../indicators/index.js";
 import {
   calculatePriceReturn,
   PRICE_RETURN_ALGORITHM_VERSION,
-} from "../indicators/returns.js";
+} from "../../indicators/returns.js";
 
 export function withIndicators(
   envelope: DataEnvelope<MarketData>,

@@ -1,4 +1,4 @@
-import type { ResearchScope } from "./data.js";
+import type { ISOTime, ResearchScope } from "./data.js";
 import type {
   EastmoneySourceQuery,
   FredSourceQuery,
@@ -45,4 +45,19 @@ export interface SourceDescription {
   dataset: SourceDataset;
   provider: SourceQuery["provider"];
   capability: SourceCapability | null;
+}
+
+export interface SourceHealth extends SourceDescription {
+  cacheHits: number;
+  sourceCalls: number;
+  lastQuery: {
+    at: ISOTime;
+    outcome: "succeeded" | "failed" | "cancelled";
+    errorCode: string | null;
+  } | null;
+}
+
+export interface QueryHealth {
+  scope: ResearchScope;
+  sources: SourceHealth[];
 }

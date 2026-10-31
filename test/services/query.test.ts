@@ -18,7 +18,7 @@ import type {
 import { HttpClient } from "../../src/data/http.js";
 import { YahooMarketAdapter } from "../../src/data/yahoo-market.js";
 import { ResearchError } from "../../src/contracts/errors.js";
-import { QueryService } from "../../src/services/query.js";
+import { QueryService } from "../../src/services/query/index.js";
 import { TaskQueryService } from "../../src/services/task-query.js";
 import type { QuerySources } from "../../src/contracts/sources.js";
 import { createRunService } from "../../src/services/create-run-service.js";
