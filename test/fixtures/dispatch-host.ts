@@ -46,7 +46,7 @@ import { DecisionService } from "../../src/services/decisions.js";
 import { DigestService } from "../../src/services/digests.js";
 import { MemoryService } from "../../src/services/memory.js";
 import { NumberService } from "../../src/services/numbers.js";
-import { createRunService } from "../../src/services/create-run-service.js";
+import { createRunService } from "../../src/services/run/index.js";
 import { DataRoot } from "../../src/storage/data-root.js";
 import { createControlTools } from "../../src/tools/control.js";
 import { createWriteTools } from "../../src/tools/write.js";

@@ -7,7 +7,7 @@ import {
   searchPublic,
   approvePublicSearch,
 } from "../../src/host/public-search.js";
-import { createRunService } from "../../src/services/create-run-service.js";
+import { createRunService } from "../../src/services/run/index.js";
 import { RunStore } from "../../src/runs/store.js";
 import { DataRoot } from "../../src/storage/data-root.js";
 import type { OpenRunInput, RunState } from "../../src/contracts/runs.js";

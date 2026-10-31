@@ -1,14 +1,17 @@
-import type { ArtifactInput, ArtifactVersion } from "../contracts/artifacts.js";
-import type { ResearchArtifactInput } from "../contracts/artifact-payloads.js";
-import type { ArtifactRef } from "../contracts/data.js";
-import { ResearchError } from "../contracts/errors.js";
+import type {
+  ArtifactInput,
+  ArtifactVersion,
+} from "../../contracts/artifacts.js";
+import type { ResearchArtifactInput } from "../../contracts/artifact-payloads.js";
+import type { ArtifactRef } from "../../contracts/data.js";
+import { ResearchError } from "../../contracts/errors.js";
 import type {
   ClaimResult,
   RedoTaskResult,
   ResearchRun,
-} from "../contracts/runs.js";
-import { artifactCalculationIds } from "../artifacts/references.js";
-import { artifactKey } from "../contracts/artifact-identity.js";
+} from "../../contracts/runs.js";
+import { artifactCalculationIds } from "../../artifacts/references.js";
+import { artifactKey } from "../../contracts/artifact-identity.js";
 
 export function affectedTaskIds(
   run: ResearchRun,

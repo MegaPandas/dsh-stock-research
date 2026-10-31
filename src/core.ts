@@ -191,7 +191,7 @@ export type {
   TaskState,
   TaskStatus,
 } from "./contracts/runs.js";
-export { createRunService } from "./services/create-run-service.js";
+export { createRunService } from "./services/run/index.js";
 export type {
   RunAccess,
   RunCommands,

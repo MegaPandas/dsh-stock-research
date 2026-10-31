@@ -22,7 +22,7 @@ import { YahooMarketAdapter } from "../../src/data/yahoo-market.js";
 import { RunStore } from "../../src/runs/store.js";
 import { QueryService } from "../../src/services/query/index.js";
 import { TaskQueryService } from "../../src/services/task-query.js";
-import { createRunService } from "../../src/services/create-run-service.js";
+import { createRunService } from "../../src/services/run/index.js";
 import { DataRoot } from "../../src/storage/data-root.js";
 import { US_SECURITY } from "../fixtures/market.js";
 

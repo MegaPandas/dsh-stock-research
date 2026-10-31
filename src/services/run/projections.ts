@@ -1,7 +1,7 @@
-import type { ArtifactVersion } from "../contracts/artifacts.js";
-import type { SyncRunProjections } from "../contracts/runs.js";
-import { renderRunProjections } from "../report/projections.js";
-import type { RunStore } from "../runs/store.js";
+import type { ArtifactVersion } from "../../contracts/artifacts.js";
+import type { SyncRunProjections } from "../../contracts/runs.js";
+import { renderRunProjections } from "../../report/projections.js";
+import type { RunStore } from "../../runs/store.js";
 
 export function createRunProjector(
   store: Pick<RunStore<object>, "readContents" | "syncProjections">,

@@ -18,7 +18,7 @@ import {
   ArtifactService,
 } from "../../src/services/artifacts.js";
 import { NumberService } from "../../src/services/numbers.js";
-import { createRunService } from "../../src/services/create-run-service.js";
+import { createRunService } from "../../src/services/run/index.js";
 import { RunStore } from "../../src/runs/store.js";
 import { DataRoot } from "../../src/storage/data-root.js";
 import { US_SECURITY } from "../fixtures/market.js";

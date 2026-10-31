@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
-import type { ArtifactVersion } from "../contracts/artifacts.js";
-import type { ArtifactRef } from "../contracts/data.js";
-import { ResearchError } from "../contracts/errors.js";
+import type { ArtifactVersion } from "../../contracts/artifacts.js";
+import type { ArtifactRef } from "../../contracts/data.js";
+import { ResearchError } from "../../contracts/errors.js";
 import type {
   AttemptTarget,
   BlockReasonInput,
@@ -16,9 +16,9 @@ import type {
   TaskInstructionSnapshot,
   TaskOperation,
   TaskState,
-} from "../contracts/runs.js";
-import type { ContentWriter } from "../contracts/storage.js";
-import { affectedTaskIds } from "./run-dependencies.js";
+} from "../../contracts/runs.js";
+import type { ContentWriter } from "../../contracts/storage.js";
+import { affectedTaskIds } from "./dependencies.js";
 
 export function taskState(run: ResearchRun, taskId: string): TaskState {
   const task = run.tasks.find((task) => task.taskId === taskId);

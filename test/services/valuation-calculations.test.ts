@@ -22,7 +22,7 @@ import type {
 import { DETERMINISTIC_VALUATION_PROTOCOL } from "../../src/contracts/valuation.js";
 import { SessionBindings } from "../../src/host/bindings.js";
 import { RunStore } from "../../src/runs/store.js";
-import { createRunService } from "../../src/services/create-run-service.js";
+import { createRunService } from "../../src/services/run/index.js";
 import { ArtifactService } from "../../src/services/artifacts.js";
 import { NumberService } from "../../src/services/numbers.js";
 import { assembleAgentArtifact } from "../../src/services/business-reports.js";

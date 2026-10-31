@@ -9,7 +9,7 @@ import type { RunState } from "../../src/contracts/runs.js";
 import { DataRoot } from "../../src/storage/data-root.js";
 import { RunStore } from "../../src/runs/store.js";
 import { CollectionService } from "../../src/services/collection/index.js";
-import { createRunService } from "../../src/services/create-run-service.js";
+import { createRunService } from "../../src/services/run/index.js";
 import {
   openResearch,
   type OpenResearchRequest,

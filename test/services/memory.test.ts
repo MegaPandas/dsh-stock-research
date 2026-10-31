@@ -16,7 +16,7 @@ import type { OpenRunInput, RunState } from "../../src/contracts/runs.js";
 import { MemoryStore } from "../../src/memory/store.js";
 import { RunStore } from "../../src/runs/store.js";
 import { MemoryService } from "../../src/services/memory.js";
-import { createRunService } from "../../src/services/create-run-service.js";
+import { createRunService } from "../../src/services/run/index.js";
 import { DataRoot } from "../../src/storage/data-root.js";
 import {
   MARKET_FIXTURE,

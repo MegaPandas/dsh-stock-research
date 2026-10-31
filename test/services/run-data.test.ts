@@ -13,7 +13,7 @@ import type {
   MemoryInputQuery,
   MemoryInputSnapshot,
 } from "../../src/contracts/task-data.js";
-import { createRunService } from "../../src/services/create-run-service.js";
+import { createRunService } from "../../src/services/run/index.js";
 import type { RunLifecycle } from "../../src/contracts/run-access.js";
 import { RunStore } from "../../src/runs/store.js";
 import { DataRoot } from "../../src/storage/data-root.js";

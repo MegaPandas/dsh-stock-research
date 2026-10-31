@@ -1,14 +1,14 @@
-import type { JsonValue } from "../contracts/json.js";
-import { ResearchError } from "../contracts/errors.js";
-import type { ReplaySnapshot } from "../contracts/replay.js";
+import type { JsonValue } from "../../contracts/json.js";
+import { ResearchError } from "../../contracts/errors.js";
+import type { ReplaySnapshot } from "../../contracts/replay.js";
 import type {
   OpenRunInput,
   ResearchRun,
   RunVersions,
   TaskInstructionSnapshot,
-} from "../contracts/runs.js";
-import type { ContentRef } from "../contracts/storage.js";
-import { latestInstruction } from "./run-control.js";
+} from "../../contracts/runs.js";
+import type { ContentRef } from "../../contracts/storage.js";
+import { latestInstruction } from "./control.js";
 
 export interface PreparedReplay {
   input: OpenRunInput;

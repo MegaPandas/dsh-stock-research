@@ -1,6 +1,6 @@
-import type { SourceRef } from "../contracts/data.js";
-import type { ResearchRun, TaskOperation } from "../contracts/runs.js";
-import type { ContentWriter } from "../contracts/storage.js";
+import type { SourceRef } from "../../contracts/data.js";
+import type { ResearchRun, TaskOperation } from "../../contracts/runs.js";
+import type { ContentWriter } from "../../contracts/storage.js";
 import type {
   EvidenceInput,
   EvidenceQuery,
@@ -9,8 +9,8 @@ import type {
   MemoryInputSnapshot,
   MemorySnapshotEntry,
   RegisteredEvidenceRecord,
-} from "../contracts/task-data.js";
-import { currentAttempt } from "./run-control.js";
+} from "../../contracts/task-data.js";
+import { currentAttempt } from "./control.js";
 
 export function persistEvidence<T>(
   run: ResearchRun,

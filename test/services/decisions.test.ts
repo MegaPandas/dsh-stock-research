@@ -11,7 +11,7 @@ import type { EvidenceInput } from "../../src/contracts/task-data.js";
 import { parseArtifactInput } from "../../src/services/artifact-schema.js";
 import { DecisionService } from "../../src/services/decisions.js";
 import { NumberService } from "../../src/services/numbers.js";
-import { createRunService } from "../../src/services/create-run-service.js";
+import { createRunService } from "../../src/services/run/index.js";
 import { assembleAgentArtifact } from "../../src/services/business-reports.js";
 import { agentAnalysisReport } from "../fixtures/analysis-report.js";
 import {

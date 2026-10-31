@@ -21,7 +21,7 @@ import { ResearchError } from "../../src/contracts/errors.js";
 import { QueryService } from "../../src/services/query/index.js";
 import { TaskQueryService } from "../../src/services/task-query.js";
 import type { QuerySources } from "../../src/contracts/sources.js";
-import { createRunService } from "../../src/services/create-run-service.js";
+import { createRunService } from "../../src/services/run/index.js";
 import { RunStore } from "../../src/runs/store.js";
 import { DataRoot } from "../../src/storage/data-root.js";
 import { MARKET_FIXTURE, US_SECURITY } from "../fixtures/market.js";

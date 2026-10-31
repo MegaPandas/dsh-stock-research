@@ -21,7 +21,7 @@ import { QueryService } from "../../src/services/query/index.js";
 import { TaskQueryService } from "../../src/services/task-query.js";
 import { DataRoot } from "../../src/storage/data-root.js";
 import { RunStore } from "../../src/runs/store.js";
-import { createRunService } from "../../src/services/create-run-service.js";
+import { createRunService } from "../../src/services/run/index.js";
 
 const http = new HttpClient({
   timeoutMs: 1000,

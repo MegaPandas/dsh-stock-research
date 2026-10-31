@@ -11,7 +11,7 @@ import type {
   RunState,
   TaskOperation,
 } from "../../src/contracts/runs.js";
-import { createRunService } from "../../src/services/create-run-service.js";
+import { createRunService } from "../../src/services/run/index.js";
 import type { RunAccess } from "../../src/contracts/run-access.js";
 import { RunStore } from "../../src/runs/store.js";
 import { DataRoot } from "../../src/storage/data-root.js";

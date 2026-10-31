@@ -1,28 +1,28 @@
 import { isDeepStrictEqual } from "node:util";
-import type { RunAccess } from "../contracts/run-access.js";
-import { valuationDependencyIds } from "../valuation/dependencies.js";
-import type { ValuationCalculation } from "../contracts/valuation.js";
-import type { ValuationCalculationRegistration } from "../contracts/runs.js";
+import type { RunAccess } from "../../contracts/run-access.js";
+import { valuationDependencyIds } from "../../valuation/dependencies.js";
+import type { ValuationCalculation } from "../../contracts/valuation.js";
+import type { ValuationCalculationRegistration } from "../../contracts/runs.js";
 import type {
   ArtifactInput,
   ArtifactVersion,
   DecisionDraftValidation,
-} from "../contracts/artifacts.js";
+} from "../../contracts/artifacts.js";
 import type {
   ArtifactRef,
   ISOTime,
   ResearchScope,
   SourceRef,
-} from "../contracts/data.js";
-import { ResearchError } from "../contracts/errors.js";
-import type { NumberContext } from "../contracts/numbers.js";
+} from "../../contracts/data.js";
+import { ResearchError } from "../../contracts/errors.js";
+import type { NumberContext } from "../../contracts/numbers.js";
 import type {
   ReplayEvidenceRequest,
   ReplayEvidenceSource,
   ReplayMemoryRequest,
   ReplayRunInput,
   ReplaySnapshot,
-} from "../contracts/replay.js";
+} from "../../contracts/replay.js";
 import type {
   ArtifactCommitResult,
   AttemptFailureResult,
@@ -54,9 +54,9 @@ import type {
   StageReviewResult,
   StageView,
   SyncRunProjections,
-} from "../contracts/runs.js";
-import type { ContentRef, ContentWriter } from "../contracts/storage.js";
-import type { StageDefinition } from "../contracts/workflow.js";
+} from "../../contracts/runs.js";
+import type { ContentRef, ContentWriter } from "../../contracts/storage.js";
+import type { StageDefinition } from "../../contracts/workflow.js";
 import type {
   EvidenceCall,
   EvidenceInput,
@@ -67,10 +67,10 @@ import type {
   MemoryInputSnapshot,
   MemorySnapshotEntry,
   RegisteredEvidenceRecord,
-} from "../contracts/task-data.js";
-import type { RunStore } from "../runs/store.js";
-import { validateRunDefinition } from "./definition.js";
-import { assertStoredRun } from "./run-state.js";
+} from "../../contracts/task-data.js";
+import type { RunStore } from "../../runs/store.js";
+import { validateRunDefinition } from "../definition.js";
+import { assertStoredRun } from "./state.js";
 import {
   blockRun,
   cancelRun,
@@ -80,10 +80,10 @@ import {
   redoRun,
   resumeRun,
   taskState,
-} from "./run-control.js";
-import { assertFreshInputs } from "./run-dependencies.js";
-import { artifactKey } from "../contracts/artifact-identity.js";
-import { persistEvidence, persistMemoryInput } from "./run-data.js";
+} from "./control.js";
+import { assertFreshInputs } from "./dependencies.js";
+import { artifactKey } from "../../contracts/artifact-identity.js";
+import { persistEvidence, persistMemoryInput } from "./data.js";
 import { prepareReplay, type PreparedReplay } from "./replay-inputs.js";
 import {
   selectReplayEvidence,

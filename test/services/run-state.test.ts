@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { assertStoredRun } from "../../src/services/run-state.js";
+import { assertStoredRun } from "../../src/services/run/state.js";
 
 function fixture() {
   const scope = {

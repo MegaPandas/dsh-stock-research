@@ -31,7 +31,7 @@ import { TaskQueryService } from "../services/task-query.js";
 import { CollectionService } from "../services/collection/index.js";
 import { CollectionSnapshotStore } from "../storage/collection-snapshots.js";
 import { selectQuerySnapshot } from "../services/query-snapshot.js";
-import { createRunService } from "../services/create-run-service.js";
+import { createRunService } from "../services/run/index.js";
 import type { RunAccess } from "../contracts/run-access.js";
 import { DataRoot } from "../storage/data-root.js";
 import { createControlTools } from "../tools/control.js";

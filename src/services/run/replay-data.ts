@@ -1,23 +1,23 @@
 import { isDeepStrictEqual } from "node:util";
-import type { ArtifactVersion } from "../contracts/artifacts.js";
+import type { ArtifactVersion } from "../../contracts/artifacts.js";
 import type {
   ArtifactRef,
   ResearchScope,
   SourceRef,
-} from "../contracts/data.js";
-import { ResearchError } from "../contracts/errors.js";
+} from "../../contracts/data.js";
+import { ResearchError } from "../../contracts/errors.js";
 import type {
   ReplayEvidenceSource,
   ReplaySnapshot,
-} from "../contracts/replay.js";
+} from "../../contracts/replay.js";
 import type {
   EvidenceQuery,
   MemoryInputQuery,
   MemoryInputRegistration,
   MemoryInputSnapshot,
   RegisteredEvidenceRecord,
-} from "../contracts/task-data.js";
-import { artifactKey } from "../contracts/artifact-identity.js";
+} from "../../contracts/task-data.js";
+import { artifactKey } from "../../contracts/artifact-identity.js";
 
 export interface ReplayDataReader {
   artifact(ref: ArtifactRef): ArtifactVersion;

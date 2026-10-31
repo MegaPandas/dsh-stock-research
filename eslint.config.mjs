@@ -25,12 +25,6 @@ const pureImports = [
   "**/runs/**",
   "**/storage/**",
 ];
-const runConsumerRestriction = {
-  selector:
-    ":matches(ImportDeclaration, ExportNamedDeclaration, ExportAllDeclaration)[source.value='./runs.js'], :matches(ImportDeclaration, ExportNamedDeclaration, ExportAllDeclaration)[source.value=/services\\u002Fruns\\.js$/]",
-  message:
-    "Consumers must select run capabilities instead of depending on the RunService implementation.",
-};
 const digestPrivateRestriction = {
   selector:
     ":matches(ImportDeclaration, ExportNamedDeclaration, ExportAllDeclaration)[source.value=/(^|\\u002F)digest-(inputs|draft)\\.js$/]",
@@ -60,6 +54,10 @@ export default defineConfig(
           {
             directory: "src/services/collection",
             publicEntries: ["index.js", "view.js"],
+          },
+          {
+            directory: "src/services/run",
+            publicEntries: ["index.js"],
           },
         ],
       ],
@@ -102,7 +100,7 @@ export default defineConfig(
     },
   },
   {
-    files: ["src/services/runs.ts"],
+    files: ["src/services/run/service.ts"],
     rules: {
       "no-restricted-imports": [
         "error",
@@ -113,7 +111,7 @@ export default defineConfig(
                 ...integrationImports,
                 "@deepseek-ai/*",
                 "**/report/**",
-                "**/run-projections.*",
+                "**/projections.*",
               ],
               message:
                 "Run transactions must not depend on report rendering or projection composition.",
@@ -182,26 +180,14 @@ export default defineConfig(
     },
   },
   {
-    files: ["src/{app,services,tools,host}/**/*.ts", "src/*.ts"],
-    ignores: ["src/services/create-run-service.ts"],
-    rules: {
-      "no-restricted-syntax": ["error", runConsumerRestriction],
-    },
-  },
-  {
     files: ["src/{app,tools,host,client,services}/**/*.{ts,tsx}", "src/*.ts"],
     ignores: [
       "src/services/digests.ts",
       "src/services/digest-inputs.ts",
       "src/services/digest-draft.ts",
-      "src/services/create-run-service.ts",
     ],
     rules: {
-      "no-restricted-syntax": [
-        "error",
-        runConsumerRestriction,
-        digestPrivateRestriction,
-      ],
+      "no-restricted-syntax": ["error", digestPrivateRestriction],
     },
   },
   {
@@ -209,7 +195,6 @@ export default defineConfig(
     rules: {
       "no-restricted-syntax": [
         "error",
-        runConsumerRestriction,
         digestPrivateRestriction,
         {
           selector:

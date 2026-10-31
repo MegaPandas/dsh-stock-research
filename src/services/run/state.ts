@@ -1,8 +1,8 @@
 import { isDeepStrictEqual } from "node:util";
-import { ResearchError } from "../contracts/errors.js";
-import type { ResearchRun } from "../contracts/runs.js";
-import type { RunDefinition } from "../contracts/workflow.js";
-import { validateRunDefinition } from "./definition.js";
+import { ResearchError } from "../../contracts/errors.js";
+import type { ResearchRun } from "../../contracts/runs.js";
+import type { RunDefinition } from "../../contracts/workflow.js";
+import { validateRunDefinition } from "../definition.js";
 
 const ARTIFACT_KINDS = [
   "analysis",

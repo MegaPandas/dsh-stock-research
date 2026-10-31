@@ -14,7 +14,7 @@ import { marketCapability } from "../../src/data/market.js";
 import { QueryService } from "../../src/services/query/index.js";
 import { TaskQueryService } from "../../src/services/task-query.js";
 import { selectQuerySnapshot } from "../../src/services/query-snapshot.js";
-import { createRunService } from "../../src/services/create-run-service.js";
+import { createRunService } from "../../src/services/run/index.js";
 import { RunStore } from "../../src/runs/store.js";
 import { DataRoot } from "../../src/storage/data-root.js";
 import { MARKET_FIXTURE, US_SECURITY } from "../fixtures/market.js";

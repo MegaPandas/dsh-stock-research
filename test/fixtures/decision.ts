@@ -13,7 +13,7 @@ import type { EvidenceInput } from "../../src/contracts/task-data.js";
 import type { TaskDefinition } from "../../src/contracts/workflow.js";
 import { ArtifactService } from "../../src/services/artifacts.js";
 import { NumberService } from "../../src/services/numbers.js";
-import { createRunService } from "../../src/services/create-run-service.js";
+import { createRunService } from "../../src/services/run/index.js";
 import { RunStore } from "../../src/runs/store.js";
 import { DataRoot } from "../../src/storage/data-root.js";
 import { US_SECURITY } from "./market.js";

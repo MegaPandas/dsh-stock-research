@@ -12,7 +12,7 @@ async function violations(filePath: string, source: string) {
 it.each([
   ["src/contracts/settings.ts", "node:fs"],
   ["src/contracts/settings.ts", "../services/query/index.js"],
-  ["src/storage/cleanup.ts", "../services/runs.js"],
+  ["src/storage/cleanup.ts", "../services/run/index.js"],
   ["src/data/http.ts", "../host/runtime.js"],
   ["src/services/query/index.ts", "../../app/quick.js"],
   ["src/services/memory.ts", "../tools/read.js"],
