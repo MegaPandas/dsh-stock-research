@@ -1,9 +1,7 @@
 import type { ValuationCalculation } from "../contracts/valuation.js";
-import type { RunService } from "../services/runs.js";
-import {
-  calculateValuation,
-  readValuationCalculation,
-} from "../services/valuation-calculations.js";
+import type { RunCommands, RunReader } from "../contracts/run-access.js";
+import { calculateValuation } from "../services/valuation-calculations.js";
+import { readValuationCalculation } from "../services/valuation-records.js";
 import {
   authorizeRun,
   taskOperation,
@@ -25,7 +23,14 @@ export interface ValuationOperations {
 }
 
 export function createValuationOperations(
-  runs: RunService,
+  runs: Pick<
+    RunReader,
+    "numberContext" | "inputCatalog" | "readInput" | "view"
+  > &
+    Pick<
+      RunCommands,
+      "valuationCalculationForCall" | "recordValuationCalculation"
+    >,
   bindings: SessionBindings,
 ): ValuationOperations {
   return {

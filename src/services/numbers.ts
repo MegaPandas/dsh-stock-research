@@ -25,8 +25,8 @@ import {
   SelectorError,
   type NumberField,
 } from "./number-fields.js";
-import type { RunService } from "./runs.js";
-import { readValuationCalculation } from "./valuation-calculations.js";
+import type { RunReader } from "../contracts/run-access.js";
+import { createValuationReader } from "./valuation-records.js";
 
 export const NUMBER_CHECK_VERSION = "1";
 // Division and subtraction admit binary rounding; this is not a business/display tolerance.
@@ -50,13 +50,23 @@ interface ResolvedNumber {
 }
 
 export class NumberService {
-  constructor(private readonly runs: RunService) {}
+  constructor(
+    private readonly runs: Pick<
+      RunReader,
+      | "numberContext"
+      | "readArtifact"
+      | "readEvidence"
+      | "inputCatalog"
+      | "readInput"
+    >,
+  ) {}
 
   checkNumbers(operation: RunOperation, target: NumberTarget): NumberCheck {
     const captured = structuredClone(target);
     const context = this.runs.numberContext(operation.runId);
     const artifacts = new Map<string, ArtifactVersion>();
     const evidence = new Map<string, RegisteredEvidenceRecord<EvidenceData>>();
+    let valuationReader: ReturnType<typeof createValuationReader> | undefined;
     const inputArtifact = (ref: ArtifactRef): ArtifactVersion => {
       if (ref.runId !== context.runId)
         fail(
@@ -215,11 +225,10 @@ export class NumberService {
           };
         } else if (claim.kind === "estimated") {
           if (claim.calculationId !== undefined) {
-            const calculation = readValuationCalculation(
+            const calculation = (valuationReader ??= createValuationReader(
               this.runs,
               operation.runId,
-              claim.calculationId,
-            );
+            )).read(claim.calculationId);
             if (
               calculation.result.perShareValues.length !== 1 ||
               calculation.result.perShareValues[0] !== claim.value ||

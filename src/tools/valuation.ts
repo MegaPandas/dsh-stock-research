@@ -1,7 +1,7 @@
 import type { ToolDefinition } from "@deepseek-ai/dsh-tools";
 import { authorizeRun, type SessionBindings } from "../host/bindings.js";
-import type { RunService } from "../services/runs.js";
-import { savedValuationMethods } from "../services/valuation-calculations.js";
+import type { RunCommands, RunReader } from "../contracts/run-access.js";
+import { savedValuationMethods } from "../services/valuation-records.js";
 import {
   VALUATION_INPUT_SCHEMAS,
   valuationCalculationParameters,
@@ -94,7 +94,14 @@ export function createValuationCalculationReader(
 }
 
 export function createValuationTools(
-  runs: RunService,
+  runs: Pick<
+    RunReader,
+    "numberContext" | "inputCatalog" | "readInput" | "view"
+  > &
+    Pick<
+      RunCommands,
+      "valuationCalculationForCall" | "recordValuationCalculation"
+    >,
   bindings: SessionBindings,
 ): ToolDefinition[] {
   const operations = createValuationOperations(runs, bindings);

@@ -101,6 +101,22 @@ describe("agent report contracts", () => {
     ).toThrowError(/summary.*600/);
   });
 
+  it("rejects non-JSON report objects and undefined optional fields", () => {
+    class Report {
+      summary = "答案。";
+      content = { explanation: [], limitations: [] };
+    }
+    expect(() => parseAgentReport("ask", new Report())).toThrowError(
+      expect.objectContaining({ code: "INVALID_INPUT" }),
+    );
+    expect(() =>
+      parseAgentReport("analysis", {
+        ...analysis(),
+        content: { ...analysis().content, valuation: undefined },
+      }),
+    ).toThrowError(expect.objectContaining({ code: "INVALID_INPUT" }));
+  });
+
   it("limits the complete digest JSON in Unicode characters and retains risk handoffs", () => {
     const value: AgentReport<"digest"> = {
       summary: "交接结论。",

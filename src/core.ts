@@ -39,7 +39,8 @@ export {
 } from "./indicators/returns.js";
 export { HttpClient, HttpStatusError } from "./data/http.js";
 export type { HttpClientOptions, HttpRequestOptions } from "./data/http.js";
-export type { JsonValue, QueryCacheKey } from "./contracts/cache.js";
+export type { JsonValue } from "./contracts/json.js";
+export type { QueryCacheKey } from "./contracts/cache.js";
 export { createCacheKey, SqliteCache } from "./cache/index.js";
 export type { MarketCapability, MarketQuery } from "./contracts/market.js";
 export { YahooMarketAdapter } from "./data/yahoo-market.js";
@@ -184,6 +185,8 @@ export type {
   TaskStatus,
 } from "./contracts/runs.js";
 export { RunService } from "./services/runs.js";
+export { createRunService } from "./services/create-run-service.js";
+export type { RunCommands, RunReader } from "./contracts/run-access.js";
 export type {
   ReplayEvidenceSource,
   ReplayEvidenceRequest,
@@ -214,6 +217,7 @@ export type {
   QueryData,
   QueryEnvelope,
   QueryRequest,
+  QueryPolicy,
   QueryResponse,
   QuerySnapshot,
   MarketIndicatorsData,
@@ -228,20 +232,27 @@ export type {
   SourceData,
   SourceDataset,
   SourceEnvelope,
+  ReadSource,
   SourceQuery,
   SourceResponse,
   TaskSourceResponse,
 } from "./contracts/query.js";
 export type {
   QuerySources,
+  QuerySource,
   SourceCapability,
-} from "./services/query-sources.js";
+  SourceDescription,
+  SourceCodeVersions,
+} from "./contracts/sources.js";
 export type { QueryHealth, SourceHealth } from "./services/query.js";
 export { QueryService } from "./services/query.js";
 export { TaskQueryService } from "./services/task-query.js";
 export { CollectionService } from "./services/collection.js";
+export { createCollectionTaskFactory } from "./data/collection-tasks.js";
 export type {
   CollectionOptions,
+  CollectionSourceConfig,
+  CollectionTaskFactory,
   CollectionPlan,
   CollectedTableData,
   CollectionColumn,

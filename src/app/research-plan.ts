@@ -1,20 +1,22 @@
-import { createRequire } from "node:module";
+import packageMetadata from "../../package.json" with { type: "json" };
 import type { OpenRunInput, RunVersions } from "../contracts/runs.js";
 import type { RunDefinition, TaskDefinition } from "../contracts/workflow.js";
-import type { SourceDescription } from "../services/query-sources.js";
-import type { QueryToolPolicy } from "../tools/query-inputs.js";
+import type {
+  SourceDescription,
+  SourceCodeVersions,
+} from "../contracts/sources.js";
+import type { QueryPolicy } from "../contracts/query.js";
 import { DIGEST_HANDOFF_VERSION } from "../contracts/digests.js";
-import type { SourceCodeVersions } from "../data/versions.js";
 import {
   APPLICATION_INPUT_NAME,
   captureApplicationInput,
-} from "./research-input.js";
+} from "./research-input-capture.js";
 import { ROLE_PROMPT_VERSION } from "./research-prompts.js";
-import { VALUATION_ENGINE_VERSION } from "../contracts/valuation.js";
 import {
-  VALUATION_METHODS,
+  VALUATION_ENGINE_VERSION,
   VALUATION_METHODS_INPUT,
-} from "./valuation-methods.js";
+} from "../contracts/valuation.js";
+import VALUATION_METHODS from "../valuation/methods.json" with { type: "json" };
 import {
   PUBLIC_ANALYST_PROMPT,
   PUBLIC_RESEARCH_BRIEF,
@@ -30,15 +32,9 @@ import {
   captureQuickSnapshots,
   QUICK_SNAPSHOTS_INPUT,
   type QuickQuerySnapshot,
-} from "./quick-snapshots.js";
+} from "./query-snapshots.js";
 
-const PLUGIN_VERSION = (
-  createRequire(import.meta.url)(
-    "@megapandas/dsh-stock-research/package.json",
-  ) as {
-    version: string;
-  }
-).version;
+const PLUGIN_VERSION = packageMetadata.version;
 
 export const DIGEST_RISK_RULE =
   "riskSummaries must cover each issueId in context.requiredRisks exactly once; return [] when that list is empty. Analyst-stage risks have no risk-review issueId; do not invent identifiers. Preserve their meaning, handoff questions and upstream attribution in keyPoints or openQuestions.";
@@ -112,7 +108,7 @@ export function captureResearchInput(
   definition: RunDefinition,
   modeVersion: string,
   briefs: Readonly<Record<string, string>>,
-  policy: QueryToolPolicy,
+  policy: QueryPolicy,
   sources: readonly SourceDescription[],
   snapshots: readonly QuickQuerySnapshot[],
   publicSearchLimit: number = PUBLIC_SEARCH_LIMITS.maxSearches,

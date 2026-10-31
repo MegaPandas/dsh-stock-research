@@ -22,7 +22,7 @@ import type { RunState } from "../../src/contracts/runs.js";
 import { RunStore } from "../../src/runs/store.js";
 import { collectionSummary } from "../../src/services/collection-view.js";
 import { NumberService } from "../../src/services/numbers.js";
-import { RunService } from "../../src/services/runs.js";
+import { createRunService } from "../../src/services/create-run-service.js";
 import { DataRoot } from "../../src/storage/data-root.js";
 import { CN_SECURITY } from "../fixtures/market.js";
 
@@ -375,7 +375,7 @@ describe("collected table views", () => {
       root.close();
       fs.rmSync(directory, { recursive: true, force: true });
     });
-    const runs = new RunService(
+    const runs = createRunService(
       new RunStore<RunState>(root),
       () => "2024-01-04T00:00:00.000Z",
     );

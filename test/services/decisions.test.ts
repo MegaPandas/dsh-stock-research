@@ -11,7 +11,7 @@ import type { EvidenceInput } from "../../src/contracts/task-data.js";
 import { parseArtifactInput } from "../../src/services/artifact-schema.js";
 import { DecisionService } from "../../src/services/decisions.js";
 import { NumberService } from "../../src/services/numbers.js";
-import { RunService } from "../../src/services/runs.js";
+import { createRunService } from "../../src/services/create-run-service.js";
 import { assembleAgentArtifact } from "../../src/services/business-reports.js";
 import { agentAnalysisReport } from "../fixtures/analysis-report.js";
 import {
@@ -599,7 +599,10 @@ describe("decision finalization", () => {
     );
     fs.unlinkSync(join(directory, "evidence", `${c.source.evidenceId}.json`));
     fs.unlinkSync(join(directory, "report.md"));
-    const reopened = new RunService(c.store, () => "2025-01-01T00:00:00.000Z");
+    const reopened = createRunService(
+      c.store,
+      () => "2025-01-01T00:00:00.000Z",
+    );
     const retried = new DecisionService(reopened, () => {
       throw new Error("must not rebuild a published decision");
     }).decide(c.operation, "final", "decide");

@@ -1,9 +1,9 @@
 import type { OpenRunInput } from "../contracts/runs.js";
 import type { StageDefinition } from "../contracts/workflow.js";
-import type { RunService } from "../services/runs.js";
+import type { RunReader } from "../contracts/run-access.js";
 
 export function researchStageFeedback(
-  runs: RunService,
+  runs: Pick<RunReader, "view">,
   runId: string,
   taskId: string,
 ) {

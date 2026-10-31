@@ -1,40 +1,11 @@
 import type { ResearchScope } from "../contracts/data.js";
 import { ResearchError } from "../contracts/errors.js";
+import type { SourceEnvelope, SourceQuery } from "../contracts/query.js";
 import type {
-  SourceDataset,
-  SourceEnvelope,
-  SourceQuery,
-} from "../contracts/query.js";
-import type { EastmoneyIncomeAdapter } from "../data/eastmoney-income.js";
-import type { EastmoneyMarketAdapter } from "../data/eastmoney-market.js";
-import type { FredCsvAdapter } from "../data/fred-csv.js";
-import type { HostResearchAdapter } from "../data/host-research.js";
-import type { SecConceptAdapter } from "../data/sec-concept.js";
-import type { SinaIncomeAdapter } from "../data/sina-income.js";
-import type { TencentMarketAdapter } from "../data/tencent-market.js";
-import type { YahooMarketAdapter } from "../data/yahoo-market.js";
-
-type Adapter<A extends { capability: unknown; query: unknown }> = Pick<
-  A,
-  "capability" | "query"
->;
-export interface QuerySources {
-  yahoo?: Adapter<YahooMarketAdapter>;
-  eastmoneyMarket?: Adapter<EastmoneyMarketAdapter>;
-  tencent?: Adapter<TencentMarketAdapter>;
-  sec?: Adapter<SecConceptAdapter>;
-  eastmoneyIncome?: Adapter<EastmoneyIncomeAdapter>;
-  sina?: Adapter<SinaIncomeAdapter>;
-  fred?: Adapter<FredCsvAdapter>;
-  research?: Adapter<HostResearchAdapter>;
-}
-type ConfiguredAdapter = NonNullable<QuerySources[keyof QuerySources]>;
-export type SourceCapability = ConfiguredAdapter["capability"];
-export interface SourceDescription {
-  dataset: SourceDataset;
-  provider: SourceQuery["provider"];
-  capability: SourceCapability | null;
-}
+  QuerySources,
+  SourceCapability,
+  SourceDescription,
+} from "../contracts/sources.js";
 export interface SourceSelection {
   capability: SourceCapability;
   fetch(signal: AbortSignal): Promise<SourceEnvelope>;

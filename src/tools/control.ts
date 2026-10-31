@@ -1,7 +1,7 @@
 import type { ToolDefinition } from "@deepseek-ai/dsh-tools";
 import { ResearchError } from "../contracts/errors.js";
 import { authorizeRun, type SessionBindings } from "../host/bindings.js";
-import type { DispatchBridge } from "../host/dispatch.js";
+import type { DispatchOperations } from "../host/research-operations.js";
 import { researchTool } from "./errors.js";
 import {
   artifactRefSchema,
@@ -53,7 +53,7 @@ const redoOutput = resultOutput(
 );
 
 export function createControlTools(
-  bridge: DispatchBridge,
+  operations: DispatchOperations,
   bindings: SessionBindings,
 ): ToolDefinition[] {
   const controls = (
@@ -115,23 +115,36 @@ export function createControlTools(
               "INVALID_INPUT",
               "resumeSearch must be boolean.",
             );
-          return bridge.followup(
-            caller.agent,
-            runId,
-            taskId,
-            text(item.message, "message"),
-            requestId,
-            item.resumeSearch === true,
+          return operations.followupTask(
+            {
+              runId,
+              taskId,
+              requestId,
+              message: text(item.message, "message"),
+              resumeSearch: item.resumeSearch === true,
+            },
+            caller,
             exec.signal,
           );
         }
         return name === "stock_dispatch_task"
-          ? bridge.dispatch(caller.agent, runId, taskId, requestId, exec.signal)
-          : bridge.redo(
-              { runId, identity: caller.agent.id },
-              taskId,
-              requestId,
-              item.reason === undefined ? null : text(item.reason, "reason"),
+          ? operations.dispatchTask(
+              { runId, taskId, requestId },
+              caller,
+              exec.signal,
+            )
+          : operations.redoTask(
+              {
+                runId,
+                taskId,
+                requestId,
+                reason:
+                  item.reason === undefined
+                    ? null
+                    : text(item.reason, "reason"),
+              },
+              caller,
+              exec.signal,
             );
       },
     }),
@@ -166,11 +179,13 @@ export function createControlTools(
         const item = object(value, ["runId", "stageId", "requestId"]);
         const runId = text(item.runId, "runId");
         authorizeRun(caller.binding, runId);
-        return bridge.dispatchStage(
-          caller.agent,
-          runId,
-          text(item.stageId, "stageId"),
-          text(item.requestId, "requestId"),
+        return operations.dispatchStage(
+          {
+            runId,
+            stageId: text(item.stageId, "stageId"),
+            requestId: text(item.requestId, "requestId"),
+          },
+          caller,
           exec.signal,
         );
       },

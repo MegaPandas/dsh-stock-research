@@ -13,7 +13,7 @@ import type { EvidenceInput } from "../../src/contracts/task-data.js";
 import { RunStore } from "../../src/runs/store.js";
 import { DataRoot } from "../../src/storage/data-root.js";
 import { NumberService } from "../../src/services/numbers.js";
-import { RunService } from "../../src/services/runs.js";
+import { createRunService } from "../../src/services/create-run-service.js";
 import {
   withIndicators,
   withPriceReturn,
@@ -88,7 +88,7 @@ function setup() {
     }
   });
   const store = new RunStore<RunState>(root);
-  const runs = new RunService(store, () => "2024-01-05T00:00:00.000Z");
+  const runs = createRunService(store, () => "2024-01-05T00:00:00.000Z");
   const scope = {
     security: US_SECURITY,
     date: "2024-01-03",

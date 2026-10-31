@@ -1,4 +1,4 @@
-import { validateJsonSchemaValue } from "@deepseek-ai/dsh-tools";
+import { assertJsonSchema } from "../json/schema.js";
 import {
   AGENT_SUMMARY_MAX_CHARACTERS,
   DIGEST_MAX_CHARACTERS,
@@ -44,9 +44,7 @@ function readReport<Kind extends AgentReportKind>(
   kind: Kind,
   value: unknown,
 ): AgentReport<Kind> {
-  const errors = validateJsonSchemaValue(agentReportSchemas[kind], value, kind);
-  if (errors.length > 0)
-    throw new ResearchError("INVALID_INPUT", errors.join("\n"));
+  assertJsonSchema(agentReportSchemas[kind], value, kind);
   nonemptyText(value, kind);
   const report = value as AgentReport<Kind>;
   if ([...report.summary].length > AGENT_SUMMARY_MAX_CHARACTERS) {
@@ -75,10 +73,7 @@ function readReport<Kind extends AgentReportKind>(
     const { content } = report as AgentReport<"decision_draft">;
     atLeastOne(content.thesis, "decision_draft/content/thesis");
     if (content.targetPrice !== null) {
-      if (
-        !Number.isFinite(content.targetPrice.value) ||
-        content.targetPrice.value < 0
-      )
+      if (content.targetPrice.value < 0)
         invalid(
           "decision_draft/content/targetPrice/value",
           "expected a finite nonnegative price",
@@ -120,13 +115,7 @@ export function validateStoredAgentReport(
     value.content !== null &&
     "rating" in value.content
   ) {
-    const errors = validateJsonSchemaValue(
-      legacyDecisionReportSchema,
-      value,
-      kind,
-    );
-    if (errors.length > 0)
-      throw new ResearchError("INVALID_INPUT", errors.join("\n"));
+    assertJsonSchema(legacyDecisionReportSchema, value, kind);
     nonemptyText(value, kind);
     parseLocalDate((value.content as Record<string, unknown>).horizonEndDate);
     return;

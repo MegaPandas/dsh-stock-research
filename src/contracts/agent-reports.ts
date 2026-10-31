@@ -1,13 +1,6 @@
-interface ReportSchema {
-  type?: "object" | "array" | "string" | "number" | "null";
-  properties?: Record<string, ReportSchema>;
-  required?: string[];
-  additionalProperties?: boolean;
-  items?: ReportSchema;
-  enum?: string[];
-  oneOf?: ReportSchema[];
-  description?: string;
-}
+import type { JsonSchema } from "./json.js";
+
+type ReportSchema = JsonSchema;
 
 type SchemaValue<Schema> = Schema extends { oneOf: (infer Branch)[] }
   ? SchemaValue<Branch>

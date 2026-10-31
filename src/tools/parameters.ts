@@ -73,3 +73,11 @@ export function resultOutput(schema: JsonSchemaNode): ToolDefinition["output"] {
     render: (_args, value) => [{ type: "text", text: JSON.stringify(value) }],
   };
 }
+export const artifactCommitOutput = resultOutput(
+  objectSchema({
+    runId: stringSchema,
+    taskId: stringSchema,
+    attempt: { type: "integer" },
+    refs: { type: "array", items: artifactRefSchema },
+  }),
+);

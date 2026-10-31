@@ -1,4 +1,5 @@
 import { isDeepStrictEqual } from "node:util";
+import type { RunCommands, RunReader } from "../contracts/run-access.js";
 import { valuationDependencyIds } from "../valuation/dependencies.js";
 import type { ValuationCalculation } from "../contracts/valuation.js";
 import type { ValuationCalculationRegistration } from "../contracts/runs.js";
@@ -52,12 +53,9 @@ import type {
   StageReviewInput,
   StageReviewResult,
   StageView,
+  SyncRunProjections,
 } from "../contracts/runs.js";
-import type {
-  ContentRef,
-  ContentWriter,
-  ProjectionWrite,
-} from "../contracts/storage.js";
+import type { ContentRef, ContentWriter } from "../contracts/storage.js";
 import type { StageDefinition } from "../contracts/workflow.js";
 import type {
   EvidenceCall,
@@ -70,7 +68,6 @@ import type {
   MemorySnapshotEntry,
   RegisteredEvidenceRecord,
 } from "../contracts/task-data.js";
-import { renderArtifact } from "../report/render.js";
 import type { RunStore } from "../runs/store.js";
 import { validateRunDefinition } from "./definition.js";
 import { assertStoredRun } from "./run-state.js";
@@ -92,14 +89,6 @@ import {
   selectReplayMemory,
   type ReplayDataReader,
 } from "./replay-data.js";
-
-const FIXED_VIEWS = {
-  plan: "plan.md",
-  digest: "digest.md",
-  decision_draft: "decision.draft.md",
-  decision: "decision.json",
-  report: "report.md",
-} as const;
 
 function controlScope(identity: string): string {
   return JSON.stringify([identity]);
@@ -220,12 +209,13 @@ function initialInstructions(input: OpenRunInput) {
   });
 }
 
-export class RunService {
+export class RunService implements RunReader, RunCommands {
   readonly #restored = new Set<string>();
 
   constructor(
     private readonly store: RunStore<RunState>,
     private readonly now: () => ISOTime,
+    private readonly syncProjections: SyncRunProjections,
   ) {}
 
   open(
@@ -1101,36 +1091,13 @@ export class RunService {
     const currentRefs = new Set(
       run.tasks.flatMap((task) => task.outputRefs.map(artifactKey)),
     );
-    const fixed = new Map<string, ProjectionWrite>();
-    const named = new Map<string, ProjectionWrite>();
-    for (const artifact of run.artifacts) {
-      if (!currentRefs.has(artifactKey(artifact.ref))) continue;
-      const version = this.readArtifact(artifact.ref);
-      const kind = artifact.kind;
-      const content =
-        kind === "decision"
-          ? `${JSON.stringify(version.content.payload, null, 2)}\n`
-          : renderArtifact(version.content);
-      if (kind === "analysis" || kind === "debate" || kind === "risk") {
-        const directory = kind === "analysis" ? "reports" : "debate";
-        const key = `${directory}/${artifact.taskId}`;
-        const existing = named.get(key);
-        named.set(key, {
-          target: { directory, name: artifact.taskId },
-          content:
-            existing === undefined
-              ? content
-              : `${existing.content}\n---\n\n${content}`,
-        });
-      } else {
-        const filename = FIXED_VIEWS[kind];
-        fixed.set(filename, { target: { filename }, content });
-      }
-    }
-    this.store.syncProjections(runId, run.revision, [
-      ...named.values(),
-      ...fixed.values(),
-    ]);
+    this.syncProjections({
+      runId,
+      revision: run.revision,
+      artifactRefs: run.artifacts
+        .filter((artifact) => currentRefs.has(artifactKey(artifact.ref)))
+        .map((artifact) => artifact.ref),
+    });
   }
 
   private submit(

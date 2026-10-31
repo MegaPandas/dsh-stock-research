@@ -10,7 +10,7 @@ import {
   DataRoot,
   MemoryService,
   MemoryStore,
-  RunService,
+  createRunService,
   RunStore,
 } from "@megapandas/dsh-stock-research/core";
 
@@ -57,7 +57,7 @@ let root;
 let memory;
 try {
   root = new DataRoot(directory);
-  const runs = new RunService(new RunStore(root), () => cutoff);
+  const runs = createRunService(new RunStore(root), () => cutoff);
   const { runId } = runs.open(
     "benchmark",
     {

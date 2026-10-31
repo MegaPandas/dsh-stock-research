@@ -8,10 +8,11 @@ import { afterEach, describe, expect, it } from "vitest";
 import { createQuickInput } from "../../src/app/quick-plan.js";
 import { createDeepInput } from "../../src/app/deep-plan.js";
 import { createReplayInput } from "../../src/app/replay-input.js";
-import { attachCollection } from "../../src/app/collection-input.js";
+import { attachCollection } from "../../src/app/collection-snapshot.js";
 import type { CollectionSnapshot } from "../../src/contracts/collection.js";
 import type { ResearchScope } from "../../src/contracts/data.js";
 import { prepareResearchRole } from "../../src/app/prepare-role.js";
+import { RESEARCH_MODELS_INPUT } from "../../src/app/research-models.js";
 import {
   CALCULATION_RULES,
   ROLE_PROMPTS,
@@ -165,6 +166,27 @@ afterEach(async () => {
 });
 
 describe("persisted research role preparation", () => {
+  it("provides the recorded model options in the role execution contract", async () => {
+    const h = await host();
+    const agentOptions = {
+      provider: "runtime-fixture",
+      model: "recorded-role-model",
+      maxTokens: 512,
+    };
+    h.input.inputs.push({
+      name: RESEARCH_MODELS_INPUT,
+      content: { research: agentOptions },
+    });
+    const { runId } = h.runtime.runs.open("owner", h.input, "open-models");
+    const context = h.runtime.runs.dispatchForCall(
+      { runId, identity: "owner" },
+      "analysis.market",
+      "claim-market",
+    );
+    const provision = prepareResearchRole(h.runtime, context);
+    expect(provision.agentOptions).toEqual(agentOptions);
+  });
+
   it("reads and replays the saved method catalogue without substituting the installed copy", async () => {
     const h = await host();
     const captured = h.input.inputs.find(

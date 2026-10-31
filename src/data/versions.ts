@@ -37,7 +37,3 @@ export const COLLECTION_SOURCE_VERSIONS = Object.fromEntries(
     },
   ]),
 );
-export interface SourceCodeVersions {
-  adapterVersion: string;
-  normalizationVersion: string;
-}

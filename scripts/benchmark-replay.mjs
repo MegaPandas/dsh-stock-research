@@ -8,7 +8,7 @@ import { performance } from "node:perf_hooks";
 import process from "node:process";
 import {
   DataRoot,
-  RunService,
+  createRunService,
   RunStore,
 } from "@megapandas/dsh-stock-research/core";
 
@@ -71,7 +71,7 @@ let root;
 try {
   root = new DataRoot(directory);
   const store = new RunStore(root);
-  const runs = new RunService(store, () => "2024-01-03T00:00:00.000Z");
+  const runs = createRunService(store, () => "2024-01-03T00:00:00.000Z");
   const { runId } = runs.open(
     "benchmark",
     {

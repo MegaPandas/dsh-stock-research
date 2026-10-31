@@ -7,11 +7,12 @@ import { join } from "node:path";
 import process from "node:process";
 import {
   CollectionService,
+  createCollectionTaskFactory,
   DataRoot,
   HttpClient,
   QueryService,
   TaskQueryService,
-  RunService,
+  createRunService,
   RunStore,
   SqliteCache,
   YahooMarketAdapter,
@@ -88,13 +89,20 @@ try {
     cache,
     ttl,
   );
-  collector = new CollectionService(http, cache, queries, {
-    enabledSources: ["yahoo"],
-    freshness: { market: 7 * 86_400_000, fundamentals: 0, macro: 0 },
-    secCiks: {},
-    ttl,
-    requireDailyMarket: true,
-  });
+  collector = new CollectionService(
+    createCollectionTaskFactory(
+      http,
+      (scope, request, signal) => queries.query(scope, request, signal),
+      { secCiks: {} },
+    ),
+    cache,
+    {
+      enabledSources: ["yahoo"],
+      freshness: { market: 7 * 86_400_000, fundamentals: 0, macro: 0 },
+      ttl,
+      requireDailyMarket: true,
+    },
+  );
   stage = "ordinary-collection";
   const collected = await collector.collect(scope);
   const packet = collected.packets.find(({ id }) => id === "market.daily");
@@ -116,7 +124,7 @@ try {
   stage = "task-query-cache";
   root = new DataRoot(directory);
   const store = new RunStore(root);
-  const runs = new RunService(store, () => new Date().toISOString());
+  const runs = createRunService(store, () => new Date().toISOString());
   const manifest = createRequire(import.meta.url)(
     "@megapandas/dsh-stock-research/package.json",
   );

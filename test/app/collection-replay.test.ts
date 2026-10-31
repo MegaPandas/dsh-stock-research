@@ -2,10 +2,8 @@ import fs from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import {
-  attachCollection,
-  registerCollectionSources,
-} from "../../src/app/collection-input.js";
+import { registerCollectionSources } from "../../src/app/collection-input.js";
+import { attachCollection } from "../../src/app/collection-snapshot.js";
 import type { ResearchArtifactInput } from "../../src/contracts/artifact-payloads.js";
 import type { CollectionSnapshot } from "../../src/contracts/collection.js";
 import type {
@@ -21,7 +19,7 @@ import type {
 import { RunStore } from "../../src/runs/store.js";
 import { ArtifactService } from "../../src/services/artifacts.js";
 import { NumberService } from "../../src/services/numbers.js";
-import { RunService } from "../../src/services/runs.js";
+import { createRunService } from "../../src/services/create-run-service.js";
 import { DataRoot } from "../../src/storage/data-root.js";
 
 const cleanups: (() => void)[] = [];
@@ -91,7 +89,7 @@ function setup() {
       fs.rmSync(directory, { recursive: true, force: true });
     }
   });
-  const runs = new RunService(
+  const runs = createRunService(
     new RunStore<RunState>(root),
     () => "2026-10-27T10:01:00.000Z",
   );

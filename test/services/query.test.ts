@@ -20,8 +20,8 @@ import { YahooMarketAdapter } from "../../src/data/yahoo-market.js";
 import { ResearchError } from "../../src/contracts/errors.js";
 import { QueryService } from "../../src/services/query.js";
 import { TaskQueryService } from "../../src/services/task-query.js";
-import type { QuerySources } from "../../src/services/query-sources.js";
-import { RunService } from "../../src/services/runs.js";
+import type { QuerySources } from "../../src/contracts/sources.js";
+import { createRunService } from "../../src/services/create-run-service.js";
 import { RunStore } from "../../src/runs/store.js";
 import { DataRoot } from "../../src/storage/data-root.js";
 import { MARKET_FIXTURE, US_SECURITY } from "../fixtures/market.js";
@@ -86,7 +86,7 @@ function setup() {
   const root = new DataRoot(path);
   roots.push(root);
   const store = new RunStore<RunState>(root);
-  const runs = new RunService(store, () => "2024-01-09T12:00:00.000Z");
+  const runs = createRunService(store, () => "2024-01-09T12:00:00.000Z");
   const cache = new SqliteCache({
     path: join(path, "cache.sqlite"),
     maxEntries: 100,

@@ -13,7 +13,7 @@ import type { EvidenceInput } from "../../src/contracts/task-data.js";
 import type { TaskDefinition } from "../../src/contracts/workflow.js";
 import { ArtifactService } from "../../src/services/artifacts.js";
 import { NumberService } from "../../src/services/numbers.js";
-import { RunService } from "../../src/services/runs.js";
+import { createRunService } from "../../src/services/create-run-service.js";
 import { RunStore } from "../../src/runs/store.js";
 import { DataRoot } from "../../src/storage/data-root.js";
 import { US_SECURITY } from "./market.js";
@@ -43,7 +43,7 @@ export function decisionFixture(options: DecisionFixtureOptions = {}) {
   const root = new DataRoot(directory);
   const store = new RunStore<RunState>(root);
   const clock = { value: "2024-01-04T00:00:00.000Z", calls: 0 };
-  const runs = new RunService(store, () => clock.value);
+  const runs = createRunService(store, () => clock.value);
   const numbers = new CountedNumbers(runs);
   const artifacts = new ArtifactService(runs, numbers);
   const scope = {

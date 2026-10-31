@@ -290,6 +290,39 @@ describe("memory version store", () => {
     ).toEqual({ orphan: true });
   });
 
+  it("reads batches in request order and rechecks current disk registrations on each call", () => {
+    const { path, store } = open();
+    const first = store.commit((_current, writer) => ({
+      label: "first",
+      ref: writer.entry(null, () => ({ value: 1 })),
+    }));
+    const orphan = { entryId: first.ref!.entryId, revision: 2 };
+    fs.writeFileSync(entryPath(path, orphan), JSON.stringify({ orphan: true }));
+    const latest = store.commit((_current, writer) => ({
+      label: "third",
+      ref: writer.entry(first.ref!, () => ({ value: 3 })),
+    }));
+    expect(store.readEntries([latest.ref!, first.ref!])).toEqual([
+      { value: 3 },
+      { value: 1 },
+    ]);
+    expect(() => store.readEntries([latest.ref!, orphan])).toThrowError(
+      expect.objectContaining({ code: "VERSION_UNAVAILABLE" }),
+    );
+    fs.writeFileSync(
+      indexPath(path),
+      JSON.stringify({
+        ...latest,
+        ref: first.ref,
+        entries: { [first.ref!.entryId]: [1] },
+      }),
+    );
+    expect(() => store.readEntries([latest.ref!])).toThrowError(
+      expect.objectContaining({ code: "VERSION_UNAVAILABLE" }),
+    );
+    expect(store.readEntries([first.ref!])).toEqual([{ value: 1 }]);
+  });
+
   it("refuses to initialize an empty index over an existing entries directory", () => {
     const path = directory();
     const root = new DataRoot(path);
@@ -330,6 +363,7 @@ describe("memory version store", () => {
       () => store.readIndex(),
       () => store.currentRefs(),
       () => store.readEntry({ entryId: "__proto__", revision: 1 }),
+      () => store.readEntries([]),
       () => store.commit(() => ({ label: "new" })),
     ]) {
       expect(action).toThrowError(

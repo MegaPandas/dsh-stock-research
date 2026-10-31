@@ -107,10 +107,10 @@ function LogStream({
                     <dd>{collection.succeeded}</dd>
                   </div>
                 )}
-                {collection.missing !== undefined && (
+                {collection.failed !== undefined && (
                   <div>
                     <dt>缺失</dt>
-                    <dd>{collection.missing}</dd>
+                    <dd>{collection.failed}</dd>
                   </div>
                 )}
               </dl>

@@ -24,10 +24,8 @@ import {
 import { QueryService } from "../../src/services/query.js";
 import { TaskQueryService } from "../../src/services/task-query.js";
 import { createDataTools } from "../../src/tools/data.js";
-import {
-  dataSchemas,
-  type QueryToolPolicy,
-} from "../../src/tools/query-inputs.js";
+import { dataSchemas } from "../../src/tools/query-inputs.js";
+import type { QueryPolicy } from "../../src/contracts/query.js";
 import { decisionFixture } from "../fixtures/decision.js";
 import { CN_SECURITY, MARKET_FIXTURE } from "../fixtures/market.js";
 
@@ -172,7 +170,7 @@ function setup(mapped = true) {
   const policy = {
     freshness: { market: 11, fundamentals: 22, macro: 33 },
     secCiks,
-  } satisfies QueryToolPolicy;
+  } satisfies QueryPolicy;
   const tools = createDataTools(
     { runs: f.runs, queries, taskQueries },
     bindings,

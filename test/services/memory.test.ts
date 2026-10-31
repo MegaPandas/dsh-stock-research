@@ -16,7 +16,7 @@ import type { OpenRunInput, RunState } from "../../src/contracts/runs.js";
 import { MemoryStore } from "../../src/memory/store.js";
 import { RunStore } from "../../src/runs/store.js";
 import { MemoryService } from "../../src/services/memory.js";
-import { RunService } from "../../src/services/runs.js";
+import { createRunService } from "../../src/services/create-run-service.js";
 import { DataRoot } from "../../src/storage/data-root.js";
 import {
   MARKET_FIXTURE,
@@ -106,7 +106,7 @@ afterEach(async () => {
 function setup(query: QueryMemoryReturns = async () => response()) {
   const directory = fs.mkdtempSync(join(tmpdir(), "dsh-memory-service-"));
   const root = new DataRoot(directory);
-  const runs = new RunService(
+  const runs = createRunService(
     new RunStore<RunState>(root),
     () => "2024-01-04T00:00:00.000Z",
   );
@@ -166,6 +166,7 @@ function setup(query: QueryMemoryReturns = async () => response()) {
     fs.rmSync(directory, { recursive: true, force: true });
   });
   return {
+    directory,
     memory,
     runs,
     store,
@@ -237,6 +238,58 @@ describe("MemoryService durable review history", () => {
       c.recall({ ...c.scope, cutoff: "2024-01-04T00:00:00.000Z" }),
     ).toEqual([]);
   });
+  it("selects mixed history depths without reading past each qualifying revision", async () => {
+    const c = setup();
+    const first = await c.memory.remember(c.operation, input("a1"), "a1");
+    const second = await c.memory.remember(c.operation, input("b1"), "b1");
+    const third = await c.memory.remember(c.operation, input("c1"), "c1");
+    c.time("2024-01-06T00:00:00.000Z");
+    const current = await c.memory.remember(
+      c.operation,
+      { ...input("a2"), previous: first },
+      "a2",
+    );
+    fs.writeFileSync(
+      join(c.directory, "memory", "entries", second.entryId, "2.json"),
+      "{}",
+      { flag: "wx" },
+    );
+    c.time("2024-01-08T00:00:00.000Z");
+    const futureSecond = await c.memory.remember(
+      c.operation,
+      { ...input("b3"), previous: second },
+      "b3",
+    );
+    expect(futureSecond.revision).toBe(3);
+    const futureThird = await c.memory.remember(
+      c.operation,
+      { ...input("c2"), previous: third },
+      "c2",
+    );
+    c.time("2024-01-09T00:00:00.000Z");
+    await c.memory.remember(
+      c.operation,
+      { ...input("c3"), previous: futureThird },
+      "c3",
+    );
+    const invalidOld = { ...c.memory.read(first), note: "" };
+    fs.writeFileSync(
+      join(c.directory, "memory", "entries", first.entryId, "1.json"),
+      JSON.stringify(invalidOld),
+    );
+    const older = [second, third].sort((a, b) =>
+      a.entryId < b.entryId ? -1 : 1,
+    );
+    expect(
+      c
+        .recall({ ...c.scope, cutoff: "2024-01-07T00:00:00.000Z" })
+        .map(({ ref }) => ref),
+    ).toEqual([current, ...older]);
+    expect(() =>
+      c.recall({ ...c.scope, cutoff: "2024-01-05T00:00:00.000Z" }),
+    ).toThrowError(expect.objectContaining({ code: "STORAGE_FAILED" }));
+  });
+
   it("filters text after choosing the revision, using literal case-insensitive text", async () => {
     const c = setup();
     const first = await c.memory.remember(

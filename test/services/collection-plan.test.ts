@@ -1,9 +1,13 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { CollectionOptions } from "../../src/contracts/collection.js";
+import type {
+  CollectionOptions,
+  CollectionSourceConfig,
+} from "../../src/contracts/collection.js";
 import type { ResearchScope } from "../../src/contracts/data.js";
 import { HttpClient } from "../../src/data/http.js";
+import { createCollectionTaskFactory } from "../../src/data/collection-tasks.js";
 import { createCollectionPlans } from "../../src/services/collection-plan.js";
-import type { QueryService } from "../../src/services/query.js";
+import type { ReadSource } from "../../src/contracts/query.js";
 import { CN_SECURITY, US_SECURITY } from "../fixtures/market.js";
 
 const clients: HttpClient[] = [];
@@ -14,7 +18,7 @@ afterEach(async () => {
 
 function plans(
   enabledSources: string[],
-  settings: Partial<CollectionOptions> = {},
+  settings: Partial<CollectionOptions & CollectionSourceConfig> = {},
   security = CN_SECURITY,
 ) {
   const http = new HttpClient({
@@ -26,25 +30,74 @@ function plans(
   const fetch = vi.spyOn(globalThis, "fetch").mockImplementation(() => {
     throw new Error("Planning must not request source data");
   });
-  const query = vi.fn() as QueryService["query"];
+  const query = vi.fn() as ReadSource;
   const scope: ResearchScope = {
     security,
     date: "2026-10-28",
     cutoff: "2026-10-28T10:00:00.000Z",
   };
-  const result = createCollectionPlans(http, { query }, scope, {
+  const { secCiks = {}, xueqiuCookie, ...policy } = settings;
+  const createTasks = createCollectionTaskFactory(http, query, {
+    secCiks,
+    ...(xueqiuCookie === undefined ? {} : { xueqiuCookie }),
+  });
+  const options = {
     enabledSources,
     freshness: { market: 86400000, fundamentals: 0, macro: 0 },
-    secCiks: {},
     ttl: { market: 0, fundamentals: 0, macro: 0, research: 0 },
-    ...settings,
-  });
+    ...policy,
+  };
+  const result = createCollectionPlans(createTasks(scope, options), options);
   expect(fetch).not.toHaveBeenCalled();
   expect(query).not.toHaveBeenCalled();
   return result;
 }
 
 describe("configured collection plans", () => {
+  it("compiles supplied source capabilities without constructing or running sources", () => {
+    const run = vi.fn();
+    const sources = [
+      {
+        id: "market.daily",
+        dataset: "market" as const,
+        provider: "primary",
+        enabledBy: ["primary"],
+        run,
+      },
+      {
+        id: "market.daily",
+        dataset: "market" as const,
+        provider: "standby",
+        enabledBy: ["standby"],
+        run,
+      },
+      {
+        id: "market.weekly",
+        dataset: "market" as const,
+        provider: "disabled",
+        enabledBy: ["disabled"],
+        run,
+      },
+    ];
+    const result = createCollectionPlans(sources, {
+      enabledSources: ["primary", "standby"],
+      requireDailyMarket: true,
+    });
+    expect(result.plans).toEqual([
+      {
+        id: "market.daily",
+        dataset: "market",
+        candidates: sources.slice(0, 2),
+        required: true,
+        timeoutMs: 45000,
+      },
+    ]);
+    expect(result.disabled).toEqual([
+      expect.objectContaining({ id: "market.weekly", provider: "disabled" }),
+    ]);
+    expect(run).not.toHaveBeenCalled();
+  });
+
   it("groups sources into unique logical tables in source preference order", () => {
     const { plans: result } = plans(
       ["eastmoney-market", "tencent", "sina", "xueqiu"],

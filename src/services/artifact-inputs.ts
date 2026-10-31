@@ -14,6 +14,7 @@ import type {
   SourceRef,
 } from "../contracts/data.js";
 import type { EvidenceData } from "../contracts/query.js";
+import type { NumberContext } from "../contracts/numbers.js";
 import type { RegisteredEvidenceRecord } from "../contracts/task-data.js";
 import { artifactReferences } from "./artifact-references.js";
 import { isStageReport } from "./analysis-report.js";
@@ -21,7 +22,7 @@ import { aggregateArtifactGaps } from "./artifact-gaps.js";
 import { numberField, referenceField } from "./number-fields.js";
 import { artifactKey } from "./run-dependencies.js";
 import { verifyEvidence } from "./evidence-checks.js";
-import type { RunService } from "./runs.js";
+import type { RunReader } from "../contracts/run-access.js";
 
 export type ResearchArtifactVersion = Omit<ArtifactVersion, "content"> & {
   content: ResearchArtifactInput;
@@ -30,6 +31,7 @@ export interface ArtifactNumber {
   artifact: ArtifactRef;
   claim: NumericClaim;
 }
+type RunInputMetadata = Pick<NumberContext, "scope" | "evidence">;
 function sourceKey(ref: SourceRef): string {
   return JSON.stringify([ref.runId, ref.evidenceId, ref.selector]);
 }
@@ -41,15 +43,19 @@ function intersects(path: string, dependency: string): boolean {
   );
 }
 
-/** Fixed committed inputs, with an optional validated pending view for submission. */
+/** Fixed inputs for one operation, including validated pending submission contents. */
 export class ArtifactInputs {
   private readonly artifacts = new Map<string, ResearchArtifactVersion>();
   private readonly evidence = new Map<
     string,
     RegisteredEvidenceRecord<EvidenceData>
   >();
+  private readonly metadata = new Map<string, RunInputMetadata>();
   constructor(
-    private readonly runs: RunService,
+    private readonly runs: Pick<
+      RunReader,
+      "readArtifact" | "readEvidence" | "numberContext"
+    >,
     pending: readonly ResearchArtifactVersion[] = [],
   ) {
     for (const version of pending)
@@ -150,8 +156,7 @@ export class ArtifactInputs {
     const sources = [
       // Stage notes use their fixed task inputs; this does not assert that a sentence adopted a field.
       ...(isStageReport(content)
-        ? this.runs
-            .numberContext(ref.runId)
+        ? this.metadataFor(ref.runId)
             .evidence.filter(
               (entry) =>
                 entry.taskId === version.taskId &&
@@ -205,12 +210,21 @@ export class ArtifactInputs {
       ? numberField(envelope, ref.selector)
       : referenceField(envelope, ref.selector);
     verifyEvidence(
-      { ...this.runs.numberContext(ref.runId).scope, cutoff },
+      { ...this.metadataFor(ref.runId).scope, cutoff },
       envelope,
       ref,
       field,
       [],
     );
+  }
+  private metadataFor(runId: string): RunInputMetadata {
+    let metadata = this.metadata.get(runId);
+    if (metadata === undefined) {
+      const { scope, evidence } = this.runs.numberContext(runId);
+      metadata = { scope, evidence };
+      this.metadata.set(runId, metadata);
+    }
+    return metadata;
   }
   private blocks(ref: SourceRef, gap: DataGap, cutoff: ISOTime): boolean {
     return (

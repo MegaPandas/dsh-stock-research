@@ -18,7 +18,7 @@ import type { MemoryService } from "../services/memory.js";
 import type { NumberService } from "../services/numbers.js";
 import { readPointer, SelectorError } from "../services/number-fields.js";
 import type { QueryService } from "../services/query.js";
-import type { RunService } from "../services/runs.js";
+import type { RunReader } from "../contracts/run-access.js";
 import {
   collectionGaps,
   collectionRowSelectors,
@@ -39,15 +39,15 @@ import {
 } from "./parameters.js";
 
 export interface ReadToolServices {
-  runs: RunService;
+  runs: Pick<RunReader, "view" | "readArtifact" | "readEvidence">;
   queries: Pick<QueryService, "health">;
-  memory: MemoryService;
-  numbers: NumberService;
+  memory: Pick<MemoryService, "recall" | "recallForTask">;
+  numbers: Pick<NumberService, "checkNumbers">;
 }
 function scopeFor(
   caller: BoundCaller,
   args: Record<string, unknown>,
-  runs: RunService,
+  runs: Pick<RunReader, "view">,
 ): ResearchScope {
   const binding = caller.binding;
   if (binding.kind === "coordinator") {

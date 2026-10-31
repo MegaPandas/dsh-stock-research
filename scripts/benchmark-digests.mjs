@@ -11,7 +11,7 @@ import {
   DataRoot,
   DigestService,
   NumberService,
-  RunService,
+  createRunService,
   RunStore,
 } from "@megapandas/dsh-stock-research/core";
 import { openDigestSample, sampleDigestReply } from "./digest-sample.mjs";
@@ -27,7 +27,7 @@ function stats(values) {
 let root;
 try {
   root = new DataRoot(directory);
-  const runs = new RunService(
+  const runs = createRunService(
     new RunStore(root),
     () => "2024-01-04T00:00:00.000Z",
   );

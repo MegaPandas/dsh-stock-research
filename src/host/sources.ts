@@ -10,7 +10,7 @@ import { SinaIncomeAdapter } from "../data/sina-income.js";
 import { FredCsvAdapter } from "../data/fred-csv.js";
 import { HostResearchAdapter } from "../data/host-research.js";
 import type { HttpClient } from "../data/http.js";
-import type { QuerySources } from "../services/query-sources.js";
+import type { QuerySources } from "../contracts/sources.js";
 import type { ResearchConfig } from "./config.js";
 
 export function createSources(

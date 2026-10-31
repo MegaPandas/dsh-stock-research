@@ -1,7 +1,5 @@
-import {
-  validateJsonSchemaValue,
-  type JsonSchemaNode,
-} from "@deepseek-ai/dsh-tools";
+import type { JsonSchema } from "../contracts/json.js";
+import { assertJsonSchema } from "../json/schema.js";
 import {
   AMOUNT_SCALES,
   type ValuationMethodId,
@@ -9,9 +7,7 @@ import {
 } from "../contracts/valuation.js";
 import { ResearchError } from "../contracts/errors.js";
 const stringSchema = { type: "string" } as const;
-function objectSchema(
-  properties: Record<string, JsonSchemaNode>,
-): JsonSchemaNode {
+function objectSchema(properties: Record<string, JsonSchema>): JsonSchema {
   return {
     type: "object",
     properties,
@@ -21,7 +17,7 @@ function objectSchema(
 }
 
 const number = { type: "number" } as const;
-const array = (items: JsonSchemaNode): JsonSchemaNode => ({
+const array = (items: JsonSchema): JsonSchema => ({
   type: "array",
   items,
 });
@@ -91,9 +87,7 @@ const equity = objectSchema({
   newDebt: flow,
   debtRepaid: flow,
 });
-const terminal = (
-  parameters: Record<string, JsonSchemaNode> = {},
-): JsonSchemaNode => ({
+const terminal = (parameters: Record<string, JsonSchema> = {}): JsonSchema => ({
   oneOf: [
     objectSchema({
       kind: { type: "string", const: "finite" },
@@ -117,9 +111,9 @@ const capm = objectSchema({
   beta: number,
   countryRiskPremium: ratio,
 });
-const equityCost: JsonSchemaNode = { oneOf: [number, capm] };
+const equityCost: JsonSchema = { oneOf: [number, capm] };
 const boundedRatio = { ...ratio, minimum: 0, maximum: 1 };
-const discountRate: JsonSchemaNode = {
+const discountRate: JsonSchema = {
   oneOf: [
     number,
     capm,
@@ -139,10 +133,7 @@ const operatingInputs = {
   openingWorkingCapital: openingBalance,
   periods: array(operating),
 };
-export const VALUATION_INPUT_SCHEMAS: Record<
-  ValuationMethodId,
-  JsonSchemaNode
-> = {
+export const VALUATION_INPUT_SCHEMAS: Record<ValuationMethodId, JsonSchema> = {
   fcff_dcf: objectSchema({
     ...operatingInputs,
     discountRate,
@@ -353,19 +344,19 @@ const fields = {
   methodId: {
     type: "string",
     enum: Object.keys(VALUATION_INPUT_SCHEMAS),
-  } as JsonSchemaNode,
+  } as JsonSchema,
   purpose: {
     type: "string",
     enum: ["valuation", "target_price"],
     description:
       "valuation computes research-date value; target_price computes value at the six-month target date. Dates come from the run.",
-  } as JsonSchemaNode,
+  } as JsonSchema,
   amountUnit: {
     type: "string",
     enum: Object.keys(AMOUNT_SCALES),
     description:
       "Scale for all monetary inputs: unit=1, thousand=1000, million=1000000, hundred_million=100000000. Currency comes from the run; results use base currency units.",
-  } as JsonSchemaNode,
+  } as JsonSchema,
   shares: objectSchema({
     value: number,
     unit: {
@@ -379,7 +370,7 @@ const fields = {
     additionalProperties: true,
     description:
       "Inputs matching methodId. Read calculationInputSchema with stock_read_valuation_method for the method's required fields.",
-  } as JsonSchemaNode,
+  } as JsonSchema,
   assumptions: array({
     type: "string",
     description:
@@ -414,6 +405,16 @@ const fields = {
   ),
 };
 export const valuationCalculationParameters = objectSchema(fields);
+const requestSchemas = Object.fromEntries(
+  Object.entries(VALUATION_INPUT_SCHEMAS).map(([methodId, inputs]) => [
+    methodId,
+    objectSchema({
+      ...fields,
+      methodId: { type: "string", const: methodId },
+      inputs,
+    }),
+  ]),
+);
 
 function invalid(message: string): never {
   throw new ResearchError("INVALID_INPUT", `valuation: ${message}`);
@@ -442,7 +443,6 @@ function validateLeaves(
   numericPaths: string[],
 ): void {
   if (typeof value === "number") {
-    if (!Number.isFinite(value)) invalid(`${path} must be finite.`);
     numericPaths.push(path);
   } else if (typeof value === "string") {
     if (!value.trim()) invalid(`${path} requires nonempty text.`);
@@ -460,16 +460,7 @@ export function parseValuationRequest(value: unknown): ValuationRequest {
     !Object.hasOwn(VALUATION_INPUT_SCHEMAS, methodId)
   )
     invalid("Select a supported methodId.");
-  const errors = validateJsonSchemaValue(
-    objectSchema({
-      ...fields,
-      methodId: { type: "string", const: methodId },
-      inputs: VALUATION_INPUT_SCHEMAS[methodId as ValuationMethodId]!,
-    }),
-    value,
-    "valuation",
-  );
-  if (errors.length) invalid(errors.join("\n"));
+  assertJsonSchema(requestSchemas[methodId]!, value, "valuation");
   const paths: string[] = [];
   validateLeaves(value, "", paths);
   const request = value as ValuationRequest;

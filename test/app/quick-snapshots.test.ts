@@ -3,17 +3,19 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
-  captureQuickSnapshots,
-  QUICK_SNAPSHOTS_INPUT,
   queryToolCall,
   readQuickSnapshots,
-  type QuickQuerySnapshot,
 } from "../../src/app/quick-snapshots.js";
-import type { JsonValue } from "../../src/contracts/cache.js";
+import {
+  captureQuickSnapshots,
+  QUICK_SNAPSHOTS_INPUT,
+  type QuickQuerySnapshot,
+} from "../../src/app/query-snapshots.js";
+import type { JsonValue } from "../../src/contracts/json.js";
 import type { QueryRequest } from "../../src/contracts/query.js";
 import type { RunState } from "../../src/contracts/runs.js";
 import { RunStore } from "../../src/runs/store.js";
-import { RunService } from "../../src/services/runs.js";
+import { createRunService } from "../../src/services/create-run-service.js";
 import { DataRoot } from "../../src/storage/data-root.js";
 import { MARKET_FIXTURE, US_SECURITY } from "../fixtures/market.js";
 
@@ -43,7 +45,7 @@ function stored(content?: JsonValue, duplicateInput = false) {
   const directory = fs.mkdtempSync(join(tmpdir(), "dsh-quick-snapshots-"));
   let root = new DataRoot(directory);
   const openService = () =>
-    new RunService(
+    createRunService(
       new RunStore<RunState>(root),
       () => "2024-01-09T00:00:00.000Z",
     );

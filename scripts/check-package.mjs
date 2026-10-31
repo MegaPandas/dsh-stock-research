@@ -26,7 +26,7 @@ import {
   MemoryService,
   renderArtifact,
   validateRunDefinition,
-  RunService,
+  createRunService,
   QueryService,
   TaskQueryService,
   NumberService,
@@ -179,7 +179,7 @@ const serviceDirectory = mkdtempSync(
 let serviceRoot;
 try {
   serviceRoot = new DataRoot(serviceDirectory);
-  const service = new RunService(
+  const service = createRunService(
     new RunStore(serviceRoot),
     () => "2024-01-03T00:00:00.000Z",
   );

@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Context } from "@deepseek-ai/cordis";
 import Loader from "@deepseek-ai/cordis-plugin-loader";
-import type { Agent } from "@deepseek-ai/dsh-agent";
+import type { Agent, AgentOptions } from "@deepseek-ai/dsh-agent";
 import {
   mountAgentLoopTestDependencies,
   mountAgentLoopTestHarness,
@@ -37,6 +37,7 @@ import {
   type ResearchBinding,
 } from "../../src/host/bindings.js";
 import { DispatchBridge } from "../../src/host/dispatch.js";
+import type { RunReader } from "../../src/contracts/run-access.js";
 import { ResearchSessions } from "../../src/host/sessions.js";
 import { MemoryStore } from "../../src/memory/store.js";
 import { RunStore } from "../../src/runs/store.js";
@@ -45,10 +46,15 @@ import { DecisionService } from "../../src/services/decisions.js";
 import { DigestService } from "../../src/services/digests.js";
 import { MemoryService } from "../../src/services/memory.js";
 import { NumberService } from "../../src/services/numbers.js";
-import { RunService } from "../../src/services/runs.js";
+import { createRunService } from "../../src/services/create-run-service.js";
 import { DataRoot } from "../../src/storage/data-root.js";
 import { createControlTools } from "../../src/tools/control.js";
 import { createWriteTools } from "../../src/tools/write.js";
+import { createServiceTaskTools } from "../../src/tools/service-tasks.js";
+import {
+  createDispatchOperations,
+  createServiceTaskOperations,
+} from "../../src/host/research-operations.js";
 import { US_SECURITY } from "./market.js";
 
 export function analysis(): Extract<
@@ -233,12 +239,16 @@ function unsafeTool(name: string): ToolDefinition {
 export async function dispatchHost(
   scripts: ModelScript[] = [{ kind: "save" }],
   generateDigest?: (ctx: Context, directory: string) => GenerateDigest,
+  provideAgentOptions?: (
+    runs: Pick<RunReader, "inputCatalog" | "readInput">,
+    context: RoleDispatchContext,
+  ) => AgentOptions | undefined,
 ) {
   const directory = fs.mkdtempSync(join(tmpdir(), "dsh-dispatch-"));
   const root = new DataRoot(directory);
   const ctx = new Context();
   const now = "2024-01-04T00:00:00.000Z";
-  const runs = new RunService(new RunStore<RunState>(root), () => now);
+  const runs = createRunService(new RunStore<RunState>(root), () => now);
   const numbers = new NumberService(runs);
   const artifacts = new ArtifactService(runs, numbers);
   const memory = new MemoryService(
@@ -360,13 +370,15 @@ export async function dispatchHost(
     const bindings = new SessionBindings();
     const sessions = new ResearchSessions(ctx, bindings);
     const prepared: RoleDispatchContext[] = [];
-    const actualBridge = (bridge = new DispatchBridge(
+    const actualBridge: DispatchBridge = (bridge = new DispatchBridge(
       ctx,
       runs,
       sessions,
       (context) => {
         prepared.push(context);
+        const agentOptions = provideAgentOptions?.(runs, context);
         return {
+          ...(agentOptions === undefined ? {} : { agentOptions }),
           agentPreset: "research-task",
           prompt: [
             {
@@ -379,15 +391,23 @@ export async function dispatchHost(
       },
       digests,
     ));
-    const writeTools = createWriteTools(
-      { artifacts, memory, digests: actualBridge, decisions },
-      bindings,
-      { freshness: { market: 0, fundamentals: 0, macro: 0 }, secCiks: {} },
-    );
+    const writeTools = [
+      ...createWriteTools({ artifacts, memory }, bindings, {
+        freshness: { market: 0, fundamentals: 0, macro: 0 },
+        secCiks: {},
+      }),
+      ...createServiceTaskTools(
+        createServiceTaskOperations(actualBridge, decisions),
+        bindings,
+      ),
+    ];
     for (const tool of writeTools) ctx.tools.register(tool);
     ctx.tools.register(unsafeTool("shell"));
     const save = writeTools.find((tool) => tool.name === "stock_save_report")!;
-    const controls = createControlTools(actualBridge, bindings);
+    const controls = createControlTools(
+      createDispatchOperations(actualBridge),
+      bindings,
+    );
     for (const tool of controls) ctx.tools.register(tool);
     const children = new Map<
       string,

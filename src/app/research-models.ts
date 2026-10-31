@@ -1,5 +1,5 @@
 import type { Agent, AgentOptions } from "@deepseek-ai/dsh-agent";
-import type { RunService } from "../services/runs.js";
+import type { RunReader } from "../contracts/run-access.js";
 import { ResearchError } from "../contracts/errors.js";
 import { resolveModelOptions, type ModelConfig } from "./model-config.js";
 
@@ -17,7 +17,7 @@ export function captureResearchModels(
 }
 
 export function readResearchModels(
-  runs: RunService,
+  runs: Pick<RunReader, "inputCatalog" | "readInput">,
   runId: string,
 ): ResearchModels | undefined {
   const inputs = runs

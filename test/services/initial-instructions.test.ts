@@ -17,7 +17,8 @@ import { RunStore } from "../../src/runs/store.js";
 import { ArtifactService } from "../../src/services/artifacts.js";
 import { DigestService } from "../../src/services/digests.js";
 import { NumberService } from "../../src/services/numbers.js";
-import { RunService } from "../../src/services/runs.js";
+import { createRunService } from "../../src/services/create-run-service.js";
+import type { RunService } from "../../src/services/runs.js";
 import { DataRoot } from "../../src/storage/data-root.js";
 import { US_SECURITY } from "../fixtures/market.js";
 
@@ -37,7 +38,7 @@ function setup() {
   });
   const store = new RunStore<RunState>(root);
   const clock = { value: "2024-01-04T00:00:00.000Z" };
-  const runs = new RunService(store, () => clock.value);
+  const runs = createRunService(store, () => clock.value);
   const artifacts = new ArtifactService(runs, new NumberService(runs));
   const input: OpenRunInput = {
     definition: {

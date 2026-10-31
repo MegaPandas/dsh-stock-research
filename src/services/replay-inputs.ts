@@ -1,4 +1,4 @@
-import type { JsonValue } from "../contracts/cache.js";
+import type { JsonValue } from "../contracts/json.js";
 import { ResearchError } from "../contracts/errors.js";
 import type { ReplaySnapshot } from "../contracts/replay.js";
 import type {

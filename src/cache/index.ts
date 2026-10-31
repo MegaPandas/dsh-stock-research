@@ -2,7 +2,7 @@ import { DatabaseSync, type StatementSync } from "node:sqlite";
 import type { QueryCacheKey } from "../contracts/cache.js";
 import type { DataEnvelope } from "../contracts/data.js";
 import { ResearchError } from "../contracts/errors.js";
-import { serializeJson } from "./json.js";
+import { serializeJson } from "../json/serialize.js";
 
 export function createCacheKey(key: QueryCacheKey): string {
   return serializeJson(key);
@@ -26,6 +26,8 @@ export class SqliteCache {
     const database = new DatabaseSync(options.path);
     try {
       database.exec(`
+        PRAGMA journal_mode = WAL;
+        PRAGMA synchronous = FULL;
         CREATE TABLE IF NOT EXISTS cache_entries (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           cache_key TEXT NOT NULL UNIQUE,

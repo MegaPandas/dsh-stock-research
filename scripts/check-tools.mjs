@@ -14,7 +14,7 @@ import {
   NumberService,
   QueryService,
   TaskQueryService,
-  RunService,
+  createRunService,
   RunStore,
   SqliteCache,
   YahooMarketAdapter,
@@ -23,6 +23,8 @@ import {
   createDataTools,
   createReadTools,
   createWriteTools,
+  createServiceTaskTools,
+  createServiceTaskOperations,
   SessionBindings,
 } from "@megapandas/dsh-stock-research/tools";
 import { openDecisionSample } from "./decision-sample.mjs";
@@ -35,7 +37,7 @@ let taskQueries;
 let memory;
 try {
   root = new DataRoot(directory);
-  const runs = new RunService(
+  const runs = createRunService(
     new RunStore(root),
     () => "2024-01-04T00:00:00.000Z",
   );
@@ -111,10 +113,10 @@ try {
   const tools = [
     ...createReadTools({ runs, queries, memory, numbers }, bindings),
     ...createDataTools({ runs, queries, taskQueries }, bindings, policy),
-    ...createWriteTools(
-      { artifacts, memory, digests, decisions },
+    ...createWriteTools({ artifacts, memory }, bindings, policy),
+    ...createServiceTaskTools(
+      createServiceTaskOperations(digests, decisions),
       bindings,
-      policy,
     ),
   ];
   assert.equal(tools.length, 16);

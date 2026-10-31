@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
-import { createUsCollectionTasks } from "../../src/services/collection-us.js";
-import type { QueryService } from "../../src/services/query.js";
+import { createUsCollectionTasks } from "../../src/data/collection-us.js";
+import { createCollectionTaskFactory } from "../../src/data/collection-tasks.js";
+import type { ReadSource } from "../../src/contracts/query.js";
 import { ResearchError } from "../../src/contracts/errors.js";
 import { CollectionService } from "../../src/services/collection.js";
 import { HttpClient } from "../../src/data/http.js";
@@ -15,9 +16,9 @@ const scope = {
 const options = {
   enabledSources: ["sec"],
   freshness: { market: 0, fundamentals: 0, macro: 0 },
-  secCiks: { [US_SECURITY.id]: "0001045810" },
   ttl: { market: 0, fundamentals: 0, macro: 0, research: 0 },
 };
+const secCiks = { [US_SECURITY.id]: "0001045810" };
 
 describe("configured US collection", () => {
   it("clips the fixed daily lookback at the configured source's historical coverage", async () => {
@@ -30,9 +31,10 @@ describe("configured US collection", () => {
       .fn()
       .mockRejectedValue(new Error("fixture stop after observing the request"));
     const tasks = createUsCollectionTasks(
-      { query: query as QueryService["query"] },
+      query,
       earlyScope,
       { ...options, enabledSources: ["yahoo"] },
+      secCiks,
     );
     await expect(tasks[0]!.run()).rejects.toThrow("fixture stop");
     expect(query).toHaveBeenCalledWith(
@@ -104,11 +106,7 @@ describe("configured US collection", () => {
         },
       ],
     });
-    const tasks = createUsCollectionTasks(
-      { query: query as QueryService["query"] },
-      scope,
-      options,
-    );
+    const tasks = createUsCollectionTasks(query, scope, options, secCiks);
     const result = await tasks[0]!.run();
     expect(result.data.rows).toHaveLength(2);
     expect(result.data.rows).toContainEqual(
@@ -139,7 +137,7 @@ describe("configured US collection", () => {
 
   it("propagates cache or internal contract failures instead of recording a source gap", async () => {
     const error = new ResearchError("STORAGE_FAILED", "Cache is unavailable.");
-    const query = vi.fn().mockRejectedValue(error) as QueryService["query"];
+    const query = vi.fn().mockRejectedValue(error) as ReadSource;
     const http = new HttpClient({
       timeoutMs: 1000,
       maxConcurrency: 1,
@@ -149,7 +147,11 @@ describe("configured US collection", () => {
       get: vi.fn().mockReturnValue(undefined),
       set: vi.fn(),
     } as unknown as SqliteCache;
-    const service = new CollectionService(http, cache, { query }, options);
+    const service = new CollectionService(
+      createCollectionTaskFactory(http, query, { secCiks }),
+      cache,
+      options,
+    );
     try {
       await expect(service.collect(scope)).rejects.toBe(error);
     } finally {

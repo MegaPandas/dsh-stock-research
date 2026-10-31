@@ -1,15 +1,12 @@
 import z from "@deepseek-ai/schemastery";
-import { serializeJson } from "../cache/json.js";
-import type { JsonValue } from "../contracts/cache.js";
 import { ResearchError } from "../contracts/errors.js";
-import type { QueryRequest, QuerySnapshot } from "../contracts/query.js";
-import type { RunService } from "../services/runs.js";
+import type { QueryRequest } from "../contracts/query.js";
+import type { RunReader } from "../contracts/run-access.js";
 import type { DataToolName } from "../tools/query-inputs.js";
-
-export interface QuickQuerySnapshot extends QuerySnapshot {
-  taskId: string;
-}
-export const QUICK_SNAPSHOTS_INPUT = "stock-research:queries";
+import {
+  QUICK_SNAPSHOTS_INPUT,
+  type QuickQuerySnapshot,
+} from "./query-snapshots.js";
 
 const text = z.string().pattern(/\S/).required();
 const dataset = z
@@ -98,16 +95,8 @@ const schema = z
   })
   .required();
 
-export function captureQuickSnapshots(
-  snapshots: readonly QuickQuerySnapshot[],
-): JsonValue {
-  return JSON.parse(
-    serializeJson({ schemaVersion: 1, snapshots }),
-  ) as JsonValue;
-}
-
 export function readQuickSnapshots(
-  runs: RunService,
+  runs: Pick<RunReader, "inputCatalog" | "readInput">,
   runId: string,
 ): QuickQuerySnapshot[] {
   const saved = runs

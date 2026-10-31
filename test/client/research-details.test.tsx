@@ -30,12 +30,70 @@ function observation(
 describe("research details", () => {
   it("summarizes the latest collection counts without treating source diagnostics as missing data", () => {
     const text = [
-      "采集数据 1/2 · 成功 0，缺失 1 · 缓存命中 0，未命中 1",
-      "benchmark.gold.weekly · eastmoney · TypeError: fetch failed → socket closed · context",
-      "benchmark.gold.monthly · eastmoney · TypeError: fetch failed → socket closed · context",
-      "采集数据 2/2 · 成功 2，缺失 0 · 缓存命中 0，未命中 2",
-      "采集记录：/tmp/研究 记录.json",
-      "分析 · 已完成 0/12 个研究任务",
+      JSON.stringify({
+        type: "research/progress",
+        progress: {
+          state: {
+            status: "preparing",
+            phase: {
+              kind: "collection",
+              counts: {
+                completed: 1,
+                total: 2,
+                succeeded: 0,
+                failed: 1,
+                cacheHits: 0,
+                cacheMisses: 1,
+              },
+            },
+            operationIds: [],
+          },
+          text: "Source work started",
+        },
+      }),
+      JSON.stringify({
+        type: "research/diagnostic",
+        dataset: "benchmark.gold.weekly",
+        source: "eastmoney",
+        code: "TypeError",
+        message: "fetch failed → socket closed · context",
+      }),
+      JSON.stringify({
+        type: "research/diagnostic",
+        dataset: "benchmark.gold.monthly",
+        source: "eastmoney",
+        code: "TypeError",
+        message: "fetch failed → socket closed · context",
+      }),
+      JSON.stringify({
+        type: "research/progress",
+        progress: {
+          state: {
+            status: "preparing",
+            phase: {
+              kind: "collection",
+              counts: {
+                completed: 2,
+                total: 2,
+                succeeded: 2,
+                failed: 0,
+                cacheHits: 0,
+                cacheMisses: 2,
+              },
+            },
+            operationIds: [],
+          },
+          text: "Source work finished",
+        },
+      }),
+      JSON.stringify({
+        type: "research/collection-record",
+        path: "/tmp/研究 记录.json",
+      }),
+      JSON.stringify({
+        type: "research/message",
+        text: "分析 · 已完成 0/12 个研究任务",
+      }),
       "",
     ].join("\n");
     render(

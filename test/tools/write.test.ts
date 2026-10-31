@@ -24,6 +24,8 @@ import { DigestService } from "../../src/services/digests.js";
 import { MemoryService } from "../../src/services/memory.js";
 import { rememberInputSchema } from "../../src/tools/write-inputs.js";
 import { createWriteTools } from "../../src/tools/write.js";
+import { createServiceTaskTools } from "../../src/tools/service-tasks.js";
+import { createServiceTaskOperations } from "../../src/host/research-operations.js";
 import { createReportSubmission } from "../../src/host/report-submission.js";
 import { decisionFixture } from "../fixtures/decision.js";
 import { oneDigest } from "../fixtures/digest-conversation.js";
@@ -114,14 +116,16 @@ function setup(
   const digests = new DigestService(f.runs, f.artifacts, oneDigest(generate));
   const decisions = new DecisionService(f.runs, f.now);
   const bindings = new SessionBindings();
-  const tools = createWriteTools(
-    { artifacts: f.artifacts, memory, digests, decisions },
-    bindings,
-    {
+  const tools = [
+    ...createWriteTools({ artifacts: f.artifacts, memory }, bindings, {
       freshness: { market: 1234, fundamentals: 2345, macro: 3456 },
       secCiks: {},
-    },
-  );
+    }),
+    ...createServiceTaskTools(
+      createServiceTaskOperations(digests, decisions),
+      bindings,
+    ),
+  ];
   function agent(binding?: ResearchBinding, id = "worker") {
     const value = { id } as Agent;
     if (binding) bindings.bind(value, binding);

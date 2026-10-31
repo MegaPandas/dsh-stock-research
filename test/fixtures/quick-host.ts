@@ -3,10 +3,7 @@ import { join } from "node:path";
 import type { Agent } from "@deepseek-ai/dsh-agent";
 import type { Context } from "@deepseek-ai/cordis";
 import CommandRuntime from "@deepseek-ai/dsh-commands";
-import type {
-  CommandExecution,
-  CommandResult,
-} from "@deepseek-ai/dsh-commands";
+import type { CommandExecution } from "@deepseek-ai/dsh-commands";
 import {
   ToolCallId,
   type GenerateOptions,
@@ -53,7 +50,6 @@ export function lastToolResult<T>(request: GenerateOptions): T {
 
 /** Keep command acknowledgement and background completion separate in fixtures. */
 export function researchCommands(ctx: Context, agent: Agent) {
-  const results: { runId?: string; result: CommandResult }[] = [];
   const activities: { runId?: string }[] = [];
   const failures: unknown[] = [];
   const toolFailures: string[] = [];
@@ -61,7 +57,6 @@ export function researchCommands(ctx: Context, agent: Agent) {
     string,
     {
       line: string;
-      results: number;
       activities: number;
       failures: number;
       toolFailures: number;
@@ -94,12 +89,6 @@ export function researchCommands(ctx: Context, agent: Agent) {
         )
           activities.push({ runId: value.runId });
       }
-    if (event.type === "stock-research/activity") activities.push(event.data);
-    if (event.type === "stock-research/result")
-      results.push({
-        ...(event.data.runId === undefined ? {} : { runId: event.data.runId }),
-        result: { kind: event.data.outcome, text: event.data.text },
-      });
   });
   ctx.on("agent/error", ({ agent: subject, error }) => {
     if (subject === agent) failures.push(error);
@@ -110,7 +99,6 @@ export function researchCommands(ctx: Context, agent: Agent) {
   ) {
     const offset = {
       line,
-      results: results.length,
       activities: activities.length,
       failures: failures.length,
       toolFailures: toolFailures.length,
@@ -135,16 +123,13 @@ export function researchCommands(ctx: Context, agent: Agent) {
           text: failure instanceof Error ? failure.message : String(failure),
         },
       };
-    const result = results.slice(offset.results).at(-1);
-    const runId =
-      result?.runId ??
-      activities
-        .slice(offset.activities)
-        .findLast((activity) => activity.runId !== undefined)?.runId;
+    const runId = activities
+      .slice(offset.activities)
+      .findLast((activity) => activity.runId !== undefined)?.runId;
     if (runId === undefined)
       return {
         ...execution,
-        result: result?.result ?? {
+        result: {
           kind: "error" as const,
           text:
             toolFailures.length > offset.toolFailures

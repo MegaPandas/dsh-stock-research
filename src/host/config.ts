@@ -2,7 +2,7 @@ import z from "@deepseek-ai/schemastery";
 import type { QueryCachePolicy } from "../contracts/query.js";
 import { ResearchError } from "../contracts/errors.js";
 import type { HttpClientOptions } from "../data/http.js";
-import type { QueryToolPolicy } from "../tools/query-inputs.js";
+import type { QueryPolicy } from "../contracts/query.js";
 
 export const SOURCE_IDS = [
   "yahoo",
@@ -23,7 +23,7 @@ export interface ResearchConfig {
   enabledSources: SourceId[];
   http: HttpClientOptions;
   cache: { maxEntries: number; ttl: QueryCachePolicy };
-  policy: QueryToolPolicy;
+  policy: QueryPolicy;
   secUserAgent?: string;
   xueqiuCookie?: string;
 }

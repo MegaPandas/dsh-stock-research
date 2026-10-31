@@ -1,8 +1,7 @@
-import { useId, useLayoutEffect, useRef, useState } from "react";
 import type { ObservedJob } from "@deepseek-ai/dsh-api-job-controller/client";
 import type { JobView } from "@deepseek-ai/dsh-jobs/view";
 import { researchCardStyles } from "./research-card-styles.js";
-import { collectionCounts } from "./research-log.js";
+import type { ResearchState } from "../contracts/research-progress.js";
 import { ResearchDetails } from "./ResearchDetails.js";
 import { ResearchChives } from "./ResearchChives.js";
 
@@ -22,9 +21,9 @@ interface ResearchCardViewProps {
   title: string;
   status: ResearchCardStatus;
   progress: string | undefined;
+  state: ResearchState | undefined;
   elapsed: string | undefined;
   detail: string | undefined;
-  result: string | undefined;
   canCancel: boolean;
   cancelling: boolean;
   cancelError: string | undefined;
@@ -105,89 +104,26 @@ const stageNames: Record<string, string> = {
   "digest.risk": "风险摘要",
   "manager.decision": "投资决策",
 };
-function displayProgress(progress: string | undefined) {
-  return progress?.replace(
-    /(等待主\s*Agent\s*验收[：:]\s*)([\w.]+)/,
-    (_whole, prefix: string, stage: string) =>
-      `${prefix}${stageNames[stage] ?? stage}`,
-  );
-}
-
-const RESULT_PREVIEW_LINES = 6;
-
-function ResearchResult({ text }: { text: string }) {
-  const id = useId();
-  const content = useRef<HTMLPreElement>(null);
-  const [expanded, setExpanded] = useState(false);
-  const [overflowing, setOverflowing] = useState(false);
-
-  useLayoutEffect(() => {
-    const element = content.current!;
-    const measure = () => {
-      const lineHeight = Number.parseFloat(
-        getComputedStyle(element).lineHeight,
-      );
-      setOverflowing(
-        element.scrollHeight > lineHeight * RESULT_PREVIEW_LINES + 1,
-      );
-    };
-    measure();
-    const observer = new ResizeObserver(measure);
-    observer.observe(element);
-    return () => observer.disconnect();
-  }, [text]);
-
-  return (
-    <div className="sr-research-result">
-      <pre
-        ref={content}
-        id={id}
-        className="sr-research-result-text"
-        style={
-          expanded ? undefined : { maxHeight: `${RESULT_PREVIEW_LINES}lh` }
-        }
-      >
-        {text}
-      </pre>
-      {overflowing && (
-        <button
-          type="button"
-          className="sr-research-action sr-research-expand"
-          aria-expanded={expanded}
-          aria-controls={id}
-          onClick={() => setExpanded(!expanded)}
-        >
-          {expanded ? "收起结果" : "展开结果"}
-          <Icon kind="chevron" size={12} />
-        </button>
-      )}
-    </div>
-  );
-}
-
 export function ResearchCardView(props: ResearchCardViewProps) {
   const {
     title,
     status,
     progress,
+    state,
     elapsed,
     detail,
-    result,
     canCancel,
     cancelling,
     cancelError,
     operations,
     observations,
   } = props;
-  const heading =
-    /^(.+?)\s*·\s*(快速研究|深度研究|Quick|Deep)\s*·\s*(\d{4}-\d{2}-\d{2})$/.exec(
-      title,
-    );
+  const identity = state?.identity;
   const stopping = status === "stopping" || (canCancel && cancelling);
   const waiting =
     !stopping &&
     (status === "active" || status === "running") &&
-    /等待.*验收/.test(progress ?? "");
+    state?.phase.kind === "review";
   const live =
     !stopping &&
     !waiting &&
@@ -214,24 +150,35 @@ export function ResearchCardView(props: ResearchCardViewProps) {
             : status === "reconnecting"
               ? "clock"
               : "research";
-  const counts = collectionCounts(progress);
-  const primaryProgress = counts ? "采集研究数据" : displayProgress(progress);
-  const technicalProgress =
-    counts !== undefined || primaryProgress !== progress;
+  const ended =
+    status === "completed" ||
+    status === "killed" ||
+    status === "failed" ||
+    status === "cancelled";
+  const phase = ended ? undefined : state?.phase;
+  const counts =
+    phase?.kind === "collection" && phase.counts.total > 0
+      ? phase.counts
+      : undefined;
+  const primaryProgress = counts
+    ? "采集研究数据"
+    : phase?.kind === "review"
+      ? `等待主 Agent 验收：${stageNames[phase.stageId] ?? phase.stageId}${phase.feedback === null ? "" : ` · ${phase.feedback}`}`
+      : progress;
+  const technicalProgress = counts !== undefined || phase?.kind === "review";
   const hasDetails =
     technicalProgress ||
     operations.length > 0 ||
     observations.some((entry) => entry.text || entry.gapBefore);
   const mode =
-    heading?.[2] === "Quick"
+    identity?.mode === "quick"
       ? "快速研究"
-      : heading?.[2] === "Deep"
+      : identity?.mode === "deep"
         ? "深度研究"
-        : heading?.[2];
+        : undefined;
   const hasBody =
     primaryProgress ||
     detail ||
-    result ||
     cancelError ||
     observations.some((entry) => entry.error);
 
@@ -260,12 +207,12 @@ export function ResearchCardView(props: ResearchCardViewProps) {
         </div>
         <div className="sr-research-overview">
           <div className="sr-research-identity">
-            <h3 className="sr-research-title">{heading?.[1] ?? title}</h3>
-            {(mode || heading?.[3]) && (
+            <h3 className="sr-research-title">{identity?.symbol ?? title}</h3>
+            {(mode || identity?.date) && (
               <div className="sr-research-meta">
                 {mode && <span className="sr-research-mode">{mode}</span>}
-                {heading?.[3] && (
-                  <time dateTime={heading[3]}>{heading[3]}</time>
+                {identity?.date && (
+                  <time dateTime={identity.date}>{identity.date}</time>
                 )}
               </div>
             )}
@@ -316,10 +263,10 @@ export function ResearchCardView(props: ResearchCardViewProps) {
                     {counts.succeeded} 项已就绪
                   </span>
                 )}
-                {counts.missing !== undefined && counts.missing > 0 && (
+                {counts.failed !== undefined && counts.failed > 0 && (
                   <span className="sr-research-missing">
                     <Icon kind="warning" size={13} />
-                    {counts.missing} 项缺失
+                    {counts.failed} 项缺失
                   </span>
                 )}
               </div>
@@ -338,7 +285,6 @@ export function ResearchCardView(props: ResearchCardViewProps) {
                 任务进度连接失败：{entry.error}
               </p>
             ))}
-          {result && <ResearchResult text={result} />}
         </div>
       )}
       {(hasDetails || canCancel) && (

@@ -10,7 +10,8 @@ import type {
   TaskInstructionSnapshot,
   TaskOperation,
 } from "../../src/contracts/runs.js";
-import { RunService } from "../../src/services/runs.js";
+import { createRunService } from "../../src/services/create-run-service.js";
+import type { RunService } from "../../src/services/runs.js";
 import { RunStore } from "../../src/runs/store.js";
 import { DataRoot } from "../../src/storage/data-root.js";
 import { US_SECURITY } from "../fixtures/market.js";
@@ -60,7 +61,7 @@ function reopen(path: string) {
     path,
     root,
     store,
-    service: new RunService(store, () => clock),
+    service: createRunService(store, () => clock),
     setTime: (value: string) => {
       clock = value;
     },

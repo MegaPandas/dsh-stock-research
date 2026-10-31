@@ -62,6 +62,30 @@ const riPeriod = (netIncome: number, payoutRatio: number, endDate = end) => ({
   otherEquityChanges: 0,
 });
 describe("valuation v2", () => {
+  it.each([
+    { taxRate: -0.1, debtWeight: 0.5 },
+    { taxRate: 1.1, debtWeight: 0.5 },
+    { taxRate: 0.25, debtWeight: -0.1 },
+    { taxRate: 0.25, debtWeight: 1.1 },
+  ])("enforces WACC fraction bounds when parsing: %j", (fractions) => {
+    const value = request("fcff_dcf", {
+      forecastStartDate: start,
+      openingWorkingCapital: 0,
+      periods: [op(100)],
+      discountRate: {
+        kind: "wacc",
+        costOfEquity: 0.1,
+        preTaxCostOfDebt: 0.05,
+        ...fractions,
+      },
+      terminal: finite,
+      bridge,
+    });
+    expect(() => parseValuationRequest(value)).toThrowError(
+      expect.objectContaining({ code: "INVALID_INPUT" }),
+    );
+  });
+
   it("derives FCFF taxes, working capital and sustainable terminal reinvestment", () => {
     const r = request("fcff_dcf", {
       forecastStartDate: start,

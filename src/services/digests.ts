@@ -13,7 +13,7 @@ import { ArtifactInputs } from "./artifact-inputs.js";
 import type { ArtifactService } from "./artifacts.js";
 import { assembleDigest } from "./digest-draft.js";
 import { digestNumbers, digestRisks } from "./digest-inputs.js";
-import type { RunService } from "./runs.js";
+import type { RunCommands, RunReader } from "../contracts/run-access.js";
 
 interface PendingDigest {
   operation: TaskOperation;
@@ -27,8 +27,19 @@ export class DigestService {
   private readonly pending = new Map<string, PendingDigest>();
   private closed = false;
   constructor(
-    private readonly runs: RunService,
-    private readonly artifacts: ArtifactService,
+    private readonly runs: Pick<
+      RunReader,
+      | "readAttempt"
+      | "readInput"
+      | "readArtifact"
+      | "readEvidence"
+      | "numberContext"
+    > &
+      Pick<
+        RunCommands,
+        "claimServiceForCall" | "serviceForCall" | "failServiceAttempt"
+      >,
+    private readonly artifacts: Pick<ArtifactService, "submitArtifact">,
     private readonly generate: GenerateDigest,
   ) {}
 

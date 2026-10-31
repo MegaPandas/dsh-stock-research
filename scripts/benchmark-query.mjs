@@ -11,7 +11,7 @@ import {
   HostResearchAdapter,
   QueryService,
   TaskQueryService,
-  RunService,
+  createRunService,
   RunStore,
   SqliteCache,
 } from "@megapandas/dsh-stock-research/core";
@@ -72,7 +72,7 @@ try {
     maxEntries: 8,
   });
   const store = new RunStore(root);
-  const runs = new RunService(store, () => "2024-01-03T00:00:00.000Z");
+  const runs = createRunService(store, () => "2024-01-03T00:00:00.000Z");
   const { runId } = runs.open(
     "benchmark",
     {

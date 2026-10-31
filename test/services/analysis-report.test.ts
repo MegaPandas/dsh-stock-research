@@ -211,6 +211,23 @@ describe("directional analysis reports", () => {
     );
   });
 
+  it("uses each requested cutoff when checking a source from the fixed input view", () => {
+    const f = stageFixture();
+    f.inputs.reportedGaps(f.versions);
+    const sources = f.inputs.artifactSources(f.ref);
+    expect(sources).toHaveLength(1);
+    const source = { ...sources[0]!, selector: "/data/bars/1/close" };
+    expect(() =>
+      f.inputs.checkSourceTime(source, true, f.scope.cutoff),
+    ).not.toThrow();
+    const earlier = new Date(
+      Date.parse(f.frame.envelope.asOf) - 1,
+    ).toISOString();
+    expect(() => f.inputs.checkSourceTime(source, true, earlier)).toThrow(
+      /after cutoff/,
+    );
+  });
+
   it("keeps actual source gaps separate from analytical limitations", () => {
     const f = stageFixture((frame) => {
       frame.envelope.gaps.push({

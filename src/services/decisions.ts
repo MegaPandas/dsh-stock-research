@@ -12,11 +12,18 @@ import type {
 import { renderDecisionReport } from "../report/decision.js";
 import { selectDecisionInputs } from "./decision-basics.js";
 import { ArtifactInputs } from "./artifact-inputs.js";
-import type { RunService } from "./runs.js";
+import type { RunCommands, RunReader } from "../contracts/run-access.js";
 
 export class DecisionService {
   constructor(
-    private readonly runs: RunService,
+    private readonly runs: Pick<
+      RunReader,
+      "readArtifact" | "readEvidence" | "numberContext"
+    > &
+      Pick<
+        RunCommands,
+        "claimService" | "serviceForCall" | "finalize" | "block" | "failAttempt"
+      >,
     private readonly now: () => ISOTime,
   ) {}
 

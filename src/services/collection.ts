@@ -1,6 +1,6 @@
 import { deriveFinancialMetrics } from "../data/financial-metrics.js";
 import type { SqliteCache } from "../cache/index.js";
-import { serializeJson } from "../cache/json.js";
+import { serializeJson } from "../json/serialize.js";
 import type {
   CollectionDiagnostics,
   CollectionOptions,
@@ -9,16 +9,15 @@ import type {
   CollectionSnapshot,
   CollectionRecord,
   CollectionDataset,
+  CollectionTaskFactory,
 } from "../contracts/collection.js";
 import type { ResearchScope } from "../contracts/data.js";
-import type { HttpClient } from "../data/http.js";
 import type { CollectionSnapshotStore } from "../storage/collection-snapshots.js";
 import { collectionError } from "./collection-errors.js";
 import { createCollectionPlans } from "./collection-plan.js";
 import { CollectionCache } from "./collection-cache.js";
 import { CollectionSourceRunner } from "./collection-source.js";
 import { CollectionTableRunner } from "./collection-table.js";
-import type { QueryService } from "./query.js";
 import { SharedQueries } from "./shared-queries.js";
 import { applyCollectionFreshness } from "./collection-freshness.js";
 
@@ -36,9 +35,8 @@ export class CollectionService {
   readonly #tables: CollectionTableRunner;
 
   constructor(
-    private readonly http: HttpClient,
+    private readonly createTasks: CollectionTaskFactory,
     cache: SqliteCache,
-    private readonly queries: Pick<QueryService, "query">,
     options: CollectionOptions,
     private readonly snapshots?: CollectionSnapshotStore,
   ) {
@@ -121,9 +119,7 @@ export class CollectionService {
       attempts: [],
     };
     const { plans, disabled } = createCollectionPlans(
-      this.http,
-      this.queries,
-      scope,
+      this.createTasks(scope, this.#options),
       this.#options,
     );
     const snapshot: CollectionSnapshot = {

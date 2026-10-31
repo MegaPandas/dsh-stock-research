@@ -13,11 +13,8 @@ import {
   stringSchema,
   text,
 } from "./parameters.js";
-import {
-  dataSchemas,
-  parseDataRequest,
-  type QueryToolPolicy,
-} from "./query-inputs.js";
+import { dataSchemas, parseDataRequest } from "./query-inputs.js";
+import type { QueryPolicy } from "../contracts/query.js";
 
 const gapCodes = [
   "missing",
@@ -72,7 +69,7 @@ function memoryRef(value: unknown): MemoryRef {
 export function rememberInput(
   value: unknown,
   scope: ResearchScope,
-  policy: QueryToolPolicy,
+  policy: QueryPolicy,
 ): RememberInput {
   const item = object(value, [
     "previous",

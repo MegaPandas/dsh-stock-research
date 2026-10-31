@@ -65,12 +65,20 @@ export interface CollectionPlan {
 
 export interface CollectionOptions {
   enabledSources: readonly string[];
-  xueqiuCookie?: string;
   freshness: { market: number; fundamentals: number; macro: number };
-  secCiks: Readonly<Record<string, string>>;
   ttl: QueryCachePolicy;
   requireDailyMarket?: boolean;
 }
+
+export interface CollectionSourceConfig {
+  xueqiuCookie?: string;
+  secCiks: Readonly<Record<string, string>>;
+}
+
+export type CollectionTaskFactory = (
+  scope: ResearchScope,
+  options: Pick<CollectionOptions, "enabledSources" | "freshness">,
+) => readonly CollectionTask[];
 
 export interface CollectionPacket {
   id: string;

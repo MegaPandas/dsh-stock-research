@@ -7,12 +7,13 @@ import type { ResearchData } from "../contracts/research.js";
 import { ResearchError } from "../contracts/errors.js";
 import { HostResearchAdapter } from "../data/host-research.js";
 import type { EvidenceQuery } from "../contracts/task-data.js";
-import type { RunService } from "../services/runs.js";
+import type { RunCommands, RunReader } from "../contracts/run-access.js";
 import { type SessionBindings, taskOperation } from "./bindings.js";
 
 export async function searchPublic(
   ctx: Context,
-  runs: RunService,
+  runs: Pick<RunReader, "readEvidence"> &
+    Pick<RunCommands, "evidenceForCall" | "recordEvidence" | "replayEvidence">,
   bindings: SessionBindings,
   query: string,
   exec: ToolRunContext,

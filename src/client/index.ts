@@ -12,7 +12,6 @@ export const inject = [
   "configForms",
   "remote",
   "remote.session",
-  "remote.commands",
   "uiConversation",
   "jobs",
 ];

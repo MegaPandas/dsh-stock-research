@@ -4,6 +4,7 @@ import { createUserMessage, HarnessError } from "@deepseek-ai/dsh-llm";
 import { SessionId } from "@deepseek-ai/dsh-session";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { taskOperation } from "../../src/host/bindings.js";
+import { createDispatchOperations } from "../../src/host/research-operations.js";
 import {
   analysis,
   dispatchHost,
@@ -23,6 +24,33 @@ afterEach(async () => {
 });
 
 describe("DispatchBridge with real DSH spawn and research services", () => {
+  it("does not publish a cancelled typed redo or consume its request identity", async () => {
+    const h = await host();
+    const operations = createDispatchOperations(h.bridge);
+    const caller = h.bindings.require(h.parent.agent);
+    const request = {
+      runId: h.runId,
+      taskId: "analysis",
+      requestId: "cancelled-redo",
+      reason: "before cancellation",
+    };
+    const before = h.runs.view({ runId: h.runId });
+    const reason = new DOMException("Cancelled before execution", "AbortError");
+    await expect(
+      Promise.resolve().then(() =>
+        operations.redoTask(request, caller, AbortSignal.abort(reason)),
+      ),
+    ).rejects.toBe(reason);
+    expect(h.runs.view({ runId: h.runId })).toEqual(before);
+    await expect(
+      operations.redoTask(
+        { ...request, reason: "retry after cancellation" },
+        caller,
+        new AbortController().signal,
+      ),
+    ).resolves.toMatchObject({ runId: h.runId, taskId: "analysis" });
+  });
+
   it("submits a real artifact through a separately bound preset and replays canonical control results", async () => {
     const h = await host([{ kind: "save" }, { kind: "save" }]);
     const args = { runId: h.runId, taskId: "analysis", requestId: "same" };

@@ -3,7 +3,7 @@ import {
   SOURCE_VERSIONS,
   COLLECTION_SOURCE_VERSIONS,
 } from "../data/versions.js";
-import type { RunService } from "../services/runs.js";
+import type { RunReader } from "../contracts/run-access.js";
 import { savedCoordinator } from "./coordinator-input.js";
 import { DEEP_MODE_VERSION } from "./deep-plan.js";
 import { QUICK_MODE_VERSION } from "./quick-plan.js";
@@ -12,7 +12,7 @@ import { VALUATION_ENGINE_VERSION } from "../contracts/valuation.js";
 import { ResearchError } from "../contracts/errors.js";
 
 export function createReplayInput(
-  runs: RunService,
+  runs: Pick<RunReader, "readDefinition" | "inputCatalog" | "readInput">,
   runId: string,
 ): ReplayRunInput {
   const { definition } = savedCoordinator(runs, runId);

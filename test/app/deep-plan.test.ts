@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import { describe, expect, it } from "vitest";
 import { createDeepInput, DEEP_MODE_VERSION } from "../../src/app/deep-plan.js";
-import { APPLICATION_INPUT_NAME } from "../../src/app/research-input.js";
+import { APPLICATION_INPUT_NAME } from "../../src/app/research-input-capture.js";
 import { validateRunDefinition } from "../../src/services/definition.js";
 import { US_SECURITY } from "../fixtures/market.js";
 

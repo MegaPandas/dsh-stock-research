@@ -30,7 +30,7 @@ export function usesValuationMethods(task: TaskDefinition): boolean {
   );
 }
 
-export { savedValuationMethods as readValuationMethods } from "../services/valuation-calculations.js";
+export { savedValuationMethods as readValuationMethods } from "../services/valuation-records.js";
 
 /** Supply the latest derived observations, retaining full history in the snapshot. */
 export function financialMetricContext(packets: readonly CollectionPacket[]) {

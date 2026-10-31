@@ -1,3 +1,7 @@
+import type {
+  ResearchControl,
+  ResearchControlKind,
+} from "./research-actions.js";
 import { ResearchError } from "../contracts/errors.js";
 import type { AttemptTarget, ResumeRunInput } from "../contracts/runs.js";
 import {
@@ -7,15 +11,6 @@ import {
   stringSchema,
   text,
 } from "../tools/parameters.js";
-
-export type RunCommand =
-  | { kind: "status"; runId: string }
-  | { kind: "cancel"; runId: string }
-  | { kind: "replay"; runId: string }
-  | { kind: "resume"; runId: string; input: ResumeRunInput }
-  | { kind: "redo"; runId: string; taskId: string; reason: string | null }
-  | { kind: "recover"; runId: string; attempts: AttemptTarget[] };
-export type RunCommandKind = RunCommand["kind"];
 
 const resumeInputSchema = objectSchema({
   resolvedReasonIds: {
@@ -35,14 +30,17 @@ const attemptsSchema = {
   type: "array",
   items: objectSchema({ taskId: stringSchema, attempt: { type: "integer" } }),
 } as const;
-export type ResearchControlKind = Exclude<RunCommandKind, "status" | "redo">;
+export type ResearchToolControlKind = Exclude<
+  ResearchControlKind,
+  "status" | "redo"
+>;
 const controlFields = { runId: stringSchema, requestId: stringSchema };
 export const runControlParameters = {
   resume: objectSchema({ ...controlFields, input: resumeInputSchema }),
   recover: objectSchema({ ...controlFields, attempts: attemptsSchema }),
   cancel: objectSchema(controlFields),
   replay: objectSchema(controlFields),
-} satisfies Record<ResearchControlKind, JsonSchemaNode>;
+} satisfies Record<ResearchToolControlKind, JsonSchemaNode>;
 
 function array(value: unknown, field: string): unknown[] {
   if (!Array.isArray(value))
@@ -86,10 +84,10 @@ function attempts(value: unknown): AttemptTarget[] {
 }
 
 export function parseRunControl(
-  kind: ResearchControlKind,
+  kind: ResearchToolControlKind,
   value: unknown,
 ): {
-  command: RunCommand;
+  command: ResearchControl;
   requestId: string;
 } {
   const actionFields =
@@ -97,7 +95,7 @@ export function parseRunControl(
   const item = object(value, ["runId", "requestId", ...actionFields]);
   const runId = text(item.runId, "runId");
   const requestId = text(item.requestId, "requestId");
-  let command: RunCommand;
+  let command: ResearchControl;
   switch (kind) {
     case "resume":
       command = { kind, runId, input: resumeInput(item.input) };
@@ -113,9 +111,9 @@ export function parseRunControl(
   return { command, requestId };
 }
 export function parseRunCommand(
-  kind: RunCommandKind,
+  kind: ResearchControlKind,
   rawInput: string,
-): RunCommand {
+): ResearchControl {
   if (kind === "status" || kind === "cancel" || kind === "replay") {
     const match = /^\s*(\S+)\s*$/.exec(rawInput);
     if (match === null)

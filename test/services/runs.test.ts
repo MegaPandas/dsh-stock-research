@@ -11,7 +11,8 @@ import type {
   RunState,
   TaskOperation,
 } from "../../src/contracts/runs.js";
-import { RunService } from "../../src/services/runs.js";
+import { createRunService } from "../../src/services/create-run-service.js";
+import type { RunService } from "../../src/services/runs.js";
 import { RunStore } from "../../src/runs/store.js";
 import { DataRoot } from "../../src/storage/data-root.js";
 import { US_SECURITY } from "../fixtures/market.js";
@@ -101,7 +102,7 @@ function setup(path?: string) {
   roots.push(root);
   const store = new RunStore<RunState>(root);
   let timestamp = INITIAL_TIME;
-  const service = new RunService(store, () => timestamp);
+  const service = createRunService(store, () => timestamp);
   return {
     path,
     root,
@@ -764,6 +765,47 @@ describe("run service transactions", () => {
         "claim-digest",
       ).inputRefs,
     ).toEqual(result.refs);
+  });
+
+  it("projects the latest valid digest and restores the earlier digest after redo and receipt replay", () => {
+    const { service, store, path } = setup();
+    const supplied = input();
+    supplied.definition.tasks = ["earlier", "later"].map((id) => ({
+      id,
+      executor: { kind: "service", service: "digest" },
+      dependsOn: [],
+      inputTasks: [],
+      outputKinds: ["digest"],
+      dataRequirements: [],
+      instructionVersion: 1,
+    }));
+    const { runId } = service.open("coordinator", supplied, "open");
+    service.commitArtifact(
+      claim(service, runId, "earlier"),
+      [artifact("digest", { body: "earlier digest" })],
+      "submit-earlier",
+    );
+    const later = claim(service, runId, "later");
+    const contents = [artifact("digest", { body: "later digest" })];
+    const submitted = service.commitArtifact(later, contents, "submit-later");
+    const filename = join(runDirectory(path, runId), "digest.md");
+    expect(fs.readFileSync(filename, "utf8")).toBe(
+      "# digest title\n\nlater digest\n",
+    );
+
+    service.redo({ runId, identity: "coordinator" }, "later", "redo-later");
+    expect(fs.readFileSync(filename, "utf8")).toBe(
+      "# digest title\n\nearlier digest\n",
+    );
+    const saved = store.read(runId);
+    fs.unlinkSync(filename);
+    expect(service.commitArtifact(later, contents, "submit-later")).toEqual(
+      submitted,
+    );
+    expect(fs.readFileSync(filename, "utf8")).toBe(
+      "# digest title\n\nearlier digest\n",
+    );
+    expect(store.read(runId)).toEqual(saved);
   });
 
   it("keeps both debate and risk content in the single view of their shared task", () => {

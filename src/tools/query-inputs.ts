@@ -2,7 +2,11 @@ import type { JsonSchemaNode } from "@deepseek-ai/dsh-tools";
 import type { ResearchScope } from "../contracts/data.js";
 import { ResearchError } from "../contracts/errors.js";
 import type { IndicatorRequest } from "../contracts/indicators.js";
-import type { PriceReturnsQuery, QueryRequest } from "../contracts/query.js";
+import type {
+  PriceReturnsQuery,
+  QueryRequest,
+  QueryPolicy,
+} from "../contracts/query.js";
 import type { ReplayEvidenceSource } from "../contracts/replay.js";
 import { parseLocalDate } from "../contracts/time.js";
 import {
@@ -20,12 +24,7 @@ export type DataToolName =
   | "stock_get_macro"
   | "stock_get_returns"
   | "stock_research";
-export interface QueryToolPolicy {
-  freshness: { market: number; fundamentals: number; macro: number };
-  secCiks: Readonly<Record<string, string>>;
-}
-
-export function captureQueryPolicy(policy: QueryToolPolicy): QueryToolPolicy {
+export function captureQueryPolicy(policy: QueryPolicy): QueryPolicy {
   for (const key of ["market", "fundamentals", "macro"] as const) {
     const value = policy.freshness[key];
     if (!Number.isFinite(value) || value < 0)
@@ -213,19 +212,19 @@ export function parseDataRequest(
   name: "stock_get_returns",
   value: unknown,
   scope: ResearchScope,
-  policy: QueryToolPolicy,
+  policy: QueryPolicy,
 ): { request: PriceReturnsQuery; source: ReplayEvidenceSource | null };
 export function parseDataRequest(
   name: DataToolName,
   value: unknown,
   scope: ResearchScope,
-  policy: QueryToolPolicy,
+  policy: QueryPolicy,
 ): { request: QueryRequest; source: ReplayEvidenceSource | null };
 export function parseDataRequest(
   name: DataToolName,
   value: unknown,
   scope: ResearchScope,
-  policy: QueryToolPolicy,
+  policy: QueryPolicy,
 ): { request: QueryRequest; source: ReplayEvidenceSource | null } {
   const provider = (value as { provider?: unknown } | null)?.provider;
   const keys =

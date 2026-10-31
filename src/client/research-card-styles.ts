@@ -244,17 +244,6 @@ export const researchCardStyles = `
   font-size: .928571em;
 }
 .sr-research-card .sr-research-alert:first-child { margin-top: 0; }
-.sr-research-card .sr-research-result { margin-top: 14px; }
-.sr-research-card .sr-research-result:first-child { margin-top: 0; }
-.sr-research-card .sr-research-result-text {
-  overflow: hidden;
-  margin: 0;
-  color: var(--sr-ink);
-  font: inherit;
-  line-height: 1.8;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-}
 .sr-research-card .sr-research-footer {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -311,8 +300,7 @@ export const researchCardStyles = `
   list-style: none;
 }
 .sr-research-card .sr-research-details > summary::-webkit-details-marker { display: none; }
-.sr-research-card .sr-research-details > summary svg,
-.sr-research-card .sr-research-expand svg { transition: transform 180ms ease; }
+.sr-research-card .sr-research-details > summary svg { transition: transform 180ms ease; }
 .sr-research-card .sr-research-details[open] > summary svg { transform: rotate(90deg); }
 .sr-research-card .sr-research-inspector {
   margin: 8px 8px 12px;
@@ -505,12 +493,6 @@ export const researchCardStyles = `
   .sr-research-card .sr-research-chives { grid-column: 2; grid-row: 1 / 3; align-self: center; height: 54px; }
   .sr-research-card .sr-research-elapsed { grid-column: 1; justify-self: start; white-space: normal; }
 }
-.sr-research-card .sr-research-expand {
-  margin: 6px 0 -8px -8px;
-  color: color-mix(in srgb, var(--sr-accent) 84%, var(--sr-ink));
-}
-.sr-research-card .sr-research-expand svg { transform: rotate(90deg); }
-.sr-research-card .sr-research-expand[aria-expanded="true"] svg { transform: rotate(-90deg); }
 @media (hover: hover) {
   .sr-research-card .sr-research-action:hover:not(:disabled) {
     color: var(--sr-ink);

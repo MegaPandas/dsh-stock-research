@@ -17,7 +17,7 @@ export type SubmitReport = (
 ) => ArtifactCommitResult;
 
 export function createReportSubmission(
-  artifacts: ArtifactService,
+  artifacts: Pick<ArtifactService, "submitArtifact">,
   bindings: SessionBindings,
 ): SubmitReport {
   return (contents, requestId, caller) => {

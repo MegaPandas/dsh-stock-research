@@ -7,7 +7,7 @@ import {
   searchPublic,
   approvePublicSearch,
 } from "../../src/host/public-search.js";
-import { RunService } from "../../src/services/runs.js";
+import { createRunService } from "../../src/services/create-run-service.js";
 import { RunStore } from "../../src/runs/store.js";
 import { DataRoot } from "../../src/storage/data-root.js";
 import type { OpenRunInput, RunState } from "../../src/contracts/runs.js";
@@ -27,7 +27,7 @@ async function setup(
   cleanups.push(h.close);
   const root = new DataRoot(h.directory);
   cleanups.push(async () => root.close());
-  const runs = new RunService(new RunStore<RunState>(root), () =>
+  const runs = createRunService(new RunStore<RunState>(root), () =>
     new Date().toISOString(),
   );
   const input: OpenRunInput = {

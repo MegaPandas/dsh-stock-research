@@ -1,4 +1,4 @@
-import type { JsonValue } from "./cache.js";
+import type { JsonValue } from "./json.js";
 import type {
   CandidateClaim,
   DataEnvelope,

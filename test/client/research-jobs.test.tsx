@@ -11,10 +11,11 @@ import {
   screen,
   waitFor,
 } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type {
   IJobs,
   JobsSnapshot,
+  ObservedJob,
 } from "@deepseek-ai/dsh-api-job-controller/client";
 import type { ChatNode } from "@deepseek-ai/dsh-client-ui-chat/client";
 import type {
@@ -33,30 +34,18 @@ import { RemoteError } from "@deepseek-ai/dsh-typert-protocol";
 import {
   ResearchJobCard,
   researchJobDefinition,
-  type ResearchJobCardProps,
   type ResearchCardData,
 } from "../../src/client/research-jobs.js";
-import type { ResearchActivity } from "../../src/app/research-job.js";
-
-beforeEach(() => {
-  // jsdom does not implement layout or ResizeObserver.
-  vi.stubGlobal(
-    "ResizeObserver",
-    class {
-      observe() {}
-      disconnect() {}
-    },
-  );
-});
+import type {
+  ResearchProgress,
+  ResearchState,
+} from "../../src/contracts/research-progress.js";
 
 afterEach(() => {
   cleanup();
-  vi.unstubAllGlobals();
   vi.useRealTimers();
-  cancelRun.mockReset();
 });
 
-const cancelRun = vi.fn<ResearchJobCardProps["cancelRun"]>(async () => {});
 const sessionId = SessionId("research-session");
 const jobId = JobId("stock-research-fixture");
 const registration: JobRegisteredData = {
@@ -106,38 +95,44 @@ function registered(seq = 0): SessionEvent<"job/registered"> {
     data: registration,
   };
 }
-function result(seq = 1): SessionEvent<"stock-research/result"> {
+function settled(
+  seq = 1,
+  overrides: Partial<JobSettledData> = {},
+): SessionEvent<"job/settled"> {
   return {
-    type: "stock-research/result",
+    type: "job/settled",
     seq: SessionSeq(seq),
-    time: 11000,
-    data: {
-      jobId,
-      runId: "run-fixture",
-      text: "完整研究报告\n\n数据、判断和来源。",
-      outcome: "success",
-    },
+    time: 12000,
+    data: { ...settlement, ...overrides },
   };
 }
-function activity(
-  seq = 1,
-  overrides: Partial<ResearchActivity> = {},
-): SessionEvent<"stock-research/activity"> {
+function progress(
+  overrides: Partial<ResearchState> = {},
+  text = "分析阶段，等待下一步安排",
+): ResearchProgress {
   return {
-    type: "stock-research/activity",
-    seq: SessionSeq(seq),
-    time: 10000,
-    data: {
-      jobId,
-      owner: sessionId,
-      label: registration.label,
-      runId: "run-fixture",
+    state: {
       status: "active",
-      progress: "分析阶段，等待主 Agent 验收",
+      phase: {
+        kind: "tasks",
+        completed: 0,
+        total: 12,
+        currentTaskIds: ["analysis.market"],
+      },
+      identity: { symbol: "002594.SZ", date: "2026-10-28", mode: "quick" },
+      runId: "run-fixture",
       operationIds: [],
-      startedAt: 1000,
       ...overrides,
     },
+    text,
+  };
+}
+function observation(value: ResearchProgress): ObservedJob {
+  return {
+    jobId,
+    text: JSON.stringify({ type: "research/progress", progress: value }) + "\n",
+    gapBefore: false,
+    streaming: true,
   };
 }
 function project(
@@ -179,11 +174,14 @@ function project(
   ) as ChatNode<"stock-research-job">;
 }
 
-function jobsFixture(rows: readonly JobView[] = []) {
-  let snapshot: JobsSnapshot = { rows: { [sessionId]: rows }, observed: {} };
+function jobsFixture(
+  rows: readonly JobView[] = [],
+  observed: JobsSnapshot["observed"] = {},
+) {
+  let snapshot: JobsSnapshot = { rows: { [sessionId]: rows }, observed };
   const listeners = new Set<() => void>();
   const unwatch = vi.fn();
-  const unobserve = vi.fn();
+  const unobserve = vi.fn<(id: JobId) => void>();
   const jobs: IJobs = {
     state: {
       getSnapshot: () => snapshot,
@@ -195,7 +193,7 @@ function jobsFixture(rows: readonly JobView[] = []) {
       },
     },
     watchRows: vi.fn(() => unwatch),
-    observe: vi.fn(() => unobserve),
+    observe: vi.fn((_owner, id) => () => unobserve(id)),
     kill: vi.fn<IJobs["kill"]>(async () => ({
       ok: true,
       value: { outcome: "requested" },
@@ -227,26 +225,33 @@ function row(overrides: Partial<JobView> = {}): JobView {
 }
 
 describe("research task chat node", () => {
-  it("connects a native task from history before its live row arrives", () => {
+  it("watches a native task from history and observes it when its live row arrives", () => {
     const h = jobsFixture();
     render(
       <ResearchJobCard
         data={project([registered()]).data}
         sessionId={sessionId}
         jobs={h.jobs}
-        cancelRun={cancelRun}
       />,
     );
     expect(h.jobs.watchRows).toHaveBeenCalledWith(sessionId);
-    expect(h.jobs.observe).toHaveBeenCalledWith(sessionId, jobId);
+    expect(h.jobs.observe).not.toHaveBeenCalled();
     act(() =>
       h.update({
-        rows: {
-          [sessionId]: [row({ progress: "等待主 Agent 验收：analysis" })],
+        rows: { [sessionId]: [row({ progress: "Reworded native progress" })] },
+        observed: {
+          [jobId]: observation(
+            progress(
+              {
+                phase: { kind: "review", stageId: "analysis", feedback: null },
+              },
+              "Unrelated copy",
+            ),
+          ),
         },
-        observed: {},
       }),
     );
+    expect(h.jobs.observe).toHaveBeenCalledWith(sessionId, jobId);
     expect(screen.getByRole("status").textContent).toBe("等待验收");
     expect(screen.getByText("等待主 Agent 验收：分析报告")).toBeTruthy();
   });
@@ -306,7 +311,6 @@ describe("research task chat node", () => {
         "stock-research-job",
       );
       expect(assembler.activityTargets().has("chat")).toBe(true);
-      assembler.append({ type: "event", event: activity() });
       assembler.append({
         type: "event",
         event: {
@@ -322,8 +326,7 @@ describe("research task chat node", () => {
       expect(assembler.get("chat")!.order).toHaveLength(1);
       expect(
         assembler.get("chat")!.nodes.get(snapshot.order[0]!)?.data,
-      ).toMatchObject({ activity: activity().data });
-      assembler.append({ type: "event", event: result(3) });
+      ).toMatchObject({ registration });
       assembler.append({
         type: "event",
         event: {
@@ -338,22 +341,22 @@ describe("research task chat node", () => {
       expect(completed.order).toHaveLength(1);
       expect(completed.nodes.get(completed.order[0]!)).toMatchObject({
         anchorSeq: 0,
-        data: { registration, settlement, result: result().data },
+        data: { registration, settlement },
       });
-      assembler.replaceWindow([{ type: "event", event: result(8) }], true);
+      assembler.replaceWindow([{ type: "event", event: settled(8) }], true);
       assembler.flush();
       const restored = assembler.get("chat")!;
       expect(restored.order).toHaveLength(1);
       expect(restored.nodes.get(restored.order[0]!)).toMatchObject({
         anchorSeq: 8,
-        data: { result: result().data },
+        data: { settlement },
       });
     } finally {
       await ctx.fiber.dispose();
     }
   });
 
-  it("publishes a visible non-command chat node from the first registration in an empty conversation", () => {
+  it("publishes a visible non-command chat node and ignores unrelated and step registrations", () => {
     const node = project([registered()]);
     expect(node).toMatchObject({
       kind: "stock-research-job",
@@ -363,105 +366,68 @@ describe("research task chat node", () => {
       anchorSeq: 0,
     });
     expect(node.data.registration?.label).toBe(registration.label);
-    expect(
-      typeof researchJobDefinition.match === "function" &&
-        researchJobDefinition.match({
-          ...registered(),
-          data: { ...registration, kind: "bash" },
-        }),
-    ).toBeNull();
+    for (const kind of ["bash", "stock-research-step"])
+      expect(
+        typeof researchJobDefinition.match === "function" &&
+          researchJobDefinition.match({
+            ...registered(),
+            data: { ...registration, kind },
+          }),
+      ).toBeNull();
   });
 
-  it("keeps one identity and anchor while adding its complete report and terminal state", () => {
-    const node = project([
-      registered(),
-      result(),
-      {
-        type: "job/settled",
-        seq: SessionSeq(2),
-        time: 12000,
-        data: settlement,
-      },
-    ]);
+  it("keeps one identity and anchor while adding native terminal state", () => {
+    const node = project([registered(), settled(2)]);
     expect(node.id).toBe(jobId);
     expect(node.anchorSeq).toBe(0);
-    expect(node.data).toMatchObject({
-      registration,
-      settlement,
-      result: { runId: "run-fixture", text: result().data.text },
-    });
+    expect(node.data).toMatchObject({ registration, settlement });
   });
 
-  it("restores the full report when a history window starts with the result event", () => {
-    const node = project([result(8)]);
+  it("restores a terminal history window without requiring a process-local Job row", () => {
+    const node = project([settled(8)]);
     expect(node.anchorSeq).toBe(8);
     const h = jobsFixture();
     render(
-      <ResearchJobCard
-        data={node.data}
-        sessionId={sessionId}
-        jobs={h.jobs}
-        cancelRun={cancelRun}
-      />,
+      <ResearchJobCard data={node.data} sessionId={sessionId} jobs={h.jobs} />,
     );
-    expect(screen.getByText(/完整研究报告/).textContent).toBe(
-      result().data.text,
-    );
-    expect(screen.getByText("已完成")).toBeTruthy();
-    expect(h.jobs.watchRows).not.toHaveBeenCalled();
+    expect(screen.getByRole("heading").textContent).toBe(registration.label);
+    expect(screen.getByRole("status").textContent).toBe("已完成");
+    expect(h.jobs.watchRows).toHaveBeenCalledWith(sessionId);
     expect(h.jobs.observe).not.toHaveBeenCalled();
     expect(screen.queryByRole("button", { name: "取消调研" })).toBeNull();
-  });
-
-  it("restores an activity-only window and ignores fine-grained step registrations", () => {
-    const node = project([activity(10)]);
-    expect(node).toMatchObject({
-      anchorSeq: 10,
-      id: jobId,
-      data: { activity: activity().data },
-    });
-    expect(
-      typeof researchJobDefinition.match === "function" &&
-        researchJobDefinition.match({
-          ...registered(),
-          data: { ...registration, kind: "stock-research-step" },
-        }),
-    ).toBeNull();
   });
 });
 
 describe("research task card", () => {
-  it("acknowledges cancellation immediately and lets a terminal event supersede its pending receipt", async () => {
+  it("acknowledges cancellation immediately and lets native settlement supersede its pending receipt", async () => {
     let finishCancellation!: () => void;
     const pending = new Promise<void>((resolve) => {
       finishCancellation = resolve;
     });
-    cancelRun.mockReturnValueOnce(pending);
-    const h = jobsFixture();
+    const h = jobsFixture([row()], { [jobId]: observation(progress()) });
+    vi.mocked(h.jobs.kill).mockImplementationOnce(async () => {
+      await pending;
+      return { ok: true, value: { outcome: "requested" } };
+    });
     const mounted = render(
       <ResearchJobCard
-        data={project([activity()]).data}
+        data={project([registered()]).data}
         sessionId={sessionId}
         jobs={h.jobs}
-        cancelRun={cancelRun}
       />,
     );
     fireEvent.click(screen.getByRole("button", { name: "取消调研" }));
+    expect(h.jobs.kill).toHaveBeenCalledWith(sessionId, jobId);
     expect(screen.getByRole("status").textContent).toBe("正在取消");
     expect(
       (screen.getByRole("button", { name: "正在取消…" }) as HTMLButtonElement)
         .disabled,
     ).toBe(true);
-
     mounted.rerender(
       <ResearchJobCard
-        data={
-          project([activity(2, { status: "completed", finishedAt: 12000 })])
-            .data
-        }
+        data={project([registered(), settled()]).data}
         sessionId={sessionId}
         jobs={h.jobs}
-        cancelRun={cancelRun}
       />,
     );
     expect(screen.getByRole("status").textContent).toBe("已完成");
@@ -470,96 +436,172 @@ describe("research task card", () => {
     expect(screen.getByRole("status").textContent).toBe("已完成");
   });
 
-  it("shows real collection counts while keeping technical identifiers in collapsed details", () => {
-    const technical =
-      "采集数据 38/53 · 成功 37，缺失 1 · eastmoney · benchmark.dxy.weekly";
-    const h = jobsFixture([row({ progress: technical })]);
+  it("uses structured collection counts and identity despite conflicting labels and copy", () => {
+    const technical = "新文案 · eastmoney · benchmark.dxy.weekly";
+    const value = progress(
+      {
+        status: "preparing",
+        phase: {
+          kind: "collection",
+          counts: {
+            completed: 38,
+            total: 53,
+            succeeded: 37,
+            failed: 1,
+            cacheHits: 2,
+            cacheMisses: 36,
+            current: { provider: "eastmoney", id: "benchmark.dxy.weekly" },
+          },
+        },
+      },
+      technical,
+    );
+    const h = jobsFixture(
+      [
+        row({
+          label: "Renamed Job title",
+          progress: "等待主 Agent 验收：fake · 采集数据 1/2",
+        }),
+      ],
+      { [jobId]: observation(value) },
+    );
     render(
       <ResearchJobCard
-        data={
-          project([
-            activity(1, {
-              label: "002594.SZ · 快速研究 · 2026-10-28",
-              status: "preparing",
-              operationIds: [jobId],
-            }),
-          ]).data
-        }
+        data={project([registered()]).data}
         sessionId={sessionId}
         jobs={h.jobs}
-        cancelRun={cancelRun}
       />,
     );
-    expect(screen.getByRole("heading").textContent).toBe("002594.SZ");
+    expect(screen.getByRole("heading", { level: 3 }).textContent).toBe(
+      "002594.SZ",
+    );
     expect(screen.getByText("快速研究")).toBeTruthy();
     expect(screen.getByText("2026-10-28")).toBeTruthy();
+    expect(screen.getByRole("status").textContent).toBe("准备数据");
     expect(screen.getByText("37 项已就绪")).toBeTruthy();
     expect(screen.getByText("1 项缺失")).toBeTruthy();
-    const progress = screen.getByRole("progressbar", { name: "数据采集进度" });
-    expect(progress.getAttribute("aria-valuenow")).toBe("38");
-    expect(progress.getAttribute("aria-valuemax")).toBe("53");
+    const bar = screen.getByRole("progressbar", { name: "数据采集进度" });
+    expect(bar.getAttribute("aria-valuenow")).toBe("38");
+    expect(bar.getAttribute("aria-valuemax")).toBe("53");
     const details = screen.getByText("查看详情").closest("details")!;
     expect(details.hasAttribute("open")).toBe(false);
-    expect(screen.getByText(technical).closest("details")).toBe(details);
+    expect(
+      screen
+        .getAllByText(technical)
+        .every((element) => element.closest("details") === details),
+    ).toBe(true);
   });
 
-  it("does not invent a total percentage during analysis and translates known review stages", () => {
-    const h = jobsFixture();
-    const technical = "等待主 Agent 验收：digest.analysis";
-    const mounted = render(
+  it("does not infer counts, review state or identity from native prose without a structured record", () => {
+    const prose = "等待主 Agent 验收：analysis · 采集数据 9/53";
+    const h = jobsFixture([row({ progress: prose })]);
+    render(
       <ResearchJobCard
-        data={project([activity(1, { progress: technical })]).data}
+        data={project([registered()]).data}
         sessionId={sessionId}
         jobs={h.jobs}
-        cancelRun={cancelRun}
+      />,
+    );
+    expect(screen.getByRole("heading").textContent).toBe(registration.label);
+    expect(screen.getByRole("status").textContent).toBe("进行中");
+    expect(screen.getByText(prose)).toBeTruthy();
+    expect(screen.queryByRole("progressbar")).toBeNull();
+    expect(screen.queryByText("快速研究")).toBeNull();
+  });
+
+  it("derives review state from phase fields and does not invent analysis percentages", () => {
+    const technical = "采集数据 99/100 · a renamed progress line";
+    const value = progress(
+      { phase: { kind: "review", stageId: "digest.analysis", feedback: null } },
+      technical,
+    );
+    const h = jobsFixture([row()], { [jobId]: observation(value) });
+    render(
+      <ResearchJobCard
+        data={project([registered()]).data}
+        sessionId={sessionId}
+        jobs={h.jobs}
       />,
     );
     expect(screen.getByRole("status").textContent).toBe("等待验收");
     expect(screen.getByText("等待主 Agent 验收：分析摘要")).toBeTruthy();
     expect(
-      screen.getByText(technical).closest("details")?.hasAttribute("open"),
-    ).toBe(false);
+      screen.getAllByText(technical).every((element) => {
+        const details = element.closest("details");
+        return details !== null && !details.hasAttribute("open");
+      }),
+    ).toBe(true);
     expect(screen.queryByRole("progressbar")).toBeNull();
-    mounted.rerender(
-      <ResearchJobCard
-        data={project([activity(2, { progress: "正在核对最新财务报告" })]).data}
-        sessionId={sessionId}
-        jobs={h.jobs}
-        cancelRun={cancelRun}
-      />,
+    act(() =>
+      h.update({
+        rows: { [sessionId]: [row()] },
+        observed: {
+          [jobId]: observation(
+            progress(
+              {
+                phase: {
+                  kind: "review",
+                  stageId: "digest.analysis",
+                  feedback: null,
+                },
+              },
+              "等待主 Agent 验收：分析摘要",
+            ),
+          ),
+        },
+      }),
     );
-    expect(screen.getByText("正在核对最新财务报告")).toBeTruthy();
+    expect(screen.getByRole("status").textContent).toBe("等待验收");
+    expect(screen.getByText("当前进展").closest("details")).toBeTruthy();
+    act(() =>
+      h.update({
+        rows: { [sessionId]: [row()] },
+        observed: {
+          [jobId]: observation(progress({}, "正在核对最新财务报告")),
+        },
+      }),
+    );
+    expect(screen.getByRole("status").textContent).toBe("进行中");
+    expect(
+      screen
+        .getAllByText("正在核对最新财务报告")
+        .some((element) => !element.closest("details")),
+    ).toBe(true);
     expect(screen.queryByRole("progressbar")).toBeNull();
   });
 
-  it("keeps preparation progress live and cancels its native job before a run exists", async () => {
-    const h = jobsFixture([row()]);
-    const { runId: _runId, ...preparing } = activity().data;
+  it("cancels the owning native Job while preparation has no run", async () => {
+    const { runId: _runId, ...state } = progress().state;
     void _runId;
-    const data = project([
-      {
-        ...activity(),
-        data: { ...preparing, status: "preparing", operationIds: [jobId] },
+    const preparing = {
+      state: {
+        ...state,
+        status: "preparing" as const,
+        phase: { kind: "preparing" as const },
       },
-    ]).data;
+      text: "准备固定数据",
+    };
+    const h = jobsFixture([row()], { [jobId]: observation(preparing) });
     render(
       <ResearchJobCard
-        data={data}
+        data={project([registered()]).data}
         sessionId={sessionId}
         jobs={h.jobs}
-        cancelRun={cancelRun}
       />,
     );
-    expect(screen.getByText("采集数据 9/53 · 东方财富")).toBeTruthy();
+    expect(
+      screen
+        .getAllByText("准备固定数据")
+        .some((element) => !element.closest("details")),
+    ).toBe(true);
     fireEvent.click(screen.getByRole("button", { name: "取消调研" }));
     await waitFor(() =>
       expect(h.jobs.kill).toHaveBeenCalledWith(sessionId, jobId),
     );
-    expect(cancelRun).not.toHaveBeenCalled();
     act(() =>
       h.update({
         rows: { [sessionId]: [row({ status: "stopping" })] },
-        observed: {},
+        observed: { [jobId]: observation(preparing) },
       }),
     );
     expect(
@@ -568,44 +610,49 @@ describe("research task card", () => {
     ).toBe(true);
   });
 
-  it("keeps the research active after preparation settles and cancels the full run", async () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(20000);
-    const h = jobsFixture([row({ status: "completed", finishedAt: 12000 })]);
-    render(
-      <ResearchJobCard
-        data={
-          project([
-            registered(),
-            {
-              type: "job/settled",
-              seq: SessionSeq(1),
-              time: 12000,
-              data: settlement,
-            },
-            activity(2),
-          ]).data
-        }
-        sessionId={sessionId}
-        jobs={h.jobs}
-        cancelRun={cancelRun}
-      />,
-    );
-    expect(screen.getByRole("status").textContent).toBe("等待验收");
-    expect(screen.getByText("用时 19 秒")).toBeTruthy();
-    expect(screen.getByText("分析阶段，等待主 Agent 验收")).toBeTruthy();
-    expect(h.jobs.observe).not.toHaveBeenCalled();
-    expect(h.jobs.watchRows).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole("button", { name: "取消调研" }));
-    await act(async () => {});
-    expect(cancelRun).toHaveBeenCalledWith(sessionId, "run-fixture");
-    expect(h.jobs.kill).not.toHaveBeenCalled();
-  });
+  it.each(["row", "event"] as const)(
+    "lets native terminal %s override a residual active progress record",
+    (source) => {
+      vi.useFakeTimers();
+      vi.setSystemTime(20000);
+      const h = jobsFixture(
+        [
+          source === "row"
+            ? row({ status: "completed", finishedAt: 12000 })
+            : row(),
+        ],
+        {
+          [jobId]: observation(
+            progress({
+              phase: { kind: "review", stageId: "analysis", feedback: null },
+            }),
+          ),
+        },
+      );
+      render(
+        <ResearchJobCard
+          data={
+            project(
+              source === "row" ? [registered()] : [registered(), settled()],
+            ).data
+          }
+          sessionId={sessionId}
+          jobs={h.jobs}
+        />,
+      );
+      expect(screen.getByRole("status").textContent).toBe("已完成");
+      expect(screen.getByText("用时 11 秒")).toBeTruthy();
+      expect(screen.queryByRole("button", { name: "取消调研" })).toBeNull();
+      expect(vi.getTimerCount()).toBe(0);
+      expect(h.jobs.observe).toHaveBeenCalledWith(sessionId, jobId);
+    },
+  );
 
-  it("observes concurrent operations in one card and releases observations when operations finish", () => {
+  it("observes concurrent operations and releases only removed step observations", () => {
     const firstId = JobId("stock-research-step-market");
     const secondId = JobId("stock-research-step-finance");
-    const h = jobsFixture([
+    const rows = [
+      row(),
       row({
         id: firstId,
         kind: "stock-research-step",
@@ -618,48 +665,48 @@ describe("research task card", () => {
         label: "财务分析",
         progress: "核对现金流",
       }),
-    ]);
+    ];
+    const h = jobsFixture(rows, {
+      [jobId]: observation(progress({ operationIds: [firstId, secondId] })),
+    });
     const mounted = render(
       <ResearchJobCard
-        data={
-          project([activity(1, { operationIds: [firstId, secondId] })]).data
-        }
+        data={project([registered()]).data}
         sessionId={sessionId}
         jobs={h.jobs}
-        cancelRun={cancelRun}
       />,
     );
-    expect(h.jobs.observe).toHaveBeenCalledWith(sessionId, firstId);
-    expect(h.jobs.observe).toHaveBeenCalledWith(sessionId, secondId);
+    for (const id of [jobId, firstId, secondId])
+      expect(h.jobs.observe).toHaveBeenCalledWith(sessionId, id);
     expect(screen.getByText("行情分析").closest("li")?.textContent).toBe(
       "行情分析进行中读取行情快照",
     );
     expect(screen.getByText("财务分析").closest("li")?.textContent).toBe(
       "财务分析进行中核对现金流",
     );
-    mounted.rerender(
-      <ResearchJobCard
-        data={project([activity(2, { operationIds: [] })]).data}
-        sessionId={sessionId}
-        jobs={h.jobs}
-        cancelRun={cancelRun}
-      />,
+    act(() =>
+      h.update({
+        rows: { [sessionId]: rows },
+        observed: { [jobId]: observation(progress({ operationIds: [] })) },
+      }),
     );
-    expect(h.unobserve).toHaveBeenCalledTimes(2);
-    expect(h.unwatch).toHaveBeenCalledOnce();
+    expect(h.unobserve).toHaveBeenCalledWith(firstId);
+    expect(h.unobserve).toHaveBeenCalledWith(secondId);
+    expect(h.unobserve).not.toHaveBeenCalledWith(jobId);
+    expect(h.unwatch).not.toHaveBeenCalled();
     mounted.unmount();
-    expect(h.unobserve).toHaveBeenCalledTimes(2);
+    expect(h.unobserve).toHaveBeenCalledWith(jobId);
+    expect(h.unwatch).toHaveBeenCalledOnce();
   });
 
-  it("shows full-run cancellation failures and keeps completed activity independent of a live row", async () => {
-    const h = jobsFixture();
-    cancelRun.mockRejectedValueOnce(new Error("运行取消失败"));
+  it("shows a rejected native cancellation and retains a later completed state independently of prose", async () => {
+    const h = jobsFixture([row()], { [jobId]: observation(progress()) });
+    vi.mocked(h.jobs.kill).mockRejectedValueOnce(new Error("运行取消失败"));
     const mounted = render(
       <ResearchJobCard
-        data={project([activity()]).data}
+        data={project([registered()]).data}
         sessionId={sessionId}
         jobs={h.jobs}
-        cancelRun={cancelRun}
       />,
     );
     fireEvent.click(screen.getByRole("button", { name: "取消调研" }));
@@ -670,70 +717,63 @@ describe("research task card", () => {
     );
     mounted.rerender(
       <ResearchJobCard
-        data={
-          project([
-            activity(2, {
-              status: "completed",
-              progress: "研究报告已生成",
-              finishedAt: 12000,
-            }),
-          ]).data
-        }
+        data={project([registered(), settled()]).data}
         sessionId={sessionId}
         jobs={h.jobs}
-        cancelRun={cancelRun}
       />,
     );
     expect(screen.getByRole("status").textContent).toBe("已完成");
     expect(screen.getByText("用时 11 秒")).toBeTruthy();
-    expect(screen.getByText("研究报告已生成")).toBeTruthy();
     expect(screen.queryByRole("button", { name: "取消调研" })).toBeNull();
   });
 
-  it("streams collection progress, ticks elapsed time, and releases observations on unmount", () => {
+  it("streams progress, ticks elapsed time, and retains terminal output until observation cleanup on unmount", () => {
     vi.useFakeTimers();
     vi.setSystemTime(10000);
-    const h = jobsFixture([row()]);
+    const h = jobsFixture([row()], {
+      [jobId]: observation(progress({}, "采集数据 9/53 · 东方财富")),
+    });
     const mounted = render(
       <ResearchJobCard
         data={project([registered()]).data}
         sessionId={sessionId}
         jobs={h.jobs}
-        cancelRun={cancelRun}
       />,
     );
-    expect(screen.getByText("采集数据 9/53 · 东方财富")).toBeTruthy();
     expect(screen.getByText(/用时 9 秒/)).toBeTruthy();
     act(() => vi.advanceTimersByTime(1000));
     expect(screen.getByText(/用时 10 秒/)).toBeTruthy();
     act(() =>
       h.update({
-        rows: { [sessionId]: [row({ progress: "分析 · 财务研究员" })] },
-        observed: {},
+        rows: { [sessionId]: [row({ progress: "Unused native copy" })] },
+        observed: { [jobId]: observation(progress({}, "分析 · 财务研究员")) },
       }),
     );
-    expect(screen.getByText("分析 · 财务研究员")).toBeTruthy();
+    expect(
+      screen
+        .getAllByText("分析 · 财务研究员")
+        .some((element) => !element.closest("details")),
+    ).toBe(true);
     expect(h.jobs.watchRows).toHaveBeenCalledWith(sessionId);
     expect(h.jobs.observe).toHaveBeenCalledWith(sessionId, jobId);
     mounted.rerender(
       <ResearchJobCard
-        data={{ ...project([registered(), result()]).data, settlement }}
+        data={project([registered(), settled()]).data}
         sessionId={sessionId}
         jobs={h.jobs}
-        cancelRun={cancelRun}
       />,
     );
-    expect(h.unwatch).toHaveBeenCalledOnce();
-    expect(h.unobserve).toHaveBeenCalledOnce();
     expect(vi.getTimerCount()).toBe(0);
+    expect(h.unwatch).not.toHaveBeenCalled();
+    expect(h.unobserve).not.toHaveBeenCalled();
     mounted.unmount();
     expect(h.unwatch).toHaveBeenCalledOnce();
-    expect(h.unobserve).toHaveBeenCalledOnce();
+    expect(h.unobserve).toHaveBeenCalledExactlyOnceWith(jobId);
     expect(h.listeners.size).toBe(0);
     expect(vi.getTimerCount()).toBe(0);
   });
 
-  it("uses native cancellation and shows a failed receipt so it can be retried", async () => {
+  it("shows a native cancellation error receipt so it can be retried", async () => {
     const h = jobsFixture([row()]);
     vi.mocked(h.jobs.kill).mockResolvedValueOnce({
       ok: false,
@@ -744,7 +784,6 @@ describe("research task card", () => {
         data={project([registered()]).data}
         sessionId={sessionId}
         jobs={h.jobs}
-        cancelRun={cancelRun}
       />,
     );
     fireEvent.click(screen.getByRole("button", { name: "取消调研" }));
@@ -772,19 +811,13 @@ describe("research task card", () => {
     const h = jobsFixture();
     const cancelled = project([
       registered(),
-      {
-        type: "job/settled",
-        seq: SessionSeq(1),
-        time: 12000,
-        data: { ...settlement, status: "killed", detail: "用户取消调研" },
-      },
+      settled(1, { status: "killed", detail: "用户取消调研" }),
     ]);
     const mounted = render(
       <ResearchJobCard
         data={cancelled.data}
         sessionId={sessionId}
         jobs={h.jobs}
-        cancelRun={cancelRun}
       />,
     );
     expect(screen.getByText(/已取消/)).toBeTruthy();
@@ -802,7 +835,6 @@ describe("research task card", () => {
         }}
         sessionId={sessionId}
         jobs={h.jobs}
-        cancelRun={cancelRun}
       />,
     );
     expect(screen.getByRole("status").textContent).toBe("执行失败");
@@ -810,17 +842,17 @@ describe("research task card", () => {
     expect(screen.getByText("数据源请求失败")).toBeTruthy();
   });
 
-  it("keeps copied history readable without observing or controlling another session's job", () => {
+  it("keeps copied native history readable without observing or controlling another session's Job", () => {
     const h = jobsFixture([row()]);
     render(
       <ResearchJobCard
-        data={project([registered(), result()]).data}
+        data={project([registered(), settled()]).data}
         sessionId={SessionId("copied-session")}
         jobs={h.jobs}
-        cancelRun={cancelRun}
       />,
     );
-    expect(screen.getByText(/完整研究报告/)).toBeTruthy();
+    expect(screen.getByRole("heading").textContent).toBe(registration.label);
+    expect(screen.getByRole("status").textContent).toBe("已完成");
     expect(h.jobs.watchRows).not.toHaveBeenCalled();
     expect(h.jobs.observe).not.toHaveBeenCalled();
     expect(screen.queryByRole("button")).toBeNull();

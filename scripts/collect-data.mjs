@@ -5,6 +5,7 @@ import process from "node:process";
 import console from "node:console";
 import {
   CollectionService,
+  createCollectionTaskFactory,
   DataRoot,
   HttpClient,
   QueryService,
@@ -62,23 +63,30 @@ const ttl = {
   research: 0,
 };
 const queries = new QueryService({}, cache, ttl);
-const collector = new CollectionService(http, cache, queries, {
-  enabledSources: [
-    "eastmoney-market",
-    "tencent",
-    "eastmoney-income",
-    "sina",
-    "china-macro",
-    "benchmarks",
-  ],
-  freshness: {
-    market: 86400000,
-    fundamentals: 200 * 86400000,
-    macro: 45 * 86400000,
+const collector = new CollectionService(
+  createCollectionTaskFactory(
+    http,
+    (scope, request, signal) => queries.query(scope, request, signal),
+    { secCiks: {} },
+  ),
+  cache,
+  {
+    enabledSources: [
+      "eastmoney-market",
+      "tencent",
+      "eastmoney-income",
+      "sina",
+      "china-macro",
+      "benchmarks",
+    ],
+    freshness: {
+      market: 86400000,
+      fundamentals: 200 * 86400000,
+      macro: 45 * 86400000,
+    },
+    ttl,
   },
-  secCiks: {},
-  ttl,
-});
+);
 const requests = [];
 const save = (name, value) =>
   writeFileSync(

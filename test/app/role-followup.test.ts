@@ -12,6 +12,7 @@ import { describe, expect, it, vi } from "vitest";
 import { createQuickInput } from "../../src/app/quick-plan.js";
 import { attachResearchStages } from "../../src/app/research-stages.js";
 import { prepareResearchRole } from "../../src/app/prepare-role.js";
+import { RESEARCH_MODELS_INPUT } from "../../src/app/research-models.js";
 import type { DispatchResult } from "../../src/host/dispatch.js";
 import { createResearchPlugin } from "../../src/runtime.js";
 import {
@@ -81,6 +82,8 @@ describe("public role follow-up contract", () => {
           );
           if (mainPhase === 1) {
             firstArtifact = snapshots[0];
+            h.ctx.agents.get(SessionId("followup-main"))!.options.maxTokens =
+              2048;
             h.ctx.stockResearch.runs.reviewStage(
               { runId, identity: "followup-main" },
               {
@@ -117,6 +120,7 @@ describe("public role follow-up contract", () => {
         yield* textResponse("三轮研究修订已完成。");
         return;
       }
+      expect(request.maxTokens).toBe(512);
       const history = JSON.stringify(request.messages);
       const round = history.includes("third-round")
         ? 3
@@ -248,6 +252,15 @@ describe("public role follow-up contract", () => {
         [],
         1,
       );
+      input.inputs.push({
+        name: RESEARCH_MODELS_INPUT,
+        content: {
+          research: {
+            ...h.agentOptions("followup-main").agentOptions,
+            maxTokens: 512,
+          },
+        },
+      });
       input.definition.tasks = input.definition.tasks.filter(
         ({ id }) => id === "analysis.public",
       );

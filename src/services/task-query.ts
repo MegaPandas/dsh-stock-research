@@ -1,4 +1,4 @@
-import { serializeJson } from "../cache/json.js";
+import { serializeJson } from "../json/serialize.js";
 import type { SourceRef } from "../contracts/data.js";
 import type {
   QueryData,
@@ -12,7 +12,7 @@ import type { EvidenceQuery } from "../contracts/task-data.js";
 import { extractCandidates } from "./candidates.js";
 import type { QueryService } from "./query.js";
 import { adoptQuerySnapshot } from "./query-snapshot.js";
-import type { RunService } from "./runs.js";
+import type { RunCommands, RunReader } from "../contracts/run-access.js";
 import { SharedQueries } from "./shared-queries.js";
 
 function evidenceQuery(request: QueryRequest): EvidenceQuery {
@@ -29,7 +29,11 @@ export class TaskQueryService {
 
   constructor(
     private readonly queries: Pick<QueryService, "query">,
-    private readonly runs: RunService,
+    private readonly runs: Pick<RunReader, "readEvidence"> &
+      Pick<
+        RunCommands,
+        "evidenceForCall" | "recordEvidence" | "replayEvidence"
+      >,
   ) {}
 
   async queryForTask<Q extends QueryRequest>(

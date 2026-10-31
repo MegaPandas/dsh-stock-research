@@ -74,12 +74,9 @@ describe("packaged DSH settings client", () => {
     expect(entry.id).toBe("@megapandas/dsh-stock-research");
     const client = entry.factory(createRequire(import.meta.url));
     const form = {};
+    const jobs = {};
     const catalog = { groups: [] };
     const modelCatalog = vi.fn(async () => ({ ok: true, value: catalog }));
-    const execute = vi.fn(async () => ({
-      ok: true,
-      value: { result: { kind: "success", text: "研究已取消" } },
-    }));
     const unregister = vi.fn();
     const unregisterCard = vi.fn();
     const unregisterEvents = vi.fn();
@@ -112,10 +109,9 @@ describe("packaged DSH settings client", () => {
       apply(services: Context) {
         services.provide("remote", {
           session: { modelCatalog },
-          commands: { execute },
         });
         services.provide("configForms", configForms);
-        services.provide("jobs", {});
+        services.provide("jobs", jobs);
         services.provide("uiConversation", {
           events: { register: registerEvents },
         });
@@ -127,9 +123,7 @@ describe("packaged DSH settings client", () => {
     expect(register).not.toHaveBeenCalled();
     ctx.provide("remote.session", {});
     await clientFiber;
-    expect(register).not.toHaveBeenCalled();
-    ctx.provide("remote.commands", {});
-    await clientFiber;
+    expect(client.inject).not.toContain("remote.commands");
     expect(configForms.get).toHaveBeenCalledWith("stock-research");
     const registration = register.mock.calls.find(
       ([options]) => (options as { name: string }).name === "settings.section",
@@ -159,25 +153,14 @@ describe("packaged DSH settings client", () => {
       ([options]) =>
         (options as { name: string }).name === "conversation.chat.node",
     )![1] as (props: unknown) => {
-      props: { cancelRun(sessionId: SessionId, runId: string): Promise<void> };
+      props: { sessionId: SessionId; jobs: object };
     };
     const card = renderer({
       node: { data: {} },
       taskSessionId: SessionId("task-session"),
     });
-    await card.props.cancelRun(SessionId("task-session"), "run-fixture");
-    expect(execute).toHaveBeenCalledWith(
-      "task-session",
-      "/stock-cancel run-fixture",
-      [],
-    );
-    execute.mockResolvedValueOnce({
-      ok: true,
-      value: { result: { kind: "error", text: "运行无法取消" } },
-    });
-    await expect(
-      card.props.cancelRun(SessionId("task-session"), "run-fixture"),
-    ).rejects.toThrow("运行无法取消");
+    expect(card.props.sessionId).toBe("task-session");
+    expect(card.props.jobs).toBe(jobs);
     await clientFiber.dispose();
     expect(unregister).toHaveBeenCalledOnce();
     expect(unregisterEvents).toHaveBeenCalledOnce();

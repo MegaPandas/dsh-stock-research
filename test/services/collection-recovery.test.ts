@@ -9,11 +9,12 @@ import type {
 } from "../../src/contracts/collection.js";
 import type { ResearchScope } from "../../src/contracts/data.js";
 import { HttpClient } from "../../src/data/http.js";
+import { createCollectionTaskFactory } from "../../src/data/collection-tasks.js";
 import { CollectionService } from "../../src/services/collection.js";
-import type { QueryService } from "../../src/services/query.js";
+import type { ReadSource } from "../../src/contracts/query.js";
 import { CollectionSnapshotStore } from "../../src/storage/collection-snapshots.js";
 import { DataRoot } from "../../src/storage/data-root.js";
-import { requireCollectionData } from "../../src/app/collection-input.js";
+import { requireCollectionData } from "../../src/app/collection-snapshot.js";
 import { CN_SECURITY } from "../fixtures/market.js";
 import { deferred } from "../fixtures/runtime-host.js";
 
@@ -44,16 +45,14 @@ function setup(
     maxConcurrency: 1,
     minIntervalMs: 0,
   });
-  const query = vi.fn<QueryService["query"]>();
+  const query = vi.fn<ReadSource>();
   const service = new CollectionService(
-    http,
+    createCollectionTaskFactory(http, query, { secCiks: {} }),
     cache,
-    { query: query as QueryService["query"] },
     {
       enabledSources,
       requireDailyMarket,
       freshness: { market: 86400000, fundamentals: 0, macro: 0 },
-      secCiks: {},
       ttl: { market: 0, fundamentals: 0, macro: 0, research: 0 },
     },
     new CollectionSnapshotStore(root),

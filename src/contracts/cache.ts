@@ -1,12 +1,5 @@
 import type { Dataset, ISOTime } from "./data.js";
-
-export type JsonValue =
-  | null
-  | boolean
-  | number
-  | string
-  | readonly JsonValue[]
-  | { readonly [key: string]: JsonValue };
+import type { JsonValue } from "./json.js";
 
 export interface QueryCacheKey {
   provider: string;

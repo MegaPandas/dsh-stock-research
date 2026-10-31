@@ -12,7 +12,8 @@ import type {
   RunState,
   StageReviewInput,
 } from "../../src/contracts/runs.js";
-import { RunService } from "../../src/services/runs.js";
+import { createRunService } from "../../src/services/create-run-service.js";
+import type { RunService } from "../../src/services/runs.js";
 import { RunStore } from "../../src/runs/store.js";
 import { DataRoot } from "../../src/storage/data-root.js";
 import { validateRunDefinition } from "../../src/services/definition.js";
@@ -112,7 +113,7 @@ function reopen(directory: string) {
   const root = new DataRoot(directory);
   roots.push(root);
   const store = new RunStore<RunState>(root);
-  return { root, store, service: new RunService(store, now) };
+  return { root, store, service: createRunService(store, now) };
 }
 function setup(staged = true) {
   const directory = fs.mkdtempSync(join(tmpdir(), "dsh-stage-review-"));

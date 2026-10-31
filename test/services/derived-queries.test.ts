@@ -21,7 +21,7 @@ import { QueryService } from "../../src/services/query.js";
 import { TaskQueryService } from "../../src/services/task-query.js";
 import { DataRoot } from "../../src/storage/data-root.js";
 import { RunStore } from "../../src/runs/store.js";
-import { RunService } from "../../src/services/runs.js";
+import { createRunService } from "../../src/services/create-run-service.js";
 
 const http = new HttpClient({
   timeoutMs: 1000,
@@ -73,7 +73,7 @@ function setup() {
   const directory = mkdtempSync(join(tmpdir(), "dsh-derived-query-"));
   const root = new DataRoot(directory);
   const store = new RunStore<RunState>(root);
-  const runs = new RunService(store, () => "2024-01-09T00:00:00.000Z");
+  const runs = createRunService(store, () => "2024-01-09T00:00:00.000Z");
   const cache = new SqliteCache({
     path: join(directory, "cache.sqlite"),
     maxEntries: 10,

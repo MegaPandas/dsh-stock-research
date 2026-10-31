@@ -4,8 +4,9 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { SqliteCache } from "../../src/cache/index.js";
 import { HttpClient } from "../../src/data/http.js";
+import { createCollectionTaskFactory } from "../../src/data/collection-tasks.js";
 import { CollectionService } from "../../src/services/collection.js";
-import type { QueryService } from "../../src/services/query.js";
+import type { ReadSource } from "../../src/contracts/query.js";
 import type { CollectionProgress } from "../../src/contracts/collection.js";
 import { CN_SECURITY } from "../fixtures/market.js";
 import { deferred } from "../fixtures/runtime-host.js";
@@ -35,15 +36,13 @@ function setup(
     maxConcurrency: 1,
     minIntervalMs: 0,
   });
-  const query = vi.fn() as QueryService["query"];
+  const query = vi.fn() as ReadSource;
   const service = new CollectionService(
-    http,
+    createCollectionTaskFactory(http, query, { secCiks: {} }),
     cache,
-    { query },
     {
       enabledSources,
       freshness: { market: 86400000, fundamentals: 0, macro: macroBudget },
-      secCiks: {},
       ttl: { market: 60000, fundamentals: 60000, macro: macroTtl, research: 0 },
     },
   );
@@ -356,13 +355,11 @@ describe("deterministic collection orchestration", () => {
         .envelope.stale,
     ).toBe(true);
     const relaxed = new CollectionService(
-      first.http,
+      createCollectionTaskFactory(first.http, first.query, { secCiks: {} }),
       first.cache,
-      { query: first.query },
       {
         enabledSources: ["eastmoney-income"],
         freshness: { market: 86400000, fundamentals: 200 * 86400000, macro: 0 },
-        secCiks: {},
         ttl: { market: 60000, fundamentals: 60000, macro: 0, research: 0 },
       },
     );

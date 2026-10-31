@@ -18,6 +18,7 @@ import type { MemoryState } from "../contracts/memory-service.js";
 import type { QuerySnapshot } from "../contracts/query.js";
 import type { OpenRunInput, RunState, RunView } from "../contracts/runs.js";
 import { HttpClient } from "../data/http.js";
+import { createCollectionTaskFactory } from "../data/collection-tasks.js";
 import { MemoryStore } from "../memory/store.js";
 import { RunStore } from "../runs/store.js";
 import { ArtifactService } from "../services/artifacts.js";
@@ -30,13 +31,20 @@ import { TaskQueryService } from "../services/task-query.js";
 import { CollectionService } from "../services/collection.js";
 import { CollectionSnapshotStore } from "../storage/collection-snapshots.js";
 import { selectQuerySnapshot } from "../services/query-snapshot.js";
-import { RunService } from "../services/runs.js";
+import { createRunService } from "../services/create-run-service.js";
+import type { RunService } from "../services/runs.js";
 import { DataRoot } from "../storage/data-root.js";
 import { createControlTools } from "../tools/control.js";
 import { createDataTools, type DataToolServices } from "../tools/data.js";
-import type { QueryToolPolicy } from "../tools/query-inputs.js";
+import type { QueryPolicy } from "../contracts/query.js";
 import { createReadTools } from "../tools/read.js";
 import { createWriteTools } from "../tools/write.js";
+import { createServiceTaskTools } from "../tools/service-tasks.js";
+import {
+  createDispatchOperations,
+  createServiceTaskOperations,
+  type ResearchOperations,
+} from "./research-operations.js";
 import { SessionBindings, type ResearchBinding } from "./bindings.js";
 import {
   createReportSubmission,
@@ -64,8 +72,9 @@ export interface ResearchRuntime {
   readonly collection: CollectionService;
   readonly memory: MemoryService;
   readonly dispatch: DispatchBridge;
+  readonly operations: ResearchOperations;
   readonly tools: readonly ToolDefinition[];
-  readonly policy: QueryToolPolicy;
+  readonly policy: QueryPolicy;
   readonly submitReport: SubmitReport;
   readonly valuations: ValuationOperations;
   bindCoordinator(agent: Agent): () => void;
@@ -87,9 +96,10 @@ export interface ResearchRuntime {
     requestId: string,
   ): RunView;
   createTools(
-    policy: QueryToolPolicy,
+    policy: QueryPolicy,
     snapshots?: readonly QuerySnapshot[],
   ): ToolDefinition[];
+  createCoordinatorTools(operations: ResearchOperations): ToolDefinition[];
   createAgent(
     options: CreateAgentOptions,
     binding: ResearchBinding,
@@ -147,6 +157,7 @@ class Runtime implements ResearchRuntime {
   readonly collection: CollectionService;
   readonly memory: MemoryService;
   readonly dispatch: DispatchBridge;
+  readonly operations: ResearchOperations;
   readonly tools: readonly ToolDefinition[];
   readonly submitReport: SubmitReport;
   readonly valuations: ValuationOperations;
@@ -158,7 +169,7 @@ class Runtime implements ResearchRuntime {
   constructor(
     private readonly ctx: Context,
     private readonly components: Components,
-    private readonly capturedPolicy: QueryToolPolicy,
+    private readonly capturedPolicy: QueryPolicy,
     private readonly publicSearchEnabled: boolean,
   ) {
     this.runs = components.runs;
@@ -166,6 +177,10 @@ class Runtime implements ResearchRuntime {
     this.collection = components.collection;
     this.memory = components.memory;
     this.dispatch = components.dispatch;
+    this.operations = {
+      ...createDispatchOperations(components.dispatch),
+      ...createServiceTaskOperations(components.dispatch, components.decisions),
+    };
     this.submitReport = createReportSubmission(
       components.artifacts,
       components.bindings,
@@ -174,7 +189,7 @@ class Runtime implements ResearchRuntime {
     this.valuations = createValuationOperations(this.runs, components.bindings);
   }
 
-  get policy(): QueryToolPolicy {
+  get policy(): QueryPolicy {
     return structuredClone(this.capturedPolicy);
   }
 
@@ -258,10 +273,10 @@ class Runtime implements ResearchRuntime {
   }
 
   createTools(
-    policy: QueryToolPolicy,
+    policy: QueryPolicy,
     snapshots: readonly QuerySnapshot[] = [],
   ): ToolDefinition[] {
-    const { bindings, numbers, artifacts, decisions } = this.components;
+    const { bindings, numbers, artifacts } = this.components;
     const taskQueries: DataToolServices["taskQueries"] = {
       replayForTask: (...args) =>
         this.components.taskQueries.replayForTask(...args),
@@ -290,12 +305,16 @@ class Runtime implements ResearchRuntime {
         bindings,
         policy,
       ),
-      ...createWriteTools(
-        { artifacts, decisions, memory: this.memory, digests: this.dispatch },
-        bindings,
-        policy,
-      ),
-      ...createControlTools(this.dispatch, bindings),
+      ...createWriteTools({ artifacts, memory: this.memory }, bindings, policy),
+      ...this.createCoordinatorTools(this.operations),
+    ];
+  }
+
+  createCoordinatorTools(operations: ResearchOperations): ToolDefinition[] {
+    const { bindings } = this.components;
+    return [
+      ...createServiceTaskTools(operations, bindings),
+      ...createControlTools(operations, bindings),
     ];
   }
 
@@ -458,22 +477,26 @@ export function createResearchPlugin(prepareRole: PrepareRole) {
         acquired.push(() => http.close());
         const sources = createSources(ctx, http, config);
         const now = () => new Date().toISOString();
-        const runs = new RunService(new RunStore<RunState>(root), now);
+        const runs = createRunService(new RunStore<RunState>(root), now);
         const queries = new QueryService(sources, cache, config.cache.ttl);
         acquired.push(() => queries.close());
         const taskQueries = new TaskQueryService(queries, runs);
         acquired.push(() => taskQueries.close());
         const collection = new CollectionService(
-          http,
+          createCollectionTaskFactory(
+            http,
+            (scope, request, signal) => queries.query(scope, request, signal),
+            {
+              secCiks: config.policy.secCiks,
+              ...(config.xueqiuCookie === undefined
+                ? {}
+                : { xueqiuCookie: config.xueqiuCookie }),
+            },
+          ),
           cache,
-          queries,
           {
             enabledSources: config.enabledSources,
-            ...(config.xueqiuCookie === undefined
-              ? {}
-              : { xueqiuCookie: config.xueqiuCookie }),
             freshness: config.policy.freshness,
-            secCiks: config.policy.secCiks,
             ttl: config.cache.ttl,
             requireDailyMarket: true,
           },

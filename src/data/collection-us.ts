@@ -3,24 +3,24 @@ import type {
   CollectionTask,
 } from "../contracts/collection.js";
 import type { DataEnvelope, ResearchScope } from "../contracts/data.js";
-import type { QueryRequest } from "../contracts/query.js";
+import type { ReadSource, SourceQuery } from "../contracts/query.js";
 import type { CollectionOptions } from "../contracts/collection.js";
-import type { QueryService } from "./query.js";
-import { COLLECTION_VERSION } from "../data/versions.js";
-import { SESSION_DATES } from "../data/market-session.js";
+import { COLLECTION_VERSION } from "./versions.js";
+import { SESSION_DATES } from "./market-session.js";
 
 /** US collection retains the explicitly configured Yahoo/SEC/FRED coverage. */
 export function createUsCollectionTasks(
-  queries: Pick<QueryService, "query">,
+  readSource: ReadSource,
   scope: ResearchScope,
-  options: CollectionOptions,
+  options: Pick<CollectionOptions, "enabledSources" | "freshness">,
+  secCiks: Readonly<Record<string, string>>,
 ): CollectionTask[] {
   const enabled = new Set(options.enabledSources);
   const dateBefore = (days: number) =>
     new Date(Date.parse(`${scope.date}T00:00:00Z`) - days * 86_400_000)
       .toISOString()
       .slice(0, 10);
-  const jobs: { id: string; request: QueryRequest }[] = [];
+  const jobs: { id: string; request: SourceQuery }[] = [];
   if (enabled.has("yahoo"))
     jobs.push({
       id: "market.daily",
@@ -36,7 +36,7 @@ export function createUsCollectionTasks(
         },
       },
     });
-  const cik = options.secCiks[scope.security.id];
+  const cik = secCiks[scope.security.id];
   if (enabled.has("sec") && cik !== undefined)
     for (const field of ["revenue", "netIncome"] as const)
       jobs.push({
@@ -73,7 +73,7 @@ export function createUsCollectionTasks(
     provider: request.provider,
     enabledBy: [request.provider],
     async run(signal) {
-      const envelope = await queries.query(scope, request, signal);
+      const envelope = await readSource(scope, request, signal);
       const source = envelope.data;
       let data: CollectedTableData;
       if ("bars" in source)

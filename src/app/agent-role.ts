@@ -41,8 +41,9 @@ import {
   valuationMethodContext,
 } from "./valuation-methods.js";
 import { validateRoleValuation } from "../services/valuation.js";
-import { valuationCalculationCatalog } from "../services/valuation-calculations.js";
+import { valuationCalculationCatalog } from "../services/valuation-records.js";
 import { valuationDraftInput } from "./valuation-draft.js";
+import { readResearchModels } from "./research-models.js";
 import {
   createValuationCalculationTool,
   createValuationCalculationReader,
@@ -269,7 +270,9 @@ export function prepareUnifiedRole(
       ? {}
       : { input: valuationDraftInput(reportKind, services.runs, claim.runId) }),
   });
+  const agentOptions = readResearchModels(services.runs, claim.runId)?.research;
   return {
+    ...(agentOptions === undefined ? {} : { agentOptions }),
     systemPrompt,
     tools: [...tools, ...submission.tools],
     followup(next, { resumeSearch }) {

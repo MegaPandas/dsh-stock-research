@@ -107,7 +107,7 @@ process.stdout.write(
       arch: process.arch,
       cpu: cpus()[0].model,
       storage:
-        "temporary directory, file-backed SQLite with default durability",
+        "temporary directory, file-backed SQLite WAL with synchronous FULL",
       samples: SAMPLE_COUNT,
       measurements: [measure(1_024), measure(16_384)],
     },

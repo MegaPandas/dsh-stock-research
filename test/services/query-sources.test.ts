@@ -1,3 +1,4 @@
+import type { QuerySources } from "../../src/contracts/sources.js";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type {
   DataEnvelope,
@@ -22,7 +23,6 @@ import { YahooMarketAdapter } from "../../src/data/yahoo-market.js";
 import {
   describeSources,
   selectSource,
-  type QuerySources,
 } from "../../src/services/query-sources.js";
 
 const usScope: ResearchScope = {

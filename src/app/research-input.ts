@@ -1,18 +1,8 @@
 import z from "@deepseek-ai/schemastery";
-import type { JsonValue } from "../contracts/cache.js";
 import { ResearchError } from "../contracts/errors.js";
-import { serializeJson } from "../cache/json.js";
-import type { RunService } from "../services/runs.js";
-import type { SourceDescription } from "../services/query-sources.js";
-import type { QueryToolPolicy } from "../tools/query-inputs.js";
-import {
-  ARTIFACT_GUIDES,
-  CALCULATION_RULES,
-  ROLE_PROMPTS,
-} from "./research-prompts.js";
-import { PUBLIC_SEARCH_LIMITS } from "./public-research.js";
+import type { RunReader } from "../contracts/run-access.js";
+import { APPLICATION_INPUT_NAME } from "./research-input-capture.js";
 
-export const APPLICATION_INPUT_NAME = "stock-research:application";
 const text = z.string().pattern(/\S/).required();
 const policy = z
   .object({
@@ -52,30 +42,10 @@ const schema = z
   })
   .required();
 
-export function captureApplicationInput(
-  policy: QueryToolPolicy,
-  sources: readonly SourceDescription[],
-  publicSearchLimit: number = PUBLIC_SEARCH_LIMITS.maxSearches,
-): JsonValue {
-  return JSON.parse(
-    serializeJson({
-      schemaVersion: 2,
-      publicSearchLimit,
-      policy,
-      sourceCatalogue: sources
-        .filter((source) => source.capability !== null)
-        .map(({ dataset, provider, capability }) => ({
-          dataset,
-          provider,
-          capability,
-        })),
-      prompts: { ...ROLE_PROMPTS, valuation: CALCULATION_RULES },
-      guides: ARTIFACT_GUIDES,
-    }),
-  ) as JsonValue;
-}
-
-export function readApplicationInput(runs: RunService, runId: string) {
+export function readApplicationInput(
+  runs: Pick<RunReader, "inputCatalog" | "readInput">,
+  runId: string,
+) {
   const saved = runs
     .inputCatalog(runId)
     .inputs.filter((input) => input.name === APPLICATION_INPUT_NAME);

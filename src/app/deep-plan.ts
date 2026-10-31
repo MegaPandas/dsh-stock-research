@@ -1,9 +1,9 @@
 import type { ResearchScope } from "../contracts/data.js";
 import type { OpenRunInput } from "../contracts/runs.js";
 import type { StageDefinition, TaskDefinition } from "../contracts/workflow.js";
-import type { SourceDescription } from "../services/query-sources.js";
-import type { QueryToolPolicy } from "../tools/query-inputs.js";
-import type { QuickQuerySnapshot } from "./quick-snapshots.js";
+import type { SourceDescription } from "../contracts/sources.js";
+import type { QueryPolicy } from "../contracts/query.js";
+import type { QuickQuerySnapshot } from "./query-snapshots.js";
 import { PUBLIC_SEARCH_LIMITS } from "./public-research.js";
 import {
   captureResearchInput,
@@ -72,7 +72,7 @@ const BRIEFS = {
 
 export function createDeepInput(
   scope: ResearchScope,
-  policy: QueryToolPolicy,
+  policy: QueryPolicy,
   sources: readonly SourceDescription[],
   snapshots: readonly QuickQuerySnapshot[] = [],
   publicSearchLimit: number = PUBLIC_SEARCH_LIMITS.maxSearches,

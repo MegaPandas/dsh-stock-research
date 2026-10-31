@@ -2,9 +2,13 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
+import { spawnSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
+import { execPath } from "node:process";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createCacheKey, SqliteCache } from "../../src/cache/index.js";
-import type { JsonValue, QueryCacheKey } from "../../src/contracts/cache.js";
+import type { JsonValue } from "../../src/contracts/json.js";
+import type { QueryCacheKey } from "../../src/contracts/cache.js";
 import type { MarketData } from "../../src/contracts/data.js";
 import { MARKET_FIXTURE } from "../fixtures/market.js";
 
@@ -111,6 +115,32 @@ describe("SqliteCache", () => {
     vi.restoreAllMocks();
     rmSync(directory, { recursive: true, force: true });
   });
+
+  it.each(["before-commit", "after-commit"])(
+    "recovers the expected complete value after a process dies %s",
+    (point) => {
+      const updated = { ...MARKET_FIXTURE, stale: true };
+      const child = spawnSync(
+        execPath,
+        [
+          fileURLToPath(
+            new URL("../fixtures/cache-crash.mjs", import.meta.url),
+          ),
+          path,
+          point,
+          JSON.stringify(KEY),
+          JSON.stringify(MARKET_FIXTURE),
+          JSON.stringify(updated),
+        ],
+        { encoding: "utf8", timeout: 10_000 },
+      );
+      expect(child.error).toBeUndefined();
+      expect(child.signal).toBe("SIGKILL");
+      expect(open().get(KEY)).toEqual(
+        point === "after-commit" ? updated : MARKET_FIXTURE,
+      );
+    },
+  );
 
   it("persists the complete normalized envelope across reopen and returns independent data", () => {
     const cache = open();

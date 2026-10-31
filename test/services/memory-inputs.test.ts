@@ -12,7 +12,7 @@ import type { OpenRunInput, RunState } from "../../src/contracts/runs.js";
 import { MemoryStore } from "../../src/memory/store.js";
 import { RunStore } from "../../src/runs/store.js";
 import { MemoryService } from "../../src/services/memory.js";
-import { RunService } from "../../src/services/runs.js";
+import { createRunService } from "../../src/services/create-run-service.js";
 import { DataRoot } from "../../src/storage/data-root.js";
 import { US_SECURITY } from "../fixtures/market.js";
 
@@ -24,7 +24,7 @@ function setup() {
   let timestamp = "2024-01-01T12:00:00.000Z";
   const now = () => timestamp;
   const runStore = new RunStore<RunState>(root);
-  const runs = new RunService(runStore, now);
+  const runs = createRunService(runStore, now);
   const input: OpenRunInput = {
     definition: {
       scope: {

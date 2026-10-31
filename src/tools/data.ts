@@ -8,7 +8,7 @@ import {
 } from "../host/bindings.js";
 import type { QueryService } from "../services/query.js";
 import type { TaskQueryService } from "../services/task-query.js";
-import type { RunService } from "../services/runs.js";
+import type { RunReader } from "../contracts/run-access.js";
 import { researchTool } from "./errors.js";
 import {
   invalid,
@@ -22,15 +22,18 @@ import {
   dataSchemas,
   parseDataRequest,
   type DataToolName,
-  type QueryToolPolicy,
 } from "./query-inputs.js";
+import type { QueryPolicy } from "../contracts/query.js";
 
 export interface DataToolServices {
-  runs: RunService;
+  runs: Pick<RunReader, "view">;
   queries: Pick<QueryService, "query">;
   taskQueries: Pick<TaskQueryService, "queryForTask" | "replayForTask">;
 }
-function dataScope(caller: BoundCaller, runs: RunService): ResearchScope {
+function dataScope(
+  caller: BoundCaller,
+  runs: Pick<RunReader, "view">,
+): ResearchScope {
   const binding = caller.binding;
   if (binding.kind === "coordinator")
     throw new ResearchError(
@@ -64,7 +67,7 @@ const definitions: readonly [DataToolName, string][] = [
 export function createDataTools(
   services: DataToolServices,
   bindings: SessionBindings,
-  policy: QueryToolPolicy,
+  policy: QueryPolicy,
 ): ToolDefinition[] {
   const captured = captureQueryPolicy(policy);
   const output = resultOutput({

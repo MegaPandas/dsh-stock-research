@@ -1,6 +1,6 @@
 import type { ResearchScope } from "../contracts/data.js";
 import { ResearchError } from "../contracts/errors.js";
-import type { RunService } from "../services/runs.js";
+import type { RunReader } from "../contracts/run-access.js";
 import { scopeAtDate } from "./ask-input.js";
 
 export interface ReviewInput {
@@ -13,7 +13,7 @@ export interface ReviewInput {
 export function parseReviewInput(
   rawInput: string,
   startedAt: Date,
-  runs: RunService,
+  runs: Pick<RunReader, "readDefinition">,
 ): ReviewInput {
   const match = /^\s*(\S+)\s+(\S+)\s+([\s\S]*\S)\s*$/.exec(rawInput);
   if (match === null)

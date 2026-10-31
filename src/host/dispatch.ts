@@ -1,7 +1,7 @@
 import { continueChild } from "./child-continuation.js";
 import { randomUUID } from "node:crypto";
 import type { Context } from "@deepseek-ai/cordis";
-import type { Agent } from "@deepseek-ai/dsh-agent";
+import type { Agent, AgentOptions } from "@deepseek-ai/dsh-agent";
 import {
   errorChain,
   HarnessError,
@@ -31,7 +31,6 @@ import type { RunService } from "../services/runs.js";
 import type { DigestService } from "../services/digests.js";
 import type { ResearchSessions } from "./sessions.js";
 import { observeModelCalls } from "./model-events.js";
-import { readResearchModels } from "../app/research-models.js";
 
 export interface RoleProvision {
   followup?(
@@ -39,6 +38,7 @@ export interface RoleProvision {
     options: { resumeSearch: boolean },
   ): RoleProvision;
   agentPreset?: string;
+  agentOptions?: AgentOptions;
   prompt: ContentBlock[];
   tools: readonly ToolDefinition[];
   systemPrompt?: string;
@@ -569,7 +569,7 @@ export class DispatchBridge {
                 resumeSearch: continuation.resumeSearch,
               });
         const currentProvision = provision;
-        const models = readResearchModels(this.runs, claim.runId);
+        const agentOptions = provision.agentOptions;
         const setup = this.sessions.setup(
           {
             kind: "task",
@@ -580,12 +580,12 @@ export class DispatchBridge {
           provision.tools,
         );
         release = this.sessions.reserve(childId, async (agentCtx, agent) => {
-          if (models !== undefined) {
+          if (agentOptions !== undefined) {
             // The SDK merges omitted fields from the live parent; this run owns its exact model snapshot.
-            Object.assign(agent.options, models.research);
-            if (models.research.reasoningEffort === undefined)
+            Object.assign(agent.options, agentOptions);
+            if (agentOptions.reasoningEffort === undefined)
               delete agent.options.reasoningEffort;
-            if (models.research.maxTokens === undefined)
+            if (agentOptions.maxTokens === undefined)
               delete agent.options.maxTokens;
           }
           if (currentProvision.systemPrompt !== undefined)
@@ -619,9 +619,7 @@ export class DispatchBridge {
                 signal,
                 request: {
                   parent,
-                  ...(models === undefined
-                    ? {}
-                    : { agentOptions: models.research }),
+                  ...(agentOptions === undefined ? {} : { agentOptions }),
                   ...(provision.agentPreset === undefined
                     ? {}
                     : { agentPreset: provision.agentPreset }),

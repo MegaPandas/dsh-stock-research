@@ -1,9 +1,12 @@
 import { ResearchError } from "../contracts/errors.js";
-import type { RunService } from "../services/runs.js";
+import type { RunReader } from "../contracts/run-access.js";
 import { COORDINATOR_PROMPT_VERSION } from "./coordinator-prompt.js";
 import { ROLE_PROMPT_VERSION } from "./research-prompts.js";
 
-export function savedCoordinator(runs: RunService, runId: string) {
+export function savedCoordinator(
+  runs: Pick<RunReader, "readDefinition" | "inputCatalog" | "readInput">,
+  runId: string,
+) {
   const definition = runs.readDefinition(runId);
   const catalog = runs.inputCatalog(runId);
   const inputs = catalog.inputs.filter(

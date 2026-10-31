@@ -1,4 +1,4 @@
-import { validateJsonSchemaValue } from "@deepseek-ai/dsh-tools";
+import { assertJsonSchema } from "../json/schema.js";
 import {
   STAGE_HANDOFF_MAX_CHARACTERS,
   STAGE_HANDOFF_TARGET_CHARACTERS,
@@ -8,13 +8,7 @@ import {
 import { ResearchError } from "../contracts/errors.js";
 
 export function parseStageHandoff(value: unknown): StageHandoff {
-  const errors = validateJsonSchemaValue(
-    stageHandoffSchema,
-    value,
-    "stageHandoff",
-  );
-  if (errors.length > 0)
-    throw new ResearchError("INVALID_INPUT", errors.join("\n"));
+  assertJsonSchema(stageHandoffSchema, value, "stageHandoff");
   const handoff = value as StageHandoff;
   const entries = Object.values(handoff).flat();
   if (entries.length === 0 || entries.some((entry) => entry.trim() === ""))

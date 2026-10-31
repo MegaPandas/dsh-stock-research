@@ -22,19 +22,22 @@ import type {
 import { DETERMINISTIC_VALUATION_PROTOCOL } from "../../src/contracts/valuation.js";
 import { SessionBindings } from "../../src/host/bindings.js";
 import { RunStore } from "../../src/runs/store.js";
-import { RunService } from "../../src/services/runs.js";
+import { createRunService } from "../../src/services/create-run-service.js";
 import { ArtifactService } from "../../src/services/artifacts.js";
 import { NumberService } from "../../src/services/numbers.js";
 import { assembleAgentArtifact } from "../../src/services/business-reports.js";
 import type { AgentReport } from "../../src/contracts/agent-reports.js";
+import type { NumberTarget } from "../../src/contracts/numbers.js";
+import { calculateValuation } from "../../src/services/valuation-calculations.js";
 import {
-  calculateValuation,
   materializeTargetPrice,
   materializeValuation,
-  readValuationCalculation,
   validateCalculatedReport,
+} from "../../src/services/valuation-reports.js";
+import {
+  readValuationCalculation,
   valuationCalculationCatalog,
-} from "../../src/services/valuation-calculations.js";
+} from "../../src/services/valuation-records.js";
 import { DataRoot } from "../../src/storage/data-root.js";
 import {
   createValuationTools,
@@ -92,7 +95,7 @@ function setup(
   const path = fs.mkdtempSync(join(tmpdir(), "valuation-calculation-"));
   let root = new DataRoot(path);
   const now = () => "2024-07-01T12:00:00.000Z";
-  let runs = new RunService(new RunStore<RunState>(root), now);
+  let runs = createRunService(new RunStore<RunState>(root), now);
   const input: OpenRunInput = {
     definition: {
       scope: {
@@ -159,10 +162,91 @@ function setup(
     reopen() {
       root.close();
       root = new DataRoot(path);
-      runs = new RunService(new RunStore<RunState>(root), now);
+      runs = createRunService(new RunStore<RunState>(root), now);
     },
   };
 }
+
+function calculationClaims(
+  records: readonly { calculationId: string; value: number }[],
+): NumberTarget {
+  return {
+    kind: "pending",
+    contentId: "valuation-claims",
+    content: {
+      kind: "analysis",
+      title: "Synthetic valuation claims",
+      body: "Synthetic analysis",
+      inputRefs: [],
+      claims: records.map(({ calculationId, value }, index) => ({
+        id: `value-${index}`,
+        kind: "estimated",
+        value,
+        unit: "USD/share",
+        calculationId,
+        method: "Synthetic PS calculation",
+        assumptions: ["Synthetic revenue, multiples and unchanged shares."],
+        evidence: [],
+      })),
+      payload: {},
+    },
+  };
+}
+
+it("checks each value when distinct claims share immutable calculations", () => {
+  const f = setup();
+  const firstRequest = request();
+  firstRequest.inputs.multiples = [0.5];
+  const first = calculateValuation(f.runs, f.operation, firstRequest, "first");
+  const secondRequest = request();
+  secondRequest.inputs.multiples = [0.5];
+  secondRequest.inputs.revenue = 900;
+  const second = calculateValuation(
+    f.runs,
+    f.operation,
+    secondRequest,
+    "second",
+  );
+  const result = new NumberService(f.runs).checkNumbers(
+    f.operation,
+    calculationClaims([
+      { calculationId: first.calculationId, value: 22.5 },
+      { calculationId: second.calculationId, value: 45 },
+      { calculationId: first.calculationId, value: 22.6 },
+    ]),
+  );
+  expect(result.passed).toBe(false);
+  expect(result.claims.map(({ passed }) => passed)).toEqual([
+    true,
+    true,
+    false,
+  ]);
+  expect(result.claims[2]!.issues).toEqual([
+    expect.objectContaining({ code: "calculation" }),
+  ]);
+});
+
+it.each(["redo", "cancel"] as const)(
+  "rejects previously checked calculations after %s on the next call",
+  (action) => {
+    const f = setup();
+    const supplied = request();
+    supplied.inputs.multiples = [0.5];
+    const calculation = calculateValuation(f.runs, f.operation, supplied, "ps");
+    const target = calculationClaims([
+      { calculationId: calculation.calculationId, value: 22.5 },
+    ]);
+    const numbers = new NumberService(f.runs);
+    expect(numbers.checkNumbers(f.operation, target).passed).toBe(true);
+    const owner = { runId: f.operation.runId, identity: "coordinator" };
+    if (action === "redo") f.runs.redo(owner, f.operation.taskId, "invalidate");
+    else f.runs.cancel(owner, "invalidate");
+    expect(valuationCalculationCatalog(f.runs, f.operation.runId)).toEqual([]);
+    expect(() => numbers.checkNumbers(f.operation, target)).toThrow(
+      /superseded|unsuccessful/,
+    );
+  },
+);
 
 it("calculates independent amount/share scales and sensitivity, and persists immutable receipts", () => {
   const f = setup();

@@ -7,7 +7,7 @@ import {
   RESEARCH_MODELS_INPUT,
   type ResearchModels,
 } from "../../src/app/research-models.js";
-import type { JsonValue } from "../../src/contracts/cache.js";
+import type { JsonValue } from "../../src/contracts/json.js";
 import type { RunService } from "../../src/services/runs.js";
 import { runtimeHost } from "../fixtures/runtime-host.js";
 import { dispatchHost } from "../fixtures/dispatch-host.js";
@@ -115,7 +115,11 @@ describe("research run model snapshots", () => {
   });
 
   it("dispatches using the saved route after the main Agent changes models", async () => {
-    const h = await dispatchHost([{ kind: "save" }]);
+    const h = await dispatchHost(
+      [{ kind: "save" }],
+      undefined,
+      (runs, { claim }) => readResearchModels(runs, claim.runId)?.research,
+    );
     cleanups.push(h.close);
     const models = captureResearchModels(h.parent.agent);
     models.research.model = "saved-research-model";
@@ -141,7 +145,11 @@ describe("research run model snapshots", () => {
   });
 
   it("does not inherit a later effort or token limit when the saved same-route options omit them", async () => {
-    const h = await dispatchHost([{ kind: "save" }]);
+    const h = await dispatchHost(
+      [{ kind: "save" }],
+      undefined,
+      (runs, { claim }) => readResearchModels(runs, claim.runId)?.research,
+    );
     cleanups.push(h.close);
     const models = captureResearchModels(h.parent.agent, {
       reasoningEffort: null,

@@ -14,7 +14,7 @@ import { marketCapability } from "../../src/data/market.js";
 import { QueryService } from "../../src/services/query.js";
 import { TaskQueryService } from "../../src/services/task-query.js";
 import { selectQuerySnapshot } from "../../src/services/query-snapshot.js";
-import { RunService } from "../../src/services/runs.js";
+import { createRunService } from "../../src/services/create-run-service.js";
 import { RunStore } from "../../src/runs/store.js";
 import { DataRoot } from "../../src/storage/data-root.js";
 import { MARKET_FIXTURE, US_SECURITY } from "../fixtures/market.js";
@@ -67,7 +67,7 @@ function setup(cutoff = scope.cutoff, date = scope.date) {
   const directory = fs.mkdtempSync(join(tmpdir(), "dsh-query-snapshots-"));
   const root = new DataRoot(directory);
   const store = new RunStore<RunState>(root);
-  const runs = new RunService(store, () => "2024-01-09T00:00:00.000Z");
+  const runs = createRunService(store, () => "2024-01-09T00:00:00.000Z");
   const cache = new SqliteCache({
     path: join(directory, "cache.sqlite"),
     maxEntries: 10,

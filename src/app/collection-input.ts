@@ -1,6 +1,4 @@
 import z from "@deepseek-ai/schemastery";
-import { serializeJson } from "../cache/json.js";
-import type { JsonValue } from "../contracts/cache.js";
 import type {
   CollectionPacket,
   CollectionSnapshot,
@@ -9,24 +7,13 @@ import type { DataEnvelope } from "../contracts/data.js";
 import { ResearchError } from "../contracts/errors.js";
 import type { EvidenceData } from "../contracts/query.js";
 import type { ReplayEvidenceSource } from "../contracts/replay.js";
-import type { OpenRunInput, TaskOperation } from "../contracts/runs.js";
-import type { RunService } from "../services/runs.js";
+import type { TaskOperation } from "../contracts/runs.js";
+import type { RunCommands, RunReader } from "../contracts/run-access.js";
 import { extractCandidates } from "../services/candidates.js";
 import { collectionSummary } from "../services/collection-view.js";
 import { readQuickSnapshots } from "./quick-snapshots.js";
+import { COLLECTION_INPUT } from "./collection-snapshot.js";
 
-export const COLLECTION_INPUT = "stock-research:collection";
-export function requireCollectionData(snapshot: CollectionSnapshot): void {
-  if (!snapshot.packets.some((packet) => packet.id === "market.daily")) {
-    const failures = snapshot.failures.filter(
-      (failure) => failure.id === "market.daily",
-    );
-    throw new ResearchError(
-      "DATA_INSUFFICIENT",
-      `Daily market data is required before analysis.${failures.map((failure) => ` ${failure.provider}: ${failure.detail}`).join("")}${snapshot.recordPath === undefined ? "" : ` Collection record: ${snapshot.recordPath}`}`,
-    );
-  }
-}
 const text = z.string().pattern(/\S/).required();
 const schema = z
   .object({
@@ -45,22 +32,8 @@ const schema = z
   })
   .required();
 
-export function attachCollection(
-  input: OpenRunInput,
-  snapshot: CollectionSnapshot,
-): OpenRunInput {
-  const captured = JSON.parse(serializeJson(snapshot)) as JsonValue;
-  for (const { envelope } of snapshot.packets) {
-    const key = `collection/${envelope.dataset}/${envelope.source.provider}`;
-    input.versions.adapters[key] = envelope.source.adapterVersion;
-    input.versions.normalization[key] = envelope.source.normalizationVersion;
-  }
-  input.inputs.push({ name: COLLECTION_INPUT, content: captured });
-  return input;
-}
-
 export function readCollection(
-  runs: RunService,
+  runs: Pick<RunReader, "inputCatalog" | "readInput">,
   runId: string,
 ): CollectionSnapshot | null {
   const saved = runs
@@ -118,7 +91,16 @@ function belongsToTask(
 
 /** Register prepared inputs before the role starts; no query or network capability is exposed. */
 export function registerCollectionSources(
-  runs: RunService,
+  runs: Pick<
+    RunReader,
+    | "inputCatalog"
+    | "readInput"
+    | "view"
+    | "replaySnapshot"
+    | "numberContext"
+    | "readEvidence"
+  > &
+    Pick<RunCommands, "evidenceForCall" | "recordEvidence" | "replayEvidence">,
   operation: TaskOperation,
 ) {
   const snapshot = readCollection(runs, operation.runId);

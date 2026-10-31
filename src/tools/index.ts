@@ -18,4 +18,18 @@ export { createDataTools } from "./data.js";
 export type { DataToolServices } from "./data.js";
 export { createWriteTools } from "./write.js";
 export type { WriteToolServices } from "./write.js";
-export type { QueryToolPolicy } from "./query-inputs.js";
+export { createServiceTaskTools } from "./service-tasks.js";
+export {
+  createDispatchOperations,
+  createServiceTaskOperations,
+} from "../host/research-operations.js";
+export type {
+  DispatchOperations,
+  ServiceTaskOperations,
+  ResearchOperations,
+  ResearchTaskRequest,
+  ResearchStageRequest,
+  ResearchFollowupRequest,
+  ResearchRedoRequest,
+} from "../host/research-operations.js";
+export type { QueryPolicy } from "../contracts/query.js";

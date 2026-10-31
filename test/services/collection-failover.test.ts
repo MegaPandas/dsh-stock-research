@@ -11,13 +11,7 @@ import type { DataEnvelope } from "../../src/contracts/data.js";
 import { ResearchError } from "../../src/contracts/errors.js";
 import { HttpClient } from "../../src/data/http.js";
 import { parseSourceJson } from "../../src/data/source.js";
-import * as market from "../../src/data/collection-market.js";
-import * as financial from "../../src/data/collection-financials.js";
-import * as macro from "../../src/data/collection-macro.js";
-import * as benchmarks from "../../src/data/collection-benchmarks.js";
-import * as bonds from "../../src/data/collection-bonds.js";
 import { CollectionService } from "../../src/services/collection.js";
-import type { QueryService } from "../../src/services/query.js";
 import { CN_SECURITY } from "../fixtures/market.js";
 
 const scope = {
@@ -111,23 +105,12 @@ function setup(enabledSources = ["eastmoney-market", "tencent"]) {
       return result;
     },
   });
-  // Isolate the external source recipes; exercise the real scheduler, HTTP and cache.
-  vi.spyOn(market, "createChinaMarketTasks").mockReturnValue([
-    candidate("eastmoney"),
-    candidate("tencent"),
-  ]);
-  vi.spyOn(financial, "createChinaFinancialTasks").mockReturnValue([]);
-  vi.spyOn(macro, "createChinaMacroTasks").mockReturnValue([]);
-  vi.spyOn(benchmarks, "createBenchmarkMarketTasks").mockReturnValue([]);
-  vi.spyOn(bonds, "createBenchmarkBondTasks").mockReturnValue([]);
   const service = new CollectionService(
-    http,
+    () => [candidate("eastmoney"), candidate("tencent")],
     cache,
-    { query: vi.fn() as QueryService["query"] },
     {
       enabledSources,
       freshness: { market: 86_400_000, fundamentals: 0, macro: 0 },
-      secCiks: {},
       ttl: { market: 60_000, fundamentals: 0, macro: 0, research: 0 },
     },
   );

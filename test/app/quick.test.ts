@@ -9,10 +9,9 @@ import {
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createQuickInput } from "../../src/app/quick-plan.js";
 import type { CollectionRecord } from "../../src/contracts/collection.js";
-import {
-  attachCollection,
-  readCollection,
-} from "../../src/app/collection-input.js";
+import { readCollection } from "../../src/app/collection-input.js";
+import { attachCollection } from "../../src/app/collection-snapshot.js";
+import { researchLog } from "../../src/client/research-log.js";
 import {
   quickHost,
   initialInput,
@@ -212,6 +211,21 @@ describe("stock-quick real command boundary", () => {
     const view = h.runtime.runs.view({ runId: model.state.runId! });
     expect(model.state.taskIds).toHaveLength(12);
     expect(view.status).toBe("completed");
+    const researchJob = h.ctx.jobs
+      .list(h.outside.agent.id)
+      .find((job) => job.kind === "stock-research")!;
+    await h.ctx.jobs.wait(researchJob.id, 1000, h.outside.agent.id);
+    const output = h.ctx.jobs.readAt(researchJob.id, 0, h.outside.agent.id);
+    const progress = researchLog(
+      output.chunks.map((chunk) => chunk.text).join(""),
+    ).progress!;
+    expect(progress.state).toMatchObject({
+      status: "completed",
+      phase: { kind: "ended" },
+      runId: view.runId,
+      identity: { symbol: "002594.SZ", date: "2024-01-03", mode: "quick" },
+    });
+    expect(progress.state.operationIds).toEqual([]);
     const downstream = h.adapter.requests.filter(
       (request) =>
         request.tools?.some((tool) => tool.name === "stock_read_report") &&

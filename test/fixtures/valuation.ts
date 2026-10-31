@@ -1,7 +1,7 @@
 import type { ValuationRecord } from "../../src/contracts/agent-reports.js";
 import { decisionPolicy } from "../../src/contracts/rating-policy.js";
 import type { ValuationRequest } from "../../src/contracts/valuation.js";
-import type { ValuationSelection } from "../../src/services/valuation-calculations.js";
+import type { ValuationSelection } from "../../src/services/valuation-reports.js";
 
 export function calculationRequest(
   purpose: "valuation" | "target_price" = "valuation",

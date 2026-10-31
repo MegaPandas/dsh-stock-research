@@ -23,6 +23,11 @@ import type { SinaIncomeData, SinaIncomeQuery } from "./sina-income.js";
 import type { RegisteredEvidenceRecord } from "./task-data.js";
 import type { CollectedTableData } from "./collection.js";
 
+export interface QueryPolicy {
+  freshness: { market: number; fundamentals: number; macro: number };
+  secCiks: Readonly<Record<string, string>>;
+}
+
 export type MarketSourceQuery = {
   dataset: "market";
   provider: "yahoo" | "eastmoney" | "tencent";
@@ -74,6 +79,11 @@ export type SourceData<Q extends SourceQuery = SourceQuery> =
             ? MacroData
             : ResearchData;
 export type SourceEnvelope = DataEnvelope<SourceData>;
+export type ReadSource = (
+  scope: ResearchScope,
+  request: SourceQuery,
+  signal?: AbortSignal,
+) => Promise<SourceEnvelope>;
 export type SourceResponse<Q extends SourceQuery> = DataEnvelope<SourceData<Q>>;
 export interface TaskSourceResponse<Q extends SourceQuery> {
   sourceRef: SourceRef;

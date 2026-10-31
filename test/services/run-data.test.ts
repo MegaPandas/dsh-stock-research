@@ -13,7 +13,8 @@ import type {
   MemoryInputQuery,
   MemoryInputSnapshot,
 } from "../../src/contracts/task-data.js";
-import { RunService } from "../../src/services/runs.js";
+import { createRunService } from "../../src/services/create-run-service.js";
+import type { RunService } from "../../src/services/runs.js";
 import { RunStore } from "../../src/runs/store.js";
 import { DataRoot } from "../../src/storage/data-root.js";
 import { US_SECURITY } from "../fixtures/market.js";
@@ -91,7 +92,7 @@ function opened(path: string) {
   const root = new DataRoot(path);
   roots.push(root);
   const store = new RunStore<RunState>(root);
-  return { root, store, service: new RunService(store, () => RECORDED) };
+  return { root, store, service: createRunService(store, () => RECORDED) };
 }
 function claim(
   service: RunService,

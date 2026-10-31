@@ -4,16 +4,16 @@ import {
   type AgentReportKind,
 } from "../contracts/agent-reports.js";
 import type { ReportDraftInput } from "../host/report-draft.js";
-import type { RunService } from "../services/runs.js";
+import type { RunReader } from "../contracts/run-access.js";
 import {
   materializeTargetPrice,
   materializeValuation,
   type ValuationSelection,
-} from "../services/valuation-calculations.js";
+} from "../services/valuation-reports.js";
 
 export function valuationDraftInput(
   kind: AgentReportKind,
-  runs: RunService,
+  runs: Pick<RunReader, "numberContext" | "inputCatalog" | "readInput">,
   runId: string,
 ): ReportDraftInput {
   const schema = agentReportSchemas[kind];

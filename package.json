@@ -96,6 +96,7 @@
     "bench:memory": "node scripts/benchmark-memory.mjs",
     "bench:memory-service": "node scripts/benchmark-memory-service.mjs",
     "bench:report": "node scripts/benchmark-report.mjs",
+    "bench:inputs": "node scripts/benchmark-input-parsing.mjs",
     "bench:run-service": "node scripts/benchmark-run-service.mjs",
     "bench:run-opening": "node scripts/benchmark-run-opening.mjs",
     "bench:run-control": "node scripts/benchmark-run-control.mjs",
@@ -103,6 +104,7 @@
     "bench:query": "node scripts/benchmark-query.mjs",
     "bench:replay": "node scripts/benchmark-replay.mjs",
     "bench:numbers": "node scripts/benchmark-numbers.mjs",
+    "bench:valuation-reads": "node scripts/benchmark-valuation-reads.mjs",
     "bench:decisions": "node scripts/benchmark-decisions.mjs",
     "bench:digests": "node scripts/benchmark-digests.mjs",
     "bench:roles": "node scripts/benchmark-role-preparation.mjs",
@@ -147,6 +149,9 @@
   },
   "overrides": {
     "zod": "4.6.6"
+  },
+  "dependencies": {
+    "ajv": "8.20.0"
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "4.0.5",

@@ -8,11 +8,11 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { createQuickInput } from "../../src/app/quick-plan.js";
 import { prepareResearchRole } from "../../src/app/prepare-role.js";
 import { PUBLIC_RESEARCH_PROMPT_INPUT } from "../../src/app/public-research.js";
+import { readApplicationInput } from "../../src/app/research-input.js";
 import {
   APPLICATION_INPUT_NAME,
   captureApplicationInput,
-  readApplicationInput,
-} from "../../src/app/research-input.js";
+} from "../../src/app/research-input-capture.js";
 import { createResearchPlugin } from "../../src/runtime.js";
 import {
   objectSchema,

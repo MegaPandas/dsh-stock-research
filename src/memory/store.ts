@@ -168,15 +168,23 @@ export class MemoryStore<State extends object> {
   }
 
   readEntry<T>(ref: MemoryRef): T {
+    return this.readEntries<T>([ref])[0]!;
+  }
+
+  readEntries<T>(refs: readonly MemoryRef[]): T[] {
     const index = this.readIndex();
-    if (!registered(index.entries, ref))
-      throw new ResearchError(
-        "VERSION_UNAVAILABLE",
-        "Memory revision is not registered.",
-      );
-    return readJson(
-      join(this.#directory, "entries", ref.entryId, `${ref.revision}.json`),
-    ) as T;
+    for (const ref of refs)
+      if (!registered(index.entries, ref))
+        throw new ResearchError(
+          "VERSION_UNAVAILABLE",
+          "Memory revision is not registered.",
+        );
+    return refs.map(
+      (ref) =>
+        readJson(
+          join(this.#directory, "entries", ref.entryId, `${ref.revision}.json`),
+        ) as T,
+    );
   }
 
   commit(

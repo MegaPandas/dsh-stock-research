@@ -4,8 +4,8 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { SqliteCache } from "../../src/cache/index.js";
 import { HttpClient } from "../../src/data/http.js";
+import { createCollectionTaskFactory } from "../../src/data/collection-tasks.js";
 import { CollectionService } from "../../src/services/collection.js";
-import type { QueryService } from "../../src/services/query.js";
 import { CN_SECURITY } from "../fixtures/market.js";
 
 const scope = {
@@ -32,14 +32,14 @@ function setup(enabledSources: string[]) {
     minIntervalMs: 0,
   });
   const service = new CollectionService(
-    http,
+    createCollectionTaskFactory(http, vi.fn(), {
+      secCiks: {},
+      xueqiuCookie: cookie,
+    }),
     cache,
-    { query: vi.fn() as QueryService["query"] },
     {
       enabledSources,
-      xueqiuCookie: cookie,
       freshness: { market: 86400000, fundamentals: 200 * 86400000, macro: 0 },
-      secCiks: {},
       ttl: { market: 60000, fundamentals: 60000, macro: 0, research: 0 },
     },
   );

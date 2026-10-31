@@ -17,7 +17,7 @@ import { HostResearchAdapter } from "../../src/data/host-research.js";
 import { RunStore } from "../../src/runs/store.js";
 import { QueryService } from "../../src/services/query.js";
 import { TaskQueryService } from "../../src/services/task-query.js";
-import { RunService } from "../../src/services/runs.js";
+import { createRunService } from "../../src/services/create-run-service.js";
 import { DataRoot } from "../../src/storage/data-root.js";
 import { US_SECURITY } from "../fixtures/market.js";
 
@@ -50,7 +50,7 @@ function setup() {
   const store = new RunStore<RunState>(root);
   let timestamp = "2024-01-03T00:00:00.000Z";
   const now = () => timestamp;
-  const runs = new RunService(store, now);
+  const runs = createRunService(store, now);
   const input: OpenRunInput = {
     definition: {
       scope: {
@@ -470,7 +470,7 @@ describe("pinned replay run inputs", () => {
       },
       "later",
     );
-    const restored = new RunService(
+    const restored = createRunService(
       new RunStore<RunState>(context.root),
       context.now,
     );
@@ -506,7 +506,7 @@ describe("pinned replay run inputs", () => {
     const saved = context.store
       .list()
       .find((entry) => entry.runId !== context.runId)!;
-    const restored = new RunService(
+    const restored = createRunService(
       new RunStore<RunState>(context.root),
       context.now,
     );

@@ -19,10 +19,8 @@ import { scopedQueryParameters } from "./query-scope.js";
 import { ModelConfig, resolveModelOptions } from "./model-config.js";
 import { researchCutoff } from "./ask-input.js";
 import { collectionReadTools } from "./collection-tools.js";
-import {
-  collectionDirectory,
-  requireCollectionData,
-} from "./collection-input.js";
+import { collectionDirectory } from "./collection-input.js";
+import { requireCollectionData } from "./collection-snapshot.js";
 
 export type AskConfig = ModelConfig;
 export const Config = ModelConfig.required(false);

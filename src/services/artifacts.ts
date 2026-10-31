@@ -16,7 +16,7 @@ import { EvidenceTimeError, verifyEvidence } from "./evidence-checks.js";
 import { readPointer, referenceField, SelectorError } from "./number-fields.js";
 import type { NumberService } from "./numbers.js";
 import { artifactKey } from "./run-dependencies.js";
-import type { RunService } from "./runs.js";
+import type { RunCommands, RunReader } from "../contracts/run-access.js";
 import {
   ArtifactInputs,
   type ResearchArtifactVersion,
@@ -26,11 +26,11 @@ import {
   selectDecisionInputs,
 } from "./decision-basics.js";
 import { checkDecisionRequirements } from "./decision-requirements.js";
+import { readValuationCalculation } from "./valuation-records.js";
 import {
-  readValuationCalculation,
   validateCalculatedReport,
   validateCalculatedTarget,
-} from "./valuation-calculations.js";
+} from "./valuation-reports.js";
 
 function invalid(detail: string): never {
   throw new ResearchError("INVALID_ARTIFACT", detail);
@@ -46,8 +46,17 @@ export class ArtifactNumberError extends ResearchError {
 
 export class ArtifactService {
   constructor(
-    private readonly runs: RunService,
-    private readonly numbers: NumberService,
+    private readonly runs: Pick<
+      RunReader,
+      | "readDefinition"
+      | "numberContext"
+      | "readEvidence"
+      | "readArtifact"
+      | "inputCatalog"
+      | "readInput"
+    > &
+      Pick<RunCommands, "artifactForCall" | "commitArtifact">,
+    private readonly numbers: Pick<NumberService, "checkNumbers">,
   ) {}
 
   submitArtifact(

@@ -1,5 +1,5 @@
 import { createCacheKey, type SqliteCache } from "../cache/index.js";
-import { serializeJson } from "../cache/json.js";
+import { serializeJson } from "../json/serialize.js";
 import type { QueryCacheKey } from "../contracts/cache.js";
 import type { ISOTime, ResearchScope } from "../contracts/data.js";
 import { ResearchError } from "../contracts/errors.js";
@@ -18,10 +18,9 @@ import { withIndicators, withPriceReturn } from "./derived-queries.js";
 import {
   describeSources,
   selectSource,
-  type QuerySources,
-  type SourceDescription,
   type SourceSelection,
 } from "./query-sources.js";
+import type { QuerySources, SourceDescription } from "../contracts/sources.js";
 import { SharedQueries } from "./shared-queries.js";
 
 interface SourceObservation {

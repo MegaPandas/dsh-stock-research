@@ -22,7 +22,7 @@ import { YahooMarketAdapter } from "../../src/data/yahoo-market.js";
 import { RunStore } from "../../src/runs/store.js";
 import { QueryService } from "../../src/services/query.js";
 import { TaskQueryService } from "../../src/services/task-query.js";
-import { RunService } from "../../src/services/runs.js";
+import { createRunService } from "../../src/services/create-run-service.js";
 import { DataRoot } from "../../src/storage/data-root.js";
 import { US_SECURITY } from "../fixtures/market.js";
 
@@ -72,7 +72,7 @@ function setup() {
   const store = new RunStore<RunState>(root);
   let timestamp = "2024-01-04T00:00:00.000Z";
   const now = () => timestamp;
-  const runs = new RunService(store, now);
+  const runs = createRunService(store, now);
   const input: OpenRunInput = {
     definition: {
       scope: {
@@ -598,7 +598,7 @@ describe("offline evidence replay", () => {
     const copied = c.runs.replayEvidence(d.operation, query, "data");
     c.runs.cancel({ runId: d.runId, identity: "owner" }, "cancel");
     fs.unlinkSync(c.evidenceFile(original));
-    const restored = new RunService(new RunStore<RunState>(c.root), c.now);
+    const restored = createRunService(new RunStore<RunState>(c.root), c.now);
     const q = c.queries(restored);
     expect(
       (await q.service.queryForTask(d.operation, query, "data")).sourceRef,
@@ -734,7 +734,7 @@ describe("offline memory and receipt replay", () => {
     fs.unlinkSync(
       join(c.runDirectory(c.runId), "inputs", `${original.inputRef.id}.json`),
     );
-    const restored = new RunService(new RunStore<RunState>(c.root), c.now);
+    const restored = createRunService(new RunStore<RunState>(c.root), c.now);
     expect(
       restored.replayMemoryInput(d.operation, memoryQuery, "memory"),
     ).toEqual(copied);
@@ -810,7 +810,7 @@ describe("offline memory and receipt replay", () => {
     vi.restoreAllMocks();
     const saved = c.store.read(d.runId);
     fs.unlinkSync(c.evidenceFile(original));
-    const restored = new RunService(new RunStore<RunState>(c.root), c.now);
+    const restored = createRunService(new RunStore<RunState>(c.root), c.now);
     const result = restored.replayEvidence(d.operation, query, "data");
     expect(c.store.read(d.runId).revision).toBe(saved.revision);
     expect(c.store.read(d.runId).evidence).toHaveLength(1);

@@ -16,21 +16,18 @@ function serialize(value: unknown, ancestors: Set<object>): string {
     return JSON.stringify(value);
   }
   if (typeof value !== "object" || value === null) {
-    throw new ResearchError(
-      "INVALID_INPUT",
-      "Cache values must be finite JSON data",
-    );
+    throw new ResearchError("INVALID_INPUT", "Values must be finite JSON data");
   }
   if (ancestors.has(value)) {
     throw new ResearchError(
       "INVALID_INPUT",
-      "Cache values must not contain cycles",
+      "JSON values must not contain cycles",
     );
   }
   if (Object.getOwnPropertySymbols(value).length > 0) {
     throw new ResearchError(
       "INVALID_INPUT",
-      "Cache values must not contain symbol properties",
+      "JSON values must not contain symbol properties",
     );
   }
 
@@ -40,7 +37,7 @@ function serialize(value: unknown, ancestors: Set<object>): string {
     if (Object.keys(value).length !== value.length) {
       throw new ResearchError(
         "INVALID_INPUT",
-        "Cache arrays must contain only indexed JSON values",
+        "JSON arrays must contain only indexed JSON values",
       );
     }
     result = `[${Array.from(value, (item: unknown) => serialize(item, ancestors)).join(",")}]`;
@@ -49,7 +46,7 @@ function serialize(value: unknown, ancestors: Set<object>): string {
     if (prototype !== Object.prototype && prototype !== null) {
       throw new ResearchError(
         "INVALID_INPUT",
-        "Cache objects must be plain JSON objects",
+        "JSON objects must be plain objects",
       );
     }
     const object = value as Record<string, unknown>;

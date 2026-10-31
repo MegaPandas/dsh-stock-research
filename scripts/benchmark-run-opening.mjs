@@ -11,7 +11,7 @@ const core =
   process.argv[2] === undefined
     ? "@megapandas/dsh-stock-research/core"
     : pathToFileURL(resolve(process.argv[2])).href;
-const { DataRoot, RunStore, RunService } = await import(core);
+const { DataRoot, RunStore, createRunService } = await import(core);
 const historySizes = [0, 100, 500];
 const samples = 5;
 const tasksPerRun = 20;
@@ -105,7 +105,7 @@ for (const historyRuns of historySizes) {
   try {
     console.error(`Preparing ${historyRuns} historical runs.`);
     root = new DataRoot(directory);
-    const seed = new RunService(new RunStore(root), now);
+    const seed = createRunService(new RunStore(root), now);
     for (let i = 0; i < historyRuns; i++)
       seed.open("benchmark", input, `history-${i}`);
     root.close();
@@ -113,8 +113,8 @@ for (const historyRuns of historySizes) {
     const opening = [];
     for (let i = 0; i < samples; i++) {
       root = new DataRoot(directory);
-      const initialized = measure(
-        () => new RunService(new RunStore(root), now),
+      const initialized = measure(() =>
+        createRunService(new RunStore(root), now),
       );
       startup.push(initialized);
       const opened = measure(() =>
