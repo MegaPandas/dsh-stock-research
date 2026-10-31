@@ -1,21 +1,11 @@
-export interface ModelRoute {
-  provider: string;
-  model: string;
-  reasoningEffort?: string;
-}
+import type {
+  ModelCatalog as NativeModelCatalog,
+  ModelSelection,
+} from "@deepseek-ai/dsh-api-remotes/client";
+
+export type ModelRoute = ModelSelection;
 
 export interface ModelCatalog {
-  default?: ModelRoute;
-  groups: {
-    id: string;
-    name: string;
-    models: {
-      id: string;
-      name: string;
-      reasoning?: {
-        efforts: { id: string; name: string; description?: string }[];
-        defaultEffort?: string;
-      };
-    }[];
-  }[];
+  readonly default?: ModelRoute;
+  readonly groups: NativeModelCatalog["groups"];
 }

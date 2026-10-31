@@ -214,6 +214,8 @@ export function ResearchJobCard({
 }
 
 export function registerResearchJobs(ctx: Context): void {
+  // The SDK merges server JobRegistry and client IJobs onto the same Context.
+  // This registration runs in the browser and consumes the native client service.
   const jobs = ctx.jobs as unknown as IJobs;
   ctx.effect(() => ctx.uiConversation.events.register(researchJobDefinition));
   ctx.slots.inject("conversation.chat.node", () =>
