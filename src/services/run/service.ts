@@ -431,7 +431,16 @@ export class RunService implements RunAccess {
     taskId: string,
     requestId: string,
   ): ClaimResult {
-    return this.mutate<ClaimResult>(
+    return this.claimTask(operation, taskId, requestId).result;
+  }
+
+  private claimTask(
+    operation: RunOperation,
+    taskId: string,
+    requestId: string,
+    executor?: "role" | "digest" | "finalize",
+  ) {
+    return this.transact<ClaimResult>(
       operation,
       controlScope(operation.identity),
       "claim",
@@ -476,6 +485,23 @@ export class RunService implements RunAccess {
           ...instruction,
         };
       },
+      executor === undefined
+        ? undefined
+        : (run) => {
+            const task = run.definition.tasks.find(
+              (task) => task.id === taskId,
+            );
+            const matches =
+              executor === "role"
+                ? task?.executor.kind === "role"
+                : task?.executor.kind === "service" &&
+                  task.executor.service === executor;
+            if (!matches)
+              throw new ResearchError(
+                "INVALID_INPUT",
+                `Task ${taskId} is not a ${executor}${executor === "role" ? "" : " service"} task.`,
+              );
+          },
     );
   }
 
@@ -532,18 +558,7 @@ export class RunService implements RunAccess {
     service: "digest" | "finalize",
     requestId: string,
   ): ClaimResult {
-    const definition = this.read(operation.runId).definition.tasks.find(
-      (task) => task.id === taskId,
-    );
-    if (
-      definition?.executor.kind !== "service" ||
-      definition.executor.service !== service
-    )
-      throw new ResearchError(
-        "INVALID_INPUT",
-        `Task ${taskId} is not a ${service} service task.`,
-      );
-    return this.claim(operation, taskId, requestId);
+    return this.claimTask(operation, taskId, requestId, service).result;
   }
 
   claimServiceForCall(
@@ -552,17 +567,13 @@ export class RunService implements RunAccess {
     service: "digest" | "finalize",
     requestId: string,
   ): { claim: ClaimResult; replayed: boolean } {
-    const replayed =
-      findReceipt(
-        this.read(operation.runId),
-        controlScope(operation.identity),
-        "claim",
-        requestId,
-      ) !== undefined;
-    return {
-      claim: this.claimService(operation, taskId, service, requestId),
-      replayed,
-    };
+    const { result: claim, replayed } = this.claimTask(
+      operation,
+      taskId,
+      requestId,
+      service,
+    );
+    return { claim, replayed };
   }
 
   hasClaimReceipt(operation: RunOperation, requestId: string): boolean {
@@ -614,17 +625,14 @@ export class RunService implements RunAccess {
     taskId: string,
     requestId: string,
   ): RoleDispatchContext {
-    const run = this.read(operation.runId);
-    const definition = run.definition.tasks.find((task) => task.id === taskId);
-    if (definition?.executor.kind !== "role")
-      throw new ResearchError(
-        "INVALID_INPUT",
-        `Task ${taskId} is not a role task.`,
-      );
-    const replayed =
-      findReceipt(run, controlScope(operation.identity), "claim", requestId) !==
-      undefined;
-    const claim = this.claim(operation, taskId, requestId);
+    const {
+      result: claim,
+      run,
+      replayed,
+    } = this.claimTask(operation, taskId, requestId, "role");
+    const definition = run.definition.tasks.find(
+      (task) => task.id === taskId,
+    )! as RoleDispatchContext["definition"];
     return {
       claim,
       scope: run.scope,
@@ -633,7 +641,7 @@ export class RunService implements RunAccess {
         executor: definition.executor,
         instructionVersion: claim.instructionVersion,
       },
-      attempt: this.readAttempt(claim),
+      attempt: taskState(run, taskId).attempts[claim.attempt - 1]!,
       replayed,
     };
   }
@@ -1370,18 +1378,34 @@ export class RunService implements RunAccess {
     request: unknown,
     apply: (run: ResearchRun, writer: ContentWriter) => Result,
   ): Result {
+    return this.transact(operation, scope, action, requestId, request, apply)
+      .result;
+  }
+
+  private transact<Result extends RunWriteResult>(
+    operation: RunOperation,
+    scope: string,
+    action: ReceiptAction,
+    requestId: string,
+    request: unknown,
+    apply: (run: ResearchRun, writer: ContentWriter) => Result,
+    validate?: (run: ResearchRun) => void,
+  ): { result: Result; run: ResearchRun; replayed: boolean } {
     const repairsViews =
       action === "commit_artifact" ||
       action === "finalize" ||
       action === "redo";
     let result!: Result;
     let contents!: ContentReader;
+    let replayed = false;
     const committed = this.store.commit(operation.runId, (run, writer) => {
       this.restore(run);
+      validate?.(run);
       contents = writer;
       const receipt = findReceipt(run, scope, action, requestId);
       if (receipt !== undefined) {
         result = this.replay(receipt, request, writer) as Result;
+        replayed = true;
         return null;
       }
       run.updatedAt = this.now();
@@ -1391,7 +1415,7 @@ export class RunService implements RunAccess {
       return run;
     });
     if (repairsViews) this.project(committed, contents);
-    return result;
+    return { result, run: committed, replayed };
   }
 
   private replay(

@@ -400,6 +400,116 @@ describe("run service transactions", () => {
     });
   });
 
+  it.each(["claimService", "claimServiceForCall"] as const)(
+    "%s reads one manifest and replays the original claim after cancellation",
+    (entry) => {
+      const { service, store } = setup();
+      const { runId } = service.open("coordinator", input(), "open");
+      completeAnalysis(service, runId);
+      const operation = { runId, identity: "coordinator" };
+      const reads = vi.spyOn(fs, "readFileSync");
+      const measured = () => {
+        reads.mockClear();
+        const result = service[entry](operation, "digest", "digest", "service");
+        expect(
+          reads.mock.calls.filter(([file]) =>
+            String(file).endsWith("/manifest.json"),
+          ),
+        ).toHaveLength(1);
+        return result;
+      };
+      const first = measured();
+      if ("claim" in first) expect(first.replayed).toBe(false);
+      service.cancel(operation, "cancel");
+      const cancelled = store.read(runId);
+      const replayed = measured();
+      expect("claim" in replayed ? replayed.claim : replayed).toEqual(
+        "claim" in first ? first.claim : first,
+      );
+      if ("claim" in replayed) expect(replayed.replayed).toBe(true);
+      expect(store.read(runId)).toEqual(cancelled);
+    },
+  );
+
+  it("dispatches from one transaction snapshot while observing later invalidation and instruction changes", () => {
+    const { service, store } = setup();
+    const supplied = input();
+    supplied.instructions = [{ taskId: "analysis", instruction: "Original" }];
+    const { runId } = service.open("coordinator", supplied, "open");
+    const operation = { runId, identity: "coordinator" };
+    const reads = vi.spyOn(fs, "readFileSync");
+    const dispatch = (requestId: string) => {
+      reads.mockClear();
+      const result = service.dispatchForCall(operation, "analysis", requestId);
+      expect(
+        reads.mock.calls.filter(([file]) =>
+          String(file).endsWith("/manifest.json"),
+        ),
+      ).toHaveLength(1);
+      return result;
+    };
+    const first = dispatch("original");
+    expect(first).toMatchObject({
+      replayed: false,
+      claim: { attempt: 1, instructionVersion: 1 },
+      attempt: { number: 1, status: "running", startedAt: INITIAL_TIME },
+    });
+    service.bindTaskSession({
+      ...first.claim,
+      identity: "worker",
+      sessionId: "child",
+    });
+    service.redo(operation, "analysis", "redo");
+    service.resume(
+      operation,
+      {
+        resolvedReasonIds: [],
+        instructions: [{ taskId: "analysis", instruction: "Revised" }],
+      },
+      "revise",
+    );
+    const revised = store.read(runId);
+    const replayed = dispatch("original");
+    expect(replayed.claim).toEqual(first.claim);
+    expect(replayed).toMatchObject({
+      replayed: true,
+      definition: { instructionVersion: 1 },
+      attempt: { number: 1, status: "invalidated", sessionId: "child" },
+    });
+    expect(store.read(runId)).toEqual(revised);
+    expect(dispatch("new")).toMatchObject({
+      replayed: false,
+      claim: { attempt: 2, instructionVersion: 2 },
+      definition: { instructionVersion: 2 },
+      attempt: { number: 2, status: "running", sessionId: null },
+    });
+  });
+
+  it("rejects the wrong claim entry before creating or replaying a receipt", () => {
+    const { service, store } = setup();
+    const { runId } = service.open("coordinator", input(), "open");
+    const operation = { runId, identity: "coordinator" };
+    const invalid = [
+      () => service.dispatchForCall(operation, "digest", "claim"),
+      () => service.dispatchForCall(operation, "missing", "claim"),
+      () => service.claimService(operation, "analysis", "digest", "claim"),
+      () =>
+        service.claimServiceForCall(operation, "digest", "finalize", "claim"),
+    ];
+    const before = store.read(runId);
+    for (const action of invalid)
+      expect(action).toThrowError(
+        expect.objectContaining({ code: "INVALID_INPUT" }),
+      );
+    expect(store.read(runId)).toEqual(before);
+    service.dispatchForCall(operation, "analysis", "claim");
+    const claimed = store.read(runId);
+    expect(() =>
+      service.claimService(operation, "analysis", "digest", "claim"),
+    ).toThrowError(expect.objectContaining({ code: "INVALID_INPUT" }));
+    expect(store.read(runId)).toEqual(claimed);
+  });
+
   it("keeps failed runs active and retries with a new attempt while rejecting old writes", () => {
     const { service, store } = setup();
     const { runId } = service.open("coordinator", input(), "open");
