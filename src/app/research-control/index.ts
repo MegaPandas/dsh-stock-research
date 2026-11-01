@@ -161,6 +161,7 @@ export class ResearchApplication implements ResearchActions {
       makeDigest: wrap("stock_make_digest", operations.makeDigest),
       decide: wrap("stock_decide", operations.decide),
       redoTask: wrap("stock_redo_task", operations.redoTask),
+      cancelTask: wrap("stock_cancel_task", operations.cancelTask),
     };
   }
 

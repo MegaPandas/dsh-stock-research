@@ -147,7 +147,9 @@ export class DigestService {
               target.taskId === operation.taskId &&
               target.attempt === operation.attempt,
           ) ||
-          this.runs.readAttempt(operation).status === "invalidated"),
+          ["invalidated", "cancelled"].includes(
+            this.runs.readAttempt(operation).status,
+          )),
     );
     await this.stopOwned(owned);
   }

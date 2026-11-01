@@ -130,6 +130,45 @@ async function host(
 }
 
 describe("role follow-up in a persistent native child", () => {
+  it.each(["cancel-task", "redo"] as const)(
+    "keeps the replacement session available for follow-up after old %s control is replayed",
+    async (method) => {
+      const h = await host();
+      const first = await h.dispatch();
+      const operation = { runId: h.runId, identity: h.parent.id };
+      const control = () =>
+        method === "redo"
+          ? h.bridge.redo(operation, "analysis", "control-first")
+          : h.bridge.cancelTask(
+              operation,
+              {
+                taskId: "analysis",
+                expectedAttempt: first.attempt,
+                reason: "Replace first report",
+              },
+              "control-first",
+            );
+      const original = await control();
+      if (method === "cancel-task")
+        await h.bridge.redo(operation, "analysis", "redo-after-cancel");
+      const second = await h.bridge.dispatch(
+        h.parent,
+        h.runId,
+        "analysis",
+        "replacement",
+        new AbortController().signal,
+      );
+      expect(second).toMatchObject({ attempt: 2, status: "succeeded" });
+      expect(await control()).toEqual(original);
+      const third = await h.follow();
+      expect(third).toMatchObject({
+        attempt: 3,
+        status: "succeeded",
+        sessionId: second.sessionId,
+      });
+    },
+  );
+
   it("reuses history and publishes a new attempt while retaining old artifacts and invalidating downstream", async () => {
     const h = await host();
     const first = await h.dispatch();

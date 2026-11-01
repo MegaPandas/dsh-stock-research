@@ -239,7 +239,13 @@ describe("DispatchBridge with real DSH spawn and research services", () => {
     ).toBeUndefined();
   });
 
-  it.each(["redo", "cancel", "redo-publish-failure"] as const)(
+  it.each([
+    "redo",
+    "cancel",
+    "redo-publish-failure",
+    "cancel-task",
+    "cancel-task-publish-failure",
+  ] as const)(
     "%s stops a role still finishing after its artifact was committed",
     async (method) => {
       const gate = modelGate();
@@ -249,7 +255,10 @@ describe("DispatchBridge with real DSH spawn and research services", () => {
       const claimed = { runId: h.runId, taskId: "analysis", attempt: 1 };
       const committed = h.runs.readAttempt(claimed).outputRefs;
       const failure = new Error("Fixture projection deletion failed");
-      if (method === "redo-publish-failure") {
+      if (
+        method === "redo-publish-failure" ||
+        method === "cancel-task-publish-failure"
+      ) {
         const unlink = fs.unlinkSync;
         vi.spyOn(fs, "unlinkSync").mockImplementation((path) => {
           if (String(path).endsWith("/reports/analysis.md")) throw failure;
@@ -260,7 +269,17 @@ describe("DispatchBridge with real DSH spawn and research services", () => {
       const stop = (
         method === "cancel"
           ? h.bridge.cancel(h.operation, "cancel-finishing")
-          : h.bridge.redo(h.operation, "analysis", "redo-finishing")
+          : method.startsWith("cancel-task")
+            ? h.bridge.cancelTask(
+                h.operation,
+                {
+                  taskId: "analysis",
+                  expectedAttempt: 1,
+                  reason: "Stop finishing role",
+                },
+                "cancel-finishing-task",
+              )
+            : h.bridge.redo(h.operation, "analysis", "redo-finishing")
       )
         .then(
           (value) => ({ status: "fulfilled" as const, value }),
@@ -285,7 +304,10 @@ describe("DispatchBridge with real DSH spawn and research services", () => {
       expect(
         h.ctx.agents.get(SessionId(String(options.sessionId))),
       ).toBeUndefined();
-      if (method === "redo-publish-failure") {
+      if (
+        method === "redo-publish-failure" ||
+        method === "cancel-task-publish-failure"
+      ) {
         expect(stopped).toMatchObject({
           status: "rejected",
           reason: { code: "STORAGE_FAILED", cause: failure },

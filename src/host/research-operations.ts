@@ -1,5 +1,7 @@
 import type {
   ArtifactCommitResult,
+  CancelTaskInput,
+  CancelTaskResult,
   RedoTaskResult,
 } from "../contracts/runs.js";
 import type { DecisionService } from "../services/decisions.js";
@@ -28,6 +30,7 @@ export interface ResearchFollowupRequest extends ResearchTaskRequest {
 export interface ResearchRedoRequest extends ResearchTaskRequest {
   reason: string | null;
 }
+export type ResearchCancelRequest = ResearchTaskRequest & CancelTaskInput;
 
 export interface DispatchOperations {
   dispatchTask(
@@ -50,6 +53,11 @@ export interface DispatchOperations {
     caller: BoundCaller,
     signal: AbortSignal,
   ): Promise<RedoTaskResult>;
+  cancelTask(
+    request: ResearchCancelRequest,
+    caller: BoundCaller,
+    signal: AbortSignal,
+  ): Promise<CancelTaskResult>;
 }
 export interface ServiceTaskOperations {
   makeDigest(
@@ -69,7 +77,7 @@ export type ResearchOperations = DispatchOperations & ServiceTaskOperations;
 export function createDispatchOperations(
   bridge: Pick<
     DispatchBridge,
-    "dispatch" | "dispatchStage" | "followup" | "redo"
+    "dispatch" | "dispatchStage" | "followup" | "redo" | "cancelTask"
   >,
 ): DispatchOperations {
   return {
@@ -109,6 +117,18 @@ export function createDispatchOperations(
         request.taskId,
         request.requestId,
         request.reason,
+      );
+    },
+    cancelTask(request, caller, signal) {
+      signal.throwIfAborted();
+      return bridge.cancelTask(
+        { runId: request.runId, identity: caller.agent.id },
+        {
+          taskId: request.taskId,
+          expectedAttempt: request.expectedAttempt,
+          reason: request.reason,
+        },
+        request.requestId,
       );
     },
   };

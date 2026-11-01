@@ -37,4 +37,5 @@ export type {
   ResearchStageRequest,
   ResearchFollowupRequest,
   ResearchRedoRequest,
+  ResearchCancelRequest,
 } from "./host/research-operations.js";

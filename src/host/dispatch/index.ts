@@ -19,6 +19,8 @@ import type {
   ArtifactCommitResult,
   AttemptTarget,
   CancelRunResult,
+  CancelTaskInput,
+  CancelTaskResult,
   RedoTaskResult,
   RecoverAttemptsResult,
   RoleDispatchContext,
@@ -126,6 +128,7 @@ type DispatchRuns = Pick<
   | "dispatchForCall"
   | "redo"
   | "cancel"
+  | "cancelTask"
   | "recoverInterrupted"
   | "bindTaskSession"
   | "failServiceAttempt"
@@ -425,11 +428,10 @@ export class DispatchBridge {
     let result: RedoTaskResult;
     try {
       result = this.runs.redo(operation, taskId, requestId, reason);
+      this.#forgetStoppedSessions(operation.runId, result.affectedTasks);
     } catch (cause) {
       return this.#controlFailure(operation.runId, cause);
     }
-    for (const task of result.affectedTasks)
-      this.#roleSessions.delete(JSON.stringify([operation.runId, task]));
     await this.#duringStop(operation.runId, result.affectedTasks, () =>
       this.#stopTargets(operation.runId, result.stopAttempts),
     );
@@ -448,6 +450,24 @@ export class DispatchBridge {
     }
     await this.#duringStop(operation.runId, null, () =>
       this.#stopTargets(operation.runId, result.stopAttempts, true),
+    );
+    return result;
+  }
+
+  async cancelTask(
+    operation: RunOperation,
+    input: CancelTaskInput,
+    requestId: string,
+  ): Promise<CancelTaskResult> {
+    let result: CancelTaskResult;
+    try {
+      result = this.runs.cancelTask(operation, input, requestId);
+      this.#forgetStoppedSessions(operation.runId, result.affectedTasks);
+    } catch (cause) {
+      return this.#controlFailure(operation.runId, cause);
+    }
+    await this.#duringStop(operation.runId, result.affectedTasks, () =>
+      this.#stopTargets(operation.runId, result.stopAttempts),
     );
     return result;
   }
@@ -732,12 +752,29 @@ export class DispatchBridge {
         owner.runId === runId &&
         (cancelled ||
           keys.has(attemptKey(runId, owner)) ||
-          this.runs.readAttempt(owner).status === "invalidated"),
+          ["invalidated", "cancelled"].includes(
+            this.runs.readAttempt(owner).status,
+          )),
     );
     await finishStops([
       this.#stop(owned),
       this.digests.stop(runId, targets, cancelled),
     ]);
+  }
+
+  #forgetStoppedSessions(runId: string, taskIds: readonly string[]): void {
+    for (const taskId of taskIds) {
+      const key = JSON.stringify([runId, taskId]);
+      const session = this.#roleSessions.get(key);
+      if (
+        session !== undefined &&
+        ["invalidated", "cancelled"].includes(
+          this.runs.readAttempt({ runId, taskId, attempt: session.attempt })
+            .status,
+        )
+      )
+        this.#roleSessions.delete(key);
+    }
   }
 
   async #controlFailure(runId: string, cause: unknown): Promise<never> {
