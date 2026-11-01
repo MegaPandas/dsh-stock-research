@@ -78,6 +78,21 @@ it.each(["12", "8"])(
       "save",
     );
     const create = vi.spyOn(h.ctx.agents, "create");
+    const release = runtime.bindCoordinator(h.outside.agent);
+    cleanups.push(async () => release());
+    runtime.authorizeCoordinatorRun(h.outside.agent, runId);
+    await runtime.executeScheduled(
+      h.outside.agent,
+      runId,
+      {
+        kind: "task",
+        taskId: "handoff",
+        attempt: 1,
+        executor: { kind: "service", service: "digest" },
+        requestId: "digest",
+      },
+      new AbortController().signal,
+    );
     const result = await runtime.dispatch.makeDigest(
       operation,
       "handoff",

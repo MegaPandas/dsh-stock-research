@@ -14,7 +14,7 @@ import type {
 } from "@deepseek-ai/dsh-subagent";
 import type { ToolDefinition } from "@deepseek-ai/dsh-tools";
 import type { ArtifactRef } from "../../contracts/data.js";
-import { ResearchError } from "../../contracts/errors.js";
+import { ExecutionStopped, ResearchError } from "../../contracts/errors.js";
 import type {
   ArtifactCommitResult,
   AttemptTarget,
@@ -174,6 +174,36 @@ export class DispatchBridge {
         if (this.#stageReceipts[i]!.parent === agent)
           this.#stageReceipts.splice(i, 1);
     });
+  }
+
+  /** Recheck a planned attempt after stop barriers; start must claim synchronously. */
+  admitScheduled<Result>(
+    runId: string,
+    targets: readonly AttemptTarget[],
+    signal: AbortSignal,
+    start: () => Promise<Result>,
+  ): Promise<Result | undefined> {
+    return this.#afterStops<Result | undefined>(
+      runId,
+      targets.map(({ taskId }) => taskId),
+      signal,
+      () => {
+        const view = this.runs.view({ runId });
+        if (
+          view.status !== "active" ||
+          !targets.every(({ taskId, attempt }) => {
+            const task = view.tasks.find((task) => task.taskId === taskId)!;
+            return (
+              task.status === "pending" &&
+              task.attempt + 1 === attempt &&
+              view.readyTasks.includes(taskId)
+            );
+          })
+        )
+          return Promise.resolve(undefined);
+        return start();
+      },
+    );
   }
 
   dispatch(
@@ -704,7 +734,14 @@ export class DispatchBridge {
           "Role execution cleanup failed.",
           { cause: cleanupFailures[0] },
         );
-      if (execution.status === "rejected") throw execution.reason;
+      if (execution.status === "rejected") {
+        if (
+          execution.reason instanceof ExecutionStopped &&
+          execution.reason === ownerSignal.reason
+        )
+          return this.#result(claim);
+        throw execution.reason;
+      }
       const result = this.#result(claim);
       if (
         result.status === "succeeded" &&
@@ -868,7 +905,7 @@ export class DispatchBridge {
   async #stop(owned: readonly OwnedAttempt[]): Promise<void> {
     for (const owner of owned)
       owner.controller.abort(
-        new DOMException("Research execution stopped.", "AbortError"),
+        new ExecutionStopped("Research execution stopped."),
       );
     const failures = (
       await Promise.all(owned.map((owner) => owner.drained))

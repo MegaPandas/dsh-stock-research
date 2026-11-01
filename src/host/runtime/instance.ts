@@ -54,6 +54,10 @@ import {
 } from "../report-submission.js";
 import type { DispatchBridge } from "../dispatch/index.js";
 import type { ResearchSessions } from "../sessions/index.js";
+import {
+  createScheduledResearchExecutor,
+  type ScheduledResearchExecutor,
+} from "../scheduled-operations.js";
 import { searchPublic, approvePublicSearch } from "../public-search.js";
 import { settle, throwFailures, type Dispose } from "./lifecycle.js";
 
@@ -72,6 +76,7 @@ export interface ResearchRuntime {
   readonly memory: MemoryAccess;
   readonly dispatch: DispatchBridge;
   readonly operations: ResearchOperations;
+  readonly executeScheduled: ScheduledResearchExecutor;
   readonly policy: QueryPolicy;
   readonly submitReport: SubmitReport;
   readonly valuations: ValuationOperations;
@@ -137,6 +142,7 @@ export class Runtime implements ResearchRuntime {
   readonly memory: MemoryService;
   readonly dispatch: DispatchBridge;
   readonly operations: ResearchOperations;
+  readonly executeScheduled: ScheduledResearchExecutor;
   readonly submitReport: SubmitReport;
   readonly valuations: ValuationOperations;
   readonly #pending = new Set<PendingAgent>();
@@ -160,6 +166,11 @@ export class Runtime implements ResearchRuntime {
       ...createDispatchOperations(components.dispatch),
       ...createServiceTaskOperations(components.dispatch, components.decisions),
     };
+    this.executeScheduled = createScheduledResearchExecutor(
+      this.dispatch,
+      components.bindings,
+      this.operations,
+    );
     this.submitReport = createReportSubmission(
       components.artifacts,
       components.bindings,

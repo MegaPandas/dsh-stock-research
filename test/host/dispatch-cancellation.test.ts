@@ -60,9 +60,7 @@ it("does not publish a pre-cancelled typed task control or consume its request i
 
 it("stops an owned attempt before provisioning starts", async () => {
   const h = await host([]);
-  const execution = h
-    .dispatch("before-provisioning")
-    .catch((reason: unknown) => reason);
+  const execution = h.dispatch("before-provisioning");
   const stopped = await h.bridge.cancelTask(
     h.operation,
     {
@@ -73,7 +71,7 @@ it("stops an owned attempt before provisioning starts", async () => {
     "cancel-analysis",
   );
   expect(stopped.stopAttempts).toEqual([{ taskId: "analysis", attempt: 1 }]);
-  expect(await execution).toBeInstanceOf(Error);
+  expect(await execution).toMatchObject({ attempt: 1, status: "cancelled" });
   expect(
     h.runs.readAttempt({ ...h.operation, taskId: "analysis", attempt: 1 })
       .status,

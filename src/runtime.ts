@@ -5,6 +5,8 @@ export { createResearchPlugin } from "./host/runtime/index.js";
 export type { ResearchRuntime } from "./host/runtime/index.js";
 export type { ReportCaller, SubmitReport } from "./host/report-submission.js";
 export type { ValuationOperations } from "./host/valuation-operations.js";
+export { createScheduledResearchExecutor } from "./host/scheduled-operations.js";
+export type { ScheduledResearchExecutor } from "./host/scheduled-operations.js";
 
 export {
   SessionBindings,

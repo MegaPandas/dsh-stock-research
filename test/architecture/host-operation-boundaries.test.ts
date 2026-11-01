@@ -16,6 +16,7 @@ it.each([
   ["valuation-operations", "../tools/errors.js"],
   ["run-reading", "./tool-protocol/parameters.js"],
   ["research-operations", "./tool-protocol/errors.js"],
+  ["scheduled-operations", "./tool-protocol/parameters.js"],
 ])("keeps host %s independent of %s", async (file, dependency) => {
   for (const source of [
     `import type { Value } from "${dependency}";`,
@@ -34,6 +35,8 @@ it.each([
   ["src/host/run-reading.ts", "./bindings.js"],
   ["src/host/research-operations.ts", "./dispatch/index.js"],
   ["src/host/research-operations.ts", "../services/decisions.js"],
+  ["src/host/scheduled-operations.ts", "../services/scheduler/index.js"],
+  ["src/host/scheduled-operations.ts", "./dispatch/index.js"],
   ["src/host/valuation-operations.ts", "../services/valuation/calculate.js"],
   ["src/host/runtime/index.ts", "../../tools/read.js"],
 ])("allows %s → %s", async (file, dependency) => {

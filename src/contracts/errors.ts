@@ -24,3 +24,11 @@ export class ResearchError extends Error {
     this.code = code;
   }
 }
+
+/** An execution owner uses this exact reason to stop its work. */
+export class ExecutionStopped extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ExecutionStopped";
+  }
+}

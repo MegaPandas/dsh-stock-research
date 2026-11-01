@@ -2,7 +2,7 @@ import type {
   DigestModelInput,
   GenerateDigest,
 } from "../../contracts/digests.js";
-import { ResearchError } from "../../contracts/errors.js";
+import { ExecutionStopped, ResearchError } from "../../contracts/errors.js";
 import type { ResearchScope } from "../../contracts/data.js";
 import type {
   ArtifactCommitResult,
@@ -245,9 +245,7 @@ export class DigestService {
 
   private async stopOwned(owned: readonly PendingDigest[]): Promise<void> {
     for (const entry of owned)
-      entry.controller.abort(
-        new DOMException("Digest execution stopped.", "AbortError"),
-      );
+      entry.controller.abort(new ExecutionStopped("Digest execution stopped."));
     await Promise.all(owned.map((entry) => entry.drained));
     const failures = owned.flatMap((entry) => entry.failures);
     if (failures.length > 0)
