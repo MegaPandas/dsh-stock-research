@@ -92,6 +92,10 @@ export default defineConfig(
             publicEntries: ["index.js"],
           },
           {
+            directory: "src/client/settings",
+            publicEntries: ["index.js"],
+          },
+          {
             directory: "src/app/research-control",
             publicEntries: ["index.js"],
           },

@@ -13,7 +13,7 @@ import type {
   ConfigForm,
   ConfigFormSnapshot,
 } from "@deepseek-ai/dsh-client-ui-settings/client";
-import { SettingsPage } from "../../src/client/SettingsPage.js";
+import { SettingsPage } from "../../src/client/settings/index.js";
 import type { ModelCatalog } from "../../src/client/settings-types.js";
 import type { ApplicationConfig } from "../../src/contracts/settings.js";
 
@@ -434,6 +434,51 @@ describe("stock research settings page", () => {
     expect((screen.getByLabelText("请求超时") as HTMLInputElement).value).toBe(
       "30",
     );
+  });
+
+  it("retains an accepted revision when a pending save finishes after navigation", async () => {
+    const h = fixture();
+    let accept!: (value: boolean) => void;
+    h.mutate.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          accept = resolve;
+        }),
+    );
+    const first = render(
+      <SettingsPage form={h.form} loadCatalog={loadCatalog} />,
+    );
+    await ready();
+    fireEvent.change(screen.getByLabelText("请求超时"), {
+      target: { value: "30" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "保存" }));
+    first.unmount();
+    const accepted = settings();
+    accepted.runtime.http.timeoutMs = 30000;
+    await act(async () => {
+      h.update({ value: accepted, revision: 8 });
+      accept(true);
+    });
+    render(<SettingsPage form={h.form} loadCatalog={loadCatalog} />);
+    await ready();
+    expect((screen.getByLabelText("请求超时") as HTMLInputElement).value).toBe(
+      "30",
+    );
+    expect(
+      (screen.getByRole("button", { name: "保存" }) as HTMLButtonElement)
+        .disabled,
+    ).toBe(true);
+    fireEvent.change(screen.getByLabelText("请求超时"), {
+      target: { value: "40" },
+    });
+    h.mutate.mockResolvedValue(false);
+    fireEvent.click(screen.getByRole("button", { name: "保存" }));
+    await screen.findByRole("alert");
+    expect(h.mutate.mock.calls[1]).toEqual([
+      [{ op: "set", path: ["runtime", "http", "timeoutMs"], value: 40000 }],
+      8,
+    ]);
   });
 
   it("keeps a dirty draft across settings navigation and explicitly rebases edited fields", async () => {

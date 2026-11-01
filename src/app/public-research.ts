@@ -1,11 +1,12 @@
 import { TEXT_BUDGET_MAX_MULTIPLIER } from "../contracts/text-budget.js";
+import { DEFAULT_PUBLIC_SEARCH_LIMIT } from "../contracts/settings.js";
 import { sharedResearchPrompt } from "./agent-prompt.js";
 
 export const PUBLIC_RESEARCH_TASK = "analysis.public";
 export const PUBLIC_RESEARCH_PROMPT_INPUT = "prompt:public-analyst";
 export const PUBLIC_SEARCH_SNIPPET_TARGET_CHARACTERS = 1600;
 export const PUBLIC_SEARCH_LIMITS = {
-  maxSearches: 8,
+  maxSearches: DEFAULT_PUBLIC_SEARCH_LIMIT,
   maxRejectedApprovals: 2,
   maxSnippetChars:
     PUBLIC_SEARCH_SNIPPET_TARGET_CHARACTERS * TEXT_BUDGET_MAX_MULTIPLIER,

@@ -2,6 +2,8 @@ import type { HttpClientOptions } from "./http.js";
 import type { QueryCachePolicy } from "./cache.js";
 import type { QueryPolicy } from "./query.js";
 
+export const DEFAULT_PUBLIC_SEARCH_LIMIT = 8;
+
 export const SOURCE_IDS = [
   "yahoo",
   "eastmoney-market",
