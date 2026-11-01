@@ -12,7 +12,10 @@ import {
 } from "@deepseek-ai/dsh-llm";
 import * as Quick from "../../src/quick.js";
 import { prepareResearchRole } from "../../src/app/role-preparation/index.js";
-import { createResearchPlugin } from "../../src/runtime.js";
+import {
+  createResearchPlugin,
+  type ResearchConfig,
+} from "../../src/runtime.js";
 import { runtimeHost } from "./runtime-host.js";
 
 export async function* toolCall(
@@ -299,6 +302,7 @@ export function researchCommands(ctx: Context, agent: Agent) {
 export async function quickHost(
   respond: (request: GenerateOptions) => AsyncIterable<StreamChunk>,
   setupHost?: (host: Awaited<ReturnType<typeof runtimeHost>>) => Promise<void>,
+  settings: Partial<ResearchConfig> = {},
 ) {
   const h = await runtimeHost({ respond });
   try {
@@ -314,6 +318,7 @@ export async function quickHost(
           freshness: { market: 86_400_000, fundamentals: 0, macro: 0 },
           secCiks: {},
         },
+        ...settings,
       }),
     );
     await h.ctx.plugin(CommandRuntime);
