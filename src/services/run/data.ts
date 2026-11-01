@@ -36,6 +36,7 @@ export function persistEvidence<T>(
       })),
     },
     recordedAt: run.updatedAt,
+    ...(input.snapshotAt === undefined ? {} : { snapshotAt: input.snapshotAt }),
     ...(replayedFrom === null ? {} : { replayedFrom }),
   }));
   run.evidence.push({

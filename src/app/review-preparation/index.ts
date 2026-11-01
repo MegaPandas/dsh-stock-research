@@ -43,7 +43,9 @@ export function prepareReviewRequest(
     .view({ runId: input.runId })
     .tasks.flatMap(({ outputRefs }) => outputRefs)
     .map((ref) => inputs.artifact(ref));
-  const reports = inputs.closure(currentReports.map(({ ref }) => ref));
+  const reports = inputs
+    .closure(currentReports.map(({ ref }) => ref))
+    .filter(({ content }) => content.kind !== "collection");
   const reader = createReportReader(reports, []);
   const selectedDecision =
     currentReports.find(({ content }) => content.kind === "decision") ??

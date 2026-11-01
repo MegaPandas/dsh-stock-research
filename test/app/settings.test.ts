@@ -47,6 +47,17 @@ async function host(
   vi.spyOn(original.collection, "collect").mockImplementation(async (scope) =>
     askCollection(scope),
   );
+  vi.spyOn(original.collection, "collectNode").mockImplementation(
+    async (scope, node) => {
+      const snapshot = askCollection(scope);
+      return {
+        ...snapshot,
+        node,
+        packets: node === "required" ? snapshot.packets : [],
+        failures: node === "macro" ? snapshot.failures : [],
+      };
+    },
+  );
   vi.spyOn(h.adapter, "resolveModel").mockImplementation(
     async (provider, id) => ({
       provider,
@@ -154,11 +165,11 @@ describe("live stock research settings", () => {
     before.publicSearchLimit = 2;
     await h.save(before);
     const paused = gate<void>();
-    vi.mocked(h.original.collection.collect).mockImplementationOnce(
+    vi.mocked(h.original.collection.collectNode).mockImplementationOnce(
       async (scope) => {
         paused.started.resolve();
         await paused.released.promise;
-        return askCollection(scope);
+        return { ...askCollection(scope), node: "required", failures: [] };
       },
     );
     const work = h.execute("/stock-quick SZ.002594 2024-01-03");

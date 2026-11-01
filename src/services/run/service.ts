@@ -1073,7 +1073,13 @@ export class RunService implements RunAccess {
           writer,
           operation,
           query,
-          { envelope, candidates },
+          {
+            envelope,
+            candidates,
+            ...(selected.record.snapshotAt === undefined
+              ? {}
+              : { snapshotAt: selected.record.snapshotAt }),
+          },
           callId,
           selected.source,
         ),

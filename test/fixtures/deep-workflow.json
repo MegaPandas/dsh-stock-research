@@ -2,34 +2,49 @@
   "mode": "deep",
   "tasks": [
     {
-      "id": "analysis.market",
+      "id": "data.market",
       "dependsOn": [],
       "inputTasks": []
+    },
+    {
+      "id": "data.fundamentals",
+      "dependsOn": [],
+      "inputTasks": []
+    },
+    {
+      "id": "data.macro",
+      "dependsOn": [],
+      "inputTasks": []
+    },
+    {
+      "id": "analysis.market",
+      "dependsOn": ["data.market"],
+      "inputTasks": ["data.market"]
     },
     {
       "id": "analysis.fundamentals",
-      "dependsOn": [],
-      "inputTasks": []
+      "dependsOn": ["data.fundamentals"],
+      "inputTasks": ["data.fundamentals"]
     },
     {
       "id": "analysis.macro",
-      "dependsOn": [],
-      "inputTasks": []
+      "dependsOn": ["data.macro"],
+      "inputTasks": ["data.macro"]
     },
     {
       "id": "analysis.business",
-      "dependsOn": [],
-      "inputTasks": []
+      "dependsOn": ["data.fundamentals"],
+      "inputTasks": ["data.fundamentals"]
     },
     {
       "id": "analysis.geopolitics",
-      "dependsOn": [],
-      "inputTasks": []
+      "dependsOn": ["data.macro"],
+      "inputTasks": ["data.macro"]
     },
     {
       "id": "analysis.sentiment",
-      "dependsOn": [],
-      "inputTasks": []
+      "dependsOn": ["data.market"],
+      "inputTasks": ["data.market"]
     },
     {
       "id": "analysis.public",
@@ -129,8 +144,8 @@
     },
     {
       "id": "manager.decision",
-      "dependsOn": ["digest.risk"],
-      "inputTasks": ["digest.risk"]
+      "dependsOn": ["digest.risk", "data.fundamentals"],
+      "inputTasks": ["digest.risk", "data.fundamentals"]
     },
     {
       "id": "finalize",

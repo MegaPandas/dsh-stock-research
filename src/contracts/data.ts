@@ -80,6 +80,8 @@ export interface EvidenceRecord<T> {
   };
   envelope: DataEnvelope<T>;
   recordedAt: ISOTime;
+  /** Frozen data-node time; ordinary query evidence uses the research cutoff. */
+  snapshotAt?: ISOTime;
   replayedFrom?: SourceRef;
 }
 

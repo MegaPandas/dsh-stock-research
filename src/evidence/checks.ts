@@ -12,13 +12,14 @@ function intersects(path: string, dependency: string): boolean {
   );
 }
 
-/** Shared evidence boundary for numeric fields and nonnumeric payload citations. */
+/** scope bounds observations; a fixed data node supplies its separate knowledge time. */
 export function verifyEvidence(
   scope: ResearchScope,
   envelope: EvidenceEnvelope,
   ref: SourceRef,
   field: Pick<NumberField, "times" | "dependencies">,
   warnings: NumberWarning[],
+  snapshotAt: string = scope.cutoff,
 ): void {
   const scoped = envelope.gaps.filter((gap) =>
     field.dependencies.some((path) => intersects(gap.field, path)),
@@ -48,11 +49,11 @@ export function verifyEvidence(
       throw new EvidenceTimeError(
         "The selected observation is incomplete or after cutoff.",
       );
-    if (point.availableAt !== null && point.availableAt > cutoff)
+    if (point.availableAt !== null && point.availableAt > snapshotAt)
       throw new EvidenceTimeError(
-        "The selected content became available after cutoff.",
+        "The selected content became available after the fixed snapshot time.",
       );
-    const captured = envelope.retrievedAt <= cutoff;
+    const captured = envelope.retrievedAt <= snapshotAt;
     const published = point.availableAt !== null && !unverified;
     const qualified =
       envelope.historicalKnowledge === "verified" &&

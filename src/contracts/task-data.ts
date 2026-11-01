@@ -21,6 +21,7 @@ export interface CandidateSeed extends Omit<CandidateClaim, "source"> {
 export interface EvidenceInput<T> {
   envelope: Omit<DataEnvelope<T>, "candidateClaims">;
   candidates: CandidateSeed[];
+  snapshotAt?: ISOTime;
 }
 export interface RegisteredEvidenceRecord<T> extends EvidenceRecord<T> {
   envelope: DataEnvelope<T> & { candidateClaims: CandidateClaim[] };

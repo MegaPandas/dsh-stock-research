@@ -1,5 +1,6 @@
 import type { Agent } from "@deepseek-ai/dsh-agent";
 import type { ResearchScope } from "../../contracts/data.js";
+import type { ArtifactPayloads } from "../../contracts/artifact-payloads.js";
 import type {
   RunReader,
   RunLifecycle,
@@ -71,7 +72,7 @@ export interface ResearchApplicationPorts extends Omit<
 > {
   runs: Pick<
     RunReader,
-    "view" | "readDefinition" | "inputCatalog" | "readInput"
+    "view" | "readDefinition" | "inputCatalog" | "readInput" | "readArtifact"
   > &
     Pick<RunLifecycle, "open" | "reviewStage" | "resume"> &
     RunChanges;
@@ -413,13 +414,34 @@ export class ResearchApplication implements ResearchActions {
 
   #context(runId: string): ResearchContext {
     const runs = this.ports.runs;
-    const collection = readCollection(runs, runId);
+    const view = runs.view({ runId });
+    const definition = runs.readDefinition(runId);
+    const dataTasks = new Set(
+      definition.tasks
+        .filter(
+          ({ executor }) =>
+            executor.kind === "service" && executor.service === "collection",
+        )
+        .map(({ id }) => id),
+    );
+    const snapshots = view.tasks
+      .filter(
+        ({ taskId, status }) => dataTasks.has(taskId) && status === "succeeded",
+      )
+      .flatMap(({ outputRefs }) =>
+        outputRefs.map(
+          (ref) =>
+            (
+              runs.readArtifact(ref).content
+                .payload as ArtifactPayloads["collection"]
+            ).snapshot,
+        ),
+      );
+    const collection = readCollection(runs, runId, snapshots);
     return {
       runId,
-      view: runs.view({ runId }),
-      tasks: runs
-        .readDefinition(runId)
-        .tasks.map(({ id, executor }) => ({ id, executor })),
+      view,
+      tasks: definition.tasks.map(({ id, executor }) => ({ id, executor })),
       ...(collection === null
         ? {}
         : {

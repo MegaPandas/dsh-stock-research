@@ -6,16 +6,20 @@ import type {
 } from "../../contracts/workflow.js";
 import type { SourceDescription } from "../../contracts/sources.js";
 import type { QueryPolicy } from "../../contracts/query.js";
-import type { QuickQuerySnapshot } from "./protocol.js";
+import {
+  ANALYST_COLLECTION_NODES,
+  type QuickQuerySnapshot,
+} from "./protocol.js";
 import { PUBLIC_SEARCH_LIMITS } from "../public-research.js";
 import {
   captureResearchInput,
+  collectionTasks,
   DIGEST_RISK_RULE,
   researchTask as task,
   SHARED_BRIEFS,
 } from "./inputs.js";
 
-export const QUICK_MODE_VERSION = "quick/10";
+export const QUICK_MODE_VERSION = "quick/11";
 const ANALYSTS = [
   "analysis.market",
   "analysis.fundamentals",
@@ -53,21 +57,26 @@ export function createQuickInput(
   snapshots: readonly QuickQuerySnapshot[] = [],
   publicSearchLimit: number = PUBLIC_SEARCH_LIMITS.maxSearches,
 ): OpenRunInput {
-  const tasks: TaskDefinition[] = ANALYSTS.map((id) => ({
-    ...task(
-      id,
-      {
-        kind: "role",
-        role: "analyst",
-        specialty: id.slice("analysis.".length),
-      },
-      [],
-      ["analysis"],
-    ),
-    ...(id === "analysis.fundamentals"
-      ? { valuation: "research" as const }
-      : {}),
-  }));
+  const tasks: TaskDefinition[] = [
+    ...collectionTasks(),
+    ...ANALYSTS.map((id) => ({
+      ...task(
+        id,
+        {
+          kind: "role",
+          role: "analyst",
+          specialty: id.slice("analysis.".length),
+        },
+        ANALYST_COLLECTION_NODES[id] === undefined
+          ? []
+          : [`data.${ANALYST_COLLECTION_NODES[id]}`],
+        ["analysis"],
+      ),
+      ...(id === "analysis.fundamentals"
+        ? { valuation: "research" as const }
+        : {}),
+    })),
+  ];
   tasks.push(
     task(
       "digest.analysis",
@@ -109,7 +118,7 @@ export function createQuickInput(
       ...task(
         "manager.decision",
         { kind: "role", role: "manager", specialty: "decision" },
-        ["digest.risk"],
+        ["digest.risk", "data.fundamentals"],
         ["decision_draft"],
       ),
       valuation: "decision",

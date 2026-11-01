@@ -685,7 +685,7 @@ try {
     const runtime = ctx.stockResearch;
     const view = runtime.runs.view({ runId });
     assert.equal(view.status, "completed");
-    assert.equal(view.tasks.length, 12);
+    assert.equal(view.tasks.length, 15);
     assert.ok(view.tasks.every((task) => task.status === "succeeded"));
     const manager = runtime.runs.readArtifact(
       view.tasks.find(({ taskId }) => taskId === "manager.decision")

@@ -31,6 +31,9 @@ export const DIGEST_RISK_RULE =
   "riskSummaries must cover each issueId in context.requiredRisks exactly once; return [] when that list is empty. Analyst-stage risks have no risk-review issueId; do not invent identifiers. Preserve their meaning, handoff questions and upstream attribution in keyPoints or openQuestions.";
 
 export const SHARED_BRIEFS = {
+  "data.market": "Capture the fixed market data node for this run.",
+  "data.fundamentals": "Capture the fixed fundamentals data node for this run.",
+  "data.macro": "Capture the fixed macro data node for this run.",
   "analysis.public": PUBLIC_RESEARCH_BRIEF,
   "analysis.market":
     "Produce a market-analysis stage memo from fixed snapshots. Read the latest 60 daily, 52 weekly and 36 monthly stock bars and source-provided moving averages from the collection catalog. Explain trends, price/volume and relative strength using source-provided bars and indicators. For A-shares, compare matching daily/weekly/monthly series for the Shanghai Composite, Shenzhen Component, CSI 300 and ChiNext. Use price structure and volume to define base and alternative paths over an explicit horizon, with confirmation/counterevidence signals and price, volume and relative-strength conditions. Explain possible changes in market expectations and alternative interpretations; price/volume inferences are not observed consensus. Fundamentals and public-information specialties supply business drivers; macro supplies rate, FX, gold and dollar-index transmission. For US stocks, use cataloged data. Use close from the latest completed daily bar; explain prices by period completion and adjustment basis.",
@@ -66,6 +69,17 @@ export function researchTask(
         : [],
     instructionVersion: id.startsWith("digest.") ? 3 : 2,
   };
+}
+
+export function collectionTasks(): TaskDefinition[] {
+  return (["market", "fundamentals", "macro"] as const).map((node) =>
+    researchTask(
+      `data.${node}`,
+      { kind: "service", service: "collection", node },
+      [],
+      ["collection"],
+    ),
+  );
 }
 
 /** Both static plans capture the same application, source and prompt contracts. */

@@ -2,7 +2,7 @@ import type { ToolRunContext } from "@deepseek-ai/dsh-tools";
 import type { AgentReport } from "../../contracts/agent-reports.js";
 import type { StageHandoff } from "../../contracts/stage-handoff.js";
 import type { RoleDispatchContext } from "../../contracts/runs.js";
-import type { ResearchArtifactVersion } from "../../contracts/artifact-payloads.js";
+import type { ArtifactRef } from "../../contracts/data.js";
 import { createReportDraft } from "../../host/report-draft.js";
 import { assembleAgentArtifact } from "../../services/agent-artifacts.js";
 import type { ArtifactNumber } from "../../services/artifact-inputs.js";
@@ -27,7 +27,7 @@ export function prepareRoleReport(
   { claim, definition, scope }: RoleDispatchContext,
   kind: RoleReportKind,
   inputs: {
-    reports: readonly ResearchArtifactVersion[];
+    inputRefs: readonly ArtifactRef[];
     tables: readonly RegisteredTable[];
     price: ArtifactNumber | null;
     valuationMethods?: ValuationMethods;
@@ -35,7 +35,7 @@ export function prepareRoleReport(
   },
   previous?: RoleReportSeed,
 ) {
-  const { reports, tables, price, valuationMethods, publicRole } = inputs;
+  const { inputRefs, tables, price, valuationMethods, publicRole } = inputs;
   const labels = {
     analysis: publicRole
       ? "公开信息与产品竞争分析"
@@ -67,7 +67,7 @@ export function prepareRoleReport(
         taskId: claim.taskId,
         specialty: definition.executor.specialty,
         title: `${scope.security.symbol} ${labels[kind]}`,
-        inputRefs: reports.map(({ ref }) => ref),
+        inputRefs: [...inputRefs],
         currency: scope.security.currency,
         referencePrice: price,
         scope,

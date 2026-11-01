@@ -4,6 +4,7 @@ import type {
   DigestDraft,
   DigestModelInput,
 } from "../../src/contracts/digests.js";
+import { ArtifactInputs } from "../../src/services/artifact-inputs.js";
 import { DigestService } from "../../src/services/digest/index.js";
 import { ResearchError } from "../../src/contracts/errors.js";
 import { NumberService } from "../../src/services/numbers/index.js";
@@ -60,6 +61,143 @@ function content(
 }
 
 describe("DigestService", () => {
+  it("keeps collection dependencies in the fixed closure while exposing only business reports to the generator", async () => {
+    const c = decisionFixture({
+      additionalTasks: [
+        {
+          id: "data",
+          executor: { kind: "service", service: "collection", node: "macro" },
+          dependsOn: [],
+          inputTasks: [],
+          outputKinds: ["collection"],
+          dataRequirements: [],
+          instructionVersion: 1,
+        },
+        {
+          id: "with-data-analysis",
+          executor: { kind: "role", role: "analyst", specialty: "macro" },
+          dependsOn: ["analysis", "data"],
+          inputTasks: ["analysis", "data"],
+          outputKinds: ["analysis"],
+          dataRequirements: [],
+          instructionVersion: 1,
+        },
+        {
+          id: "with-data-digest",
+          executor: { kind: "service", service: "digest" },
+          dependsOn: ["with-data-analysis"],
+          inputTasks: ["with-data-analysis"],
+          outputKinds: ["digest"],
+          dataRequirements: [],
+          instructionVersion: 1,
+        },
+      ],
+    });
+    fixtures.push(c);
+    const dataClaim = c.runs.claimService(
+      c.operation,
+      "data",
+      "collection",
+      "capture",
+    );
+    const dataRef = c.runs.commitArtifact(
+      { ...dataClaim, identity: c.operation.identity, sessionId: null },
+      [
+        {
+          kind: "collection",
+          title: "固定数据：macro",
+          body: "Fixed collection dependency",
+          inputRefs: [],
+          claims: [],
+          payload: {
+            snapshot: {
+              schemaVersion: 1,
+              node: "macro",
+              scope: c.scope,
+              packets: [],
+              failures: [],
+            },
+            capturedAt: c.scope.cutoff,
+            capturedFrom: null,
+          },
+        },
+      ],
+      "capture",
+    ).refs[0]!;
+    const businessClaim = c.runs.claim(
+      c.operation,
+      "with-data-analysis",
+      "analysis-with-data",
+    );
+    const businessRef = c.artifacts.submitArtifact(
+      { ...businessClaim, identity: c.operation.identity, sessionId: null },
+      [
+        {
+          kind: "analysis",
+          title: "Business analysis with fixed data",
+          body: "Qualitative analysis based on fixed inputs.",
+          inputRefs: [c.analysisRef, dataRef],
+          claims: [],
+          payload: {
+            findings: [
+              {
+                text: "Fixed inputs support the qualitative finding.",
+                evidence: [],
+                numbers: [],
+              },
+            ],
+            risks: [],
+            gaps: [],
+          },
+        },
+      ],
+      "business-report",
+    ).refs[0]!;
+    const generate = vi.fn(
+      async (context: DigestModelInput): Promise<DigestDraft> => ({
+        title: "Business digest",
+        body: "Summary of the business analysis.",
+        inputRefs: context.artifacts.map(({ ref }) => ref),
+        facts: [
+          {
+            text: "Retain the qualitative finding.",
+            inputRefs: [businessRef],
+            numbers: [],
+          },
+        ],
+        disagreements: [],
+        riskSummaries: [],
+      }),
+    );
+    const saved = await new DigestService(
+      c.runs,
+      c.artifacts,
+      generate,
+    ).makeDigest(c.operation, "with-data-digest", "make-with-data");
+    expect(generate).toHaveBeenCalledOnce();
+    const context = generate.mock.calls[0]![0];
+    expect(context.artifacts.map(({ ref }) => ref)).toEqual([businessRef]);
+    expect(context.reports.map(({ ref }) => ref)).toEqual(
+      expect.arrayContaining([businessRef, c.analysisRef]),
+    );
+    expect(context.reports).toHaveLength(2);
+    expect(
+      context.reports.every(({ content }) => content.kind === "analysis"),
+    ).toBe(true);
+    expect(context.references).toContainEqual(dataRef);
+    expect(c.runs.readAttempt(saved)).toMatchObject({
+      status: "succeeded",
+      outputRefs: saved.refs,
+    });
+    expect(content(c, saved.refs).body).toBe(
+      "Summary of the business analysis.",
+    );
+    expect(
+      new ArtifactInputs(c.runs).closure(saved.refs).map(({ ref }) => ref),
+    ).toContainEqual(dataRef);
+    expect(c.runs.readArtifact(dataRef).content.kind).toBe("collection");
+  });
+
   it("uses the selected generator independently of prompt version metadata", async () => {
     const c = setup();
     const catalog = c.runs.inputCatalog(c.operation.runId);

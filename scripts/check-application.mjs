@@ -143,7 +143,7 @@ try {
   const health = ctx.stockResearch.queries.health(scope);
   const deep = createDeepInput(scope, ctx.stockResearch.policy, health.sources);
   assert.equal(deep.definition.mode, "deep");
-  assert.equal(deep.definition.tasks.length, 22);
+  assert.equal(deep.definition.tasks.length, 25);
   assert.equal(deep.versions.mode, DEEP_MODE_VERSION);
   assert.equal(deep.versions.prompts.roles, "31");
   assert.ok(

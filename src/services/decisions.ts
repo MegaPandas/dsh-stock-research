@@ -97,7 +97,9 @@ export class DecisionService {
         finalizedAt: this.now(),
       };
       const sections = versions.filter(
-        (version) => version.content.kind !== "digest",
+        (version) =>
+          version.content.kind !== "digest" &&
+          version.content.kind !== "collection",
       );
       const digests = versions.filter(
         (version) => version.content.kind === "digest",
@@ -115,6 +117,30 @@ export class DecisionService {
         { base, target },
         [...sections, ...digests],
         searchTimes.at(-1) ?? null,
+        [
+          ...(proposal.basePrice === null
+            ? []
+            : inputs
+                .numberSources(proposal.basePrice, selected.draft.ref)
+                .map((ref) => {
+                  const record = inputs.source(ref);
+                  return {
+                    node: "基准价格",
+                    capturedAt:
+                      record.snapshotAt ?? record.envelope.retrievedAt,
+                  };
+                })),
+          ...versions.flatMap(({ content }) =>
+            content.kind === "collection"
+              ? [
+                  {
+                    node: content.title,
+                    capturedAt: content.payload.capturedAt,
+                  },
+                ]
+              : [],
+          ),
+        ],
       );
       report = {
         kind: "report",

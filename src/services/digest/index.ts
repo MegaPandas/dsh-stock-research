@@ -181,6 +181,9 @@ export class DigestService {
       const inputs = new ArtifactInputs(this.runs);
       const roots = claimed.inputRefs.map((ref) => inputs.artifact(ref));
       const versions = inputs.closure(claimed.inputRefs);
+      const reports = versions.filter(
+        ({ content }) => content.kind !== "collection",
+      );
       const context: DigestModelInput = {
         scope,
         taskId: taskOperation.taskId,
@@ -193,7 +196,7 @@ export class DigestService {
                 claimed.instructionRef,
               ).instruction,
         artifacts: roots,
-        reports: versions,
+        reports,
         references: versions.map((version) => version.ref),
         numbers: digestNumbers(versions, inputs),
         risks: inheritRisks(versions),

@@ -95,11 +95,18 @@ export function workflowModel(
     runId?: string;
     marketRef?: ArtifactRef;
     taskIds: string[];
+    dataTaskIds: string[];
     released: boolean;
     managerFeedback?: string;
     reviewedStages: string[];
     rejectedStages: string[];
-  } = { taskIds: [], released: false, reviewedStages: [], rejectedStages: [] };
+  } = {
+    taskIds: [],
+    dataTaskIds: [],
+    released: false,
+    reviewedStages: [],
+    rejectedStages: [],
+  };
   const main = new Map<
     string,
     {
@@ -199,8 +206,12 @@ export function workflowModel(
       if (marketRef !== undefined) state.marketRef = marketRef;
       else delete state.marketRef;
       for (const task of view.tasks)
-        if (task.status !== "pending" && !state.taskIds.includes(task.taskId))
-          state.taskIds.push(task.taskId);
+        if (task.status !== "pending") {
+          const visited = task.taskId.startsWith("data.")
+            ? state.dataTaskIds
+            : state.taskIds;
+          if (!visited.includes(task.taskId)) visited.push(task.taskId);
+        }
       if (view.status === "completed") {
         if (current.finalReport === undefined) {
           const reportRef =

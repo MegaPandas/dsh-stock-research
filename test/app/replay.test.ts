@@ -114,8 +114,8 @@ describe("stock-replay command", () => {
   });
 
   it.each([
-    { mode: "quick", nodes: 12 },
-    { mode: "deep", nodes: 22 },
+    { mode: "quick", nodes: 15 },
+    { mode: "deep", nodes: 25 },
   ] as const)(
     "replays all $mode tasks offline without changing the source run",
     async ({ mode, nodes }) => {
@@ -194,7 +194,12 @@ describe("stock-replay command", () => {
           (task) => task.status === "succeeded" && task.attempt === 1,
         ),
       ).toBe(true);
-      expect(replayModel.state.taskIds).toHaveLength(nodes);
+      expect(replayModel.state.taskIds).toHaveLength(nodes - 3);
+      expect(replayModel.state.dataTaskIds).toEqual([
+        "data.market",
+        "data.fundamentals",
+        "data.macro",
+      ]);
       expect(
         replay.tasks
           .flatMap((task) => task.outputRefs)
@@ -240,6 +245,8 @@ describe("stock-replay command", () => {
         originalMarket.source.evidenceId,
       );
       const replayEvidence = h.runtime.runs.readEvidence(replayMarket.source);
+      expect(originalEvidence.snapshotAt).toBe(source.scope.cutoff);
+      expect(replayEvidence.snapshotAt).toBe(originalEvidence.snapshotAt);
       const { candidateClaims: originalCandidates, ...originalEnvelope } =
         originalEvidence.envelope;
       const { candidateClaims: replayCandidates, ...replayEnvelope } =
@@ -367,6 +374,48 @@ describe("stock-replay command", () => {
     ).toBe(true);
     expect(manifest(h, runId).text).toBe(before.text);
     expect(h.adapter.requests).toEqual([]);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("fails offline when the source never completed its collection nodes instead of fetching replacements", async () => {
+    const model = workflowModel();
+    const h = await quickHost(model.respond);
+    cleanups.push(h.close);
+    const { runId } = h.runtime.runs.open(
+      h.outside.agent.id,
+      createQuickInput(scope, h.runtime.policy, []),
+      "uncaptured-source",
+    );
+    const before = manifest(h, runId);
+    const result = await h.executeAndWait(`/stock-replay ${runId}`);
+    expect(result?.result.kind).toBe("error");
+    expect(result?.result.text).toContain("DATA_INSUFFICIENT");
+    const replayManifest = h
+      .runFiles()
+      .filter((path) => path.endsWith("manifest.json"))
+      .map(
+        (path) =>
+          JSON.parse(
+            fs.readFileSync(join(h.directory, "runs", path), "utf8"),
+          ) as ResearchRun,
+      )
+      .find(({ lineage }) => lineage?.sourceRunId === runId)!;
+    expect(replayManifest).toBeDefined();
+    const replay = h.runtime.runs.view({ runId: replayManifest.runId });
+    const missing = replay.tasks.filter(({ taskId }) =>
+      taskId.startsWith("data."),
+    );
+    expect(missing).toHaveLength(3);
+    expect(
+      missing.every(
+        ({ status, failure }) =>
+          status === "failed" && failure?.code === "DATA_INSUFFICIENT",
+      ),
+    ).toBe(true);
+    expect(
+      replay.tasks.find(({ taskId }) => taskId === "analysis.market")!.attempt,
+    ).toBe(0);
+    expect(manifest(h, runId).text).toBe(before.text);
     expect(fetch).not.toHaveBeenCalled();
   });
 });

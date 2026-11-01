@@ -44,6 +44,7 @@ export function renderDecisionReport(
   prices: { base: NumericClaim | null; target: NumericClaim | null },
   sections: readonly ArtifactVersion[],
   publicSearchAsOf: ISOTime | null = null,
+  captureTimes: readonly { node: string; capturedAt: ISOTime }[] = [],
 ): string {
   const lines = [
     `# 决策报告 ${inline(result.securityId)}`,
@@ -55,7 +56,11 @@ export function renderDecisionReport(
         ]
       : []),
     "",
-    `固定数据截止：${result.cutoff}`,
+    `固定数据截止：${result.cutoff}（观测范围）`,
+    ...captureTimes.map(
+      ({ node, capturedAt }) =>
+        `数据采集时点（${inline(node)}）：${capturedAt}`,
+    ),
     ...(publicSearchAsOf === null ? [] : [`公开检索截至：${publicSearchAsOf}`]),
     "",
     prices.base === null

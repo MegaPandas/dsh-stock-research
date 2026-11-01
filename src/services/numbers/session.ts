@@ -163,7 +163,14 @@ export class NumberCheckSession {
       const field = numeric
         ? numberField(record.envelope, ref.selector)
         : referenceField(record.envelope, ref.selector);
-      verifyEvidence(context.scope, record.envelope, ref, field, warnings);
+      verifyEvidence(
+        context.scope,
+        record.envelope,
+        ref,
+        field,
+        warnings,
+        record.snapshotAt,
+      );
       return numeric ? (field as NumberField) : null;
     };
 

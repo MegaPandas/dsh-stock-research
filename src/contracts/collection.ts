@@ -180,6 +180,7 @@ export interface CollectionDiagnostics {
 
 export interface CollectionSnapshot {
   schemaVersion: 1;
+  capturedAt?: ISOTime;
   node?: CollectionNode;
   scope: ResearchScope;
   packets: CollectionPacket[];

@@ -9,6 +9,7 @@ import {
 } from "@deepseek-ai/dsh-llm";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createQuickInput } from "../../src/app/plan/quick.js";
+import { completeCollectionTasks } from "../fixtures/collection-tasks.js";
 import type { CollectionRecord } from "../../src/contracts/collection.js";
 import { readCollection } from "../../src/app/collection-input.js";
 import type { ResearchObservation } from "../../src/app/research-actions.js";
@@ -225,7 +226,7 @@ describe("stock-quick real command boundary", () => {
     expect(h.ctx.agents.list()).toEqual([h.outside.agent]);
   });
 
-  it("completes all twelve DAG nodes from one saved capture and retains original source gaps", async () => {
+  it("completes all fifteen DAG nodes from fixed collection inputs and retains original source gaps", async () => {
     fetch.mockImplementationOnce(async () => {
       vi.setSystemTime(new Date("2024-01-03T08:00:05.000Z"));
       return marketResponse();
@@ -236,6 +237,11 @@ describe("stock-quick real command boundary", () => {
     expect(result?.result.kind, result?.result.text).toBe("success");
     const view = h.runtime.runs.view({ runId: model.state.runId! });
     expect(model.state.taskIds).toHaveLength(12);
+    expect(model.state.dataTaskIds).toEqual([
+      "data.market",
+      "data.fundamentals",
+      "data.macro",
+    ]);
     expect(view.status).toBe("completed");
     const researchJob = h.ctx.jobs
       .list(h.outside.agent.id)
@@ -294,7 +300,7 @@ describe("stock-quick real command boundary", () => {
     }
     expect(
       view.tasks.filter((task) => task.status === "succeeded"),
-    ).toHaveLength(12);
+    ).toHaveLength(15);
     const report = view.tasks
       .find((task) => task.taskId === "finalize")!
       .outputRefs.map((ref) => h.runtime.runs.readArtifact(ref).content)
@@ -328,13 +334,16 @@ describe("stock-quick real command boundary", () => {
     const close = market.claims[0]!;
     if (close.kind !== "observed")
       throw new Error("Expected actual market observation");
-    const evidence = h.runtime.runs.readEvidence(close.source).envelope;
+    const evidenceRecord = h.runtime.runs.readEvidence(close.source);
+    const evidence = evidenceRecord.envelope;
+    expect(evidenceRecord.snapshotAt).toBe("2024-01-03T08:00:05.000Z");
     expect(evidence.historicalKnowledge).toBe("unverified");
     expect(evidence.gaps).toContainEqual(
       expect.objectContaining({ code: "unverified_time", field: "/data/rows" }),
     );
     expect(evidence.retrievedAt <= evidence.cutoff).toBe(true);
     const collection = readCollection(h.runtime.runs, view.runId)!;
+    expect(collection.capturedAt).toBe("2024-01-03T08:00:05.000Z");
     expect(collection.packets).toHaveLength(1);
     expect(
       collection.packets[0]!.envelope.retrievedAt <= view.scope.cutoff,
@@ -523,6 +532,7 @@ describe("stock-quick real command boundary", () => {
         input,
         `legacy-${version}`,
       );
+      completeCollectionTasks(h.runtime.runs, runId, h.outside.agent.id);
       const result = await h.executeAndWait(
         `/stock-resume ${runId} {"resolvedReasonIds":[],"instructions":[]}`,
       );
@@ -791,6 +801,25 @@ describe("stock-quick real command boundary", () => {
     const command = observe(h.executeAndWait(undefined, controller.signal));
     await pause.started.promise;
     const { runId } = await committedMarket(h);
+    const dataTasks = () =>
+      h.runtime.runs
+        .view({ runId })
+        .tasks.filter(({ taskId }) => taskId.startsWith("data."));
+    if (!dataTasks().every(({ status }) => status === "succeeded"))
+      await new Promise<void>((resolve) => {
+        const release = h.runtime.runs.subscribe(runId, () =>
+          queueMicrotask(() => {
+            if (dataTasks().every(({ status }) => status === "succeeded")) {
+              release();
+              resolve();
+            }
+          }),
+        );
+      });
+    expect(dataTasks()).toHaveLength(3);
+    expect(dataTasks().every(({ status }) => status === "succeeded")).toBe(
+      true,
+    );
     const cancelling = h.execute(`/stock-cancel ${runId}`);
     await pause.aborted.promise;
     pause.released.resolve();
@@ -805,7 +834,7 @@ describe("stock-quick real command boundary", () => {
     const view = h.runtime.runs.view({ runId: current.state.runId! });
     expect(view.runId).not.toBe(source.runId);
     expect(view.scope).toEqual(source.scope);
-    expect(view.tasks).toHaveLength(12);
+    expect(view.tasks).toHaveLength(15);
     expect(
       view.tasks.every(
         (task) => task.status === "succeeded" && task.attempt === 1,

@@ -3,7 +3,10 @@ import type { NumericClaim } from "../contracts/artifacts.js";
 import type { ResearchScope, SourceRef } from "../contracts/data.js";
 import { numberField } from "../evidence/fields.js";
 import { EvidenceTimeError, verifyEvidence } from "../evidence/checks.js";
-export type RegisteredTable = CollectionReadSource & { sourceRef: SourceRef };
+export type RegisteredTable = CollectionReadSource & {
+  sourceRef: SourceRef;
+  snapshotAt?: string;
+};
 export function referencePrice(
   tables: readonly RegisteredTable[],
   scope: ResearchScope,
@@ -30,6 +33,7 @@ export function referencePrice(
       source,
       numberField(envelope, source.selector),
       [],
+      table.snapshotAt,
     );
   } catch (cause) {
     if (!(cause instanceof EvidenceTimeError)) throw cause;

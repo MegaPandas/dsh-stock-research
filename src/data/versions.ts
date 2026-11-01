@@ -16,24 +16,30 @@ export const SOURCE_VERSIONS = {
 } as const;
 export const COLLECTION_VERSION = "4";
 export const FINANCIAL_METRICS_VERSION = "3";
-export const COLLECTION_SOURCE_VERSIONS = Object.fromEntries(
-  [
-    "market/eastmoney",
-    "market/tencent",
-    "market/sina",
-    "market/xueqiu",
-    "fundamentals/eastmoney",
-    "fundamentals/xueqiu",
-    "macro/eastmoney",
-    "macro/mofcom",
-    "market/yahoo",
-    "fundamentals/sec",
-    "macro/fred",
-  ].map((source) => [
-    `collection/${source}`,
-    {
-      adapterVersion: COLLECTION_VERSION,
-      normalizationVersion: COLLECTION_VERSION,
-    },
-  ]),
-);
+export const COLLECTION_SOURCE_VERSIONS = {
+  ...Object.fromEntries(
+    [
+      "market/eastmoney",
+      "market/tencent",
+      "market/sina",
+      "market/xueqiu",
+      "fundamentals/eastmoney",
+      "fundamentals/xueqiu",
+      "macro/eastmoney",
+      "macro/mofcom",
+      "market/yahoo",
+      "fundamentals/sec",
+      "macro/fred",
+    ].map((source) => [
+      `collection/${source}`,
+      {
+        adapterVersion: COLLECTION_VERSION,
+        normalizationVersion: COLLECTION_VERSION,
+      },
+    ]),
+  ),
+  "collection/fundamentals/stock-research": {
+    adapterVersion: FINANCIAL_METRICS_VERSION,
+    normalizationVersion: FINANCIAL_METRICS_VERSION,
+  },
+};

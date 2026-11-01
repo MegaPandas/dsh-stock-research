@@ -54,6 +54,7 @@ function setup(finishedAt = "2024-01-03T08:05:00.000Z") {
   };
   const snapshot: CollectionSnapshot = {
     schemaVersion: 1,
+    node: "required",
     scope: structuredClone(scope),
     failures: [],
     packets: [
@@ -98,7 +99,9 @@ function setup(finishedAt = "2024-01-03T08:05:00.000Z") {
       },
     ],
   };
-  const collect = vi.spyOn(collection, "collect").mockResolvedValue(snapshot);
+  const collect = vi
+    .spyOn(collection, "collectNode")
+    .mockResolvedValue(snapshot);
   const request: OpenResearchRequest = {
     scope,
     mode: "quick",
@@ -113,7 +116,7 @@ function setup(finishedAt = "2024-01-03T08:05:00.000Z") {
   };
   const ports = {
     collection,
-    now: () => new Date(finishedAt),
+    now: vi.fn(() => new Date(finishedAt)),
     openRun(input: Parameters<typeof runs.open>[1], requestId: string) {
       const { runId } = runs.open("opening-test", input, requestId);
       return runs.view({ runId });
@@ -125,14 +128,14 @@ function setup(finishedAt = "2024-01-03T08:05:00.000Z") {
 it.each([
   {
     mode: "quick" as const,
-    version: "quick/10",
+    version: "quick/11",
     finishedAt: "2024-01-03T08:05:00.000Z",
     cutoff: "2024-01-03T08:05:00.000Z",
     ageMs: 3_900_000,
   },
   {
     mode: "deep" as const,
-    version: "deep/8",
+    version: "deep/9",
     finishedAt: "2024-01-03T16:10:00.000Z",
     cutoff: "2024-01-03T15:59:59.999Z",
     ageMs: 32_399_999,
@@ -152,14 +155,34 @@ it.each([
       status: "active",
       scope: { ...f.request.scope, cutoff },
     });
+    expect(f.collect).toHaveBeenCalledWith(
+      f.request.scope,
+      "required",
+      expect.any(AbortSignal),
+      expect.any(Function),
+    );
     expect(f.runs.readDefinition(view.runId).stages?.[0]?.id).toBe("analysis");
     const catalog = f.runs.inputCatalog(view.runId);
     expect(catalog.versions.mode).toBe(version);
     expect(catalog.versions.adapters["collection/market/fixture"]).toBe(
       "adapter-fixture",
     );
+    expect(catalog.versions.adapters).toMatchObject({
+      "collection/market/tencent": "4",
+      "collection/fundamentals/sec": "4",
+      "collection/macro/fred": "4",
+      "collection/fundamentals/stock-research": "3",
+    });
+    expect(catalog.versions.normalization).toMatchObject({
+      "collection/market/tencent": "4",
+      "collection/fundamentals/sec": "4",
+      "collection/macro/fred": "4",
+      "collection/fundamentals/stock-research": "3",
+    });
     const input = catalog.inputs.find(({ name }) => name === COLLECTION_INPUT)!;
     const saved = f.runs.readInput<CollectionSnapshot>(view.runId, input.ref);
+    expect(saved).toMatchObject({ node: "required", capturedAt: finishedAt });
+    expect(f.ports.now).toHaveBeenCalledTimes(1);
     expect(saved.scope.cutoff).toBe(cutoff);
     expect(saved.packets[0]!.envelope).toMatchObject({
       cutoff,

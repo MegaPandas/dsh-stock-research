@@ -54,9 +54,20 @@ export function prepareUnifiedRole(
     );
   const reportKind = kind as RoleReportKind;
   const inputs = new ArtifactInputs(services.runs);
-  const reports = inputs.closure(claim.inputRefs);
+  const roots = claim.inputRefs.map((ref) => inputs.artifact(ref));
+  const fixedInputs = inputs.closure(claim.inputRefs);
+  const reports = fixedInputs.filter(
+    ({ content }) => content.kind !== "collection",
+  );
   const reader = createReportReader(reports, claim.inputRefs);
-  const collection = readCollection(services.runs, claim.runId);
+  const captures = roots.flatMap(({ content }) =>
+    content.kind === "collection" ? [content.payload] : [],
+  );
+  const collection = readCollection(
+    services.runs,
+    claim.runId,
+    captures.map(({ snapshot }) => snapshot),
+  );
   const collected = registerCollectionSources(
     services.runs,
     {
@@ -65,12 +76,24 @@ export function prepareUnifiedRole(
       sessionId: context.attempt.sessionId,
     },
     collection,
+    new Map(
+      captures.flatMap(({ snapshot, capturedAt }) =>
+        snapshot.packets.map(({ id }) => [id, capturedAt] as const),
+      ),
+    ),
   );
   const tables: RegisteredTable[] = collected.flatMap(({ id, sourceRef }) => {
-    const envelope =
-      services.runs.readEvidence<EvidenceData>(sourceRef).envelope;
+    const { envelope, snapshotAt } =
+      services.runs.readEvidence<EvidenceData>(sourceRef);
     return "table" in envelope.data
-      ? [{ id, sourceRef, envelope: { ...envelope, data: envelope.data } }]
+      ? [
+          {
+            id,
+            sourceRef,
+            envelope: { ...envelope, data: envelope.data },
+            ...(snapshotAt === undefined ? {} : { snapshotAt }),
+          },
+        ]
       : [];
   });
   const priceReport = reports.find(({ content }) =>
@@ -129,7 +152,7 @@ export function prepareUnifiedRole(
     context,
     reportKind,
     {
-      reports,
+      inputRefs: fixedInputs.map(({ ref }) => ref),
       tables,
       price,
       ...(valuation === undefined
@@ -169,9 +192,9 @@ export function prepareUnifiedRole(
         objective: instruction,
       },
       context: {
-        materials: claim.inputRefs.map((ref) =>
-          reportMaterial(inputs.artifact(ref).content),
-        ),
+        materials: roots
+          .filter(({ content }) => content.kind !== "collection")
+          .map(({ content }) => reportMaterial(content)),
         dataCatalog: collected.map((source) =>
           Object.fromEntries(
             Object.entries(source).filter(([key]) => key !== "sourceRef"),

@@ -37,7 +37,36 @@ describe("quick application plan", () => {
         inputTasks,
       })),
     ).toEqual(documented.tasks);
-    expect(input.definition.tasks).toHaveLength(12);
+    expect(input.definition.tasks).toHaveLength(15);
+    expect(
+      input.definition.tasks
+        .filter(({ id }) => id.startsWith("data."))
+        .map(({ id, executor, outputKinds }) => ({
+          id,
+          executor,
+          outputKinds,
+        })),
+    ).toEqual([
+      {
+        id: "data.market",
+        executor: { kind: "service", service: "collection", node: "market" },
+        outputKinds: ["collection"],
+      },
+      {
+        id: "data.fundamentals",
+        executor: {
+          kind: "service",
+          service: "collection",
+          node: "fundamentals",
+        },
+        outputKinds: ["collection"],
+      },
+      {
+        id: "data.macro",
+        executor: { kind: "service", service: "collection", node: "macro" },
+        outputKinds: ["collection"],
+      },
+    ]);
     expect(
       input.definition.tasks.find((task) => task.id === "analysis.public"),
     ).toMatchObject({
@@ -90,7 +119,7 @@ describe("quick application plan", () => {
         ?.instruction,
     ).toContain("latest completed daily bar");
     expect(input.versions.mode).toBe(QUICK_MODE_VERSION);
-    expect(QUICK_MODE_VERSION).toBe("quick/10");
+    expect(QUICK_MODE_VERSION).toBe("quick/11");
     expect(
       input.definition.tasks
         .filter(({ valuation }) => valuation !== undefined)

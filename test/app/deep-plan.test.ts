@@ -32,7 +32,7 @@ describe("deep application plan", () => {
         inputTasks,
       })),
     ).toEqual(documented.tasks);
-    expect(input.definition.tasks).toHaveLength(22);
+    expect(input.definition.tasks).toHaveLength(25);
     expect(
       input.definition.tasks.find((task) => task.id === "analysis.public"),
     ).toMatchObject({
@@ -87,7 +87,7 @@ describe("deep application plan", () => {
       input.instructions?.every((item) => item.instruction.trim().length > 0),
     ).toBe(true);
     expect(input.versions.mode).toBe(DEEP_MODE_VERSION);
-    expect(DEEP_MODE_VERSION).toBe("deep/8");
+    expect(DEEP_MODE_VERSION).toBe("deep/9");
     expect(
       input.definition.tasks
         .filter(({ valuation }) => valuation !== undefined)

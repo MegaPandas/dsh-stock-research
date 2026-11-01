@@ -16,6 +16,7 @@ import type { ResearchScope } from "../../src/contracts/data.js";
 import type { OpenRunInput, RunView } from "../../src/contracts/runs.js";
 import { ArtifactService } from "../../src/services/artifact-submission/index.js";
 import { NumberService } from "../../src/services/numbers/index.js";
+import { completeCollectionTasks } from "../fixtures/collection-tasks.js";
 import { analysis } from "../fixtures/dispatch-host.js";
 import {
   initialInput,
@@ -78,6 +79,7 @@ function seed(h: Host, modify?: (input: OpenRunInput) => void) {
   fundamentals.inputTasks = ["analysis.market"];
   modify?.(input);
   const { runId } = h.runtime.runs.open("seed-owner", input, "seed-open");
+  const dataRefs = completeCollectionTasks(h.runtime.runs, runId, "seed-owner");
   const operation = { runId, identity: "seed-owner" };
   const claim = h.runtime.runs.claim(
     operation,
@@ -89,7 +91,7 @@ function seed(h: Host, modify?: (input: OpenRunInput) => void) {
     new NumberService(h.runtime.runs),
   ).submitArtifact(
     { ...claim, identity: "seed-worker", sessionId: null },
-    [analysis()],
+    [{ ...analysis(), inputRefs: claim.inputRefs }],
     "seed-save",
   ).refs[0]!;
   h.runtime.runs.block(
@@ -112,6 +114,7 @@ function seed(h: Host, modify?: (input: OpenRunInput) => void) {
   );
   return {
     runId,
+    dataRefs,
     marketRef,
     reasons: h.runtime.runs.view(operation).blockReasons,
   };
@@ -323,9 +326,15 @@ describe("explicit run control commands", () => {
       const fundamentalsRef = view.tasks.find(
         (task) => task.taskId === "analysis.fundamentals",
       )!.outputRefs[0]!;
-      expect(
-        h.runtime.runs.readArtifact(fundamentalsRef).content.inputRefs,
-      ).toEqual([seeded.marketRef]);
+      const fixedRefs =
+        h.runtime.runs.readArtifact(fundamentalsRef).content.inputRefs;
+      expect(fixedRefs).toHaveLength(2);
+      expect(fixedRefs).toEqual(
+        expect.arrayContaining([
+          seeded.marketRef,
+          seeded.dataRefs["data.market"],
+        ]),
+      );
       const coordinator = h.adapter.requests.find(
         (request) =>
           request.sessionId === h.outside.agent.id &&

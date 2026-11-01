@@ -208,6 +208,7 @@ export class ArtifactInputs {
       ref,
       field,
       [],
+      this.source(ref).snapshotAt,
     );
   }
   private metadataFor(runId: string): RunInputMetadata {
@@ -220,9 +221,10 @@ export class ArtifactInputs {
     return metadata;
   }
   private blocks(ref: SourceRef, gap: DataGap, cutoff: ISOTime): boolean {
+    const source = this.source(ref);
     return (
       gap.code !== "unverified_time" ||
-      this.source(ref).envelope.retrievedAt > cutoff
+      source.envelope.retrievedAt > (source.snapshotAt ?? cutoff)
     );
   }
   numberGaps(

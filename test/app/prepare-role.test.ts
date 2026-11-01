@@ -10,6 +10,7 @@ import { createDeepInput } from "../../src/app/plan/deep.js";
 import { createReplayInput } from "../../src/app/replay-input.js";
 import { attachCollection } from "../../src/app/collection-snapshot.js";
 import type { CollectionSnapshot } from "../../src/contracts/collection.js";
+import { completeCollectionTasks } from "../fixtures/collection-tasks.js";
 import type { ResearchScope } from "../../src/contracts/data.js";
 import { prepareResearchRole } from "../../src/app/role-preparation/index.js";
 import { RESEARCH_MODELS_INPUT } from "../../src/app/research-models.js";
@@ -74,6 +75,16 @@ async function host(
     agentOptions: h.agentOptions,
     adapter: h.adapter as { readonly requests: GenerateOptions[] },
   };
+}
+function openPrepared(
+  h: Awaited<ReturnType<typeof host>>,
+  owner: string,
+  input: Parameters<typeof h.runtime.runs.open>[1],
+  requestId: string,
+) {
+  const opened = h.runtime.runs.open(owner, input, requestId);
+  completeCollectionTasks(h.runtime.runs, opened.runId, owner);
+  return opened;
 }
 function prompt(provision: ReturnType<typeof prepareResearchRole>) {
   const block = provision.prompt[0]!;
@@ -181,7 +192,7 @@ describe("persisted research role preparation", () => {
       name: RESEARCH_MODELS_INPUT,
       content: { research: agentOptions },
     });
-    const { runId } = h.runtime.runs.open("owner", h.input, "open-models");
+    const { runId } = openPrepared(h, "owner", h.input, "open-models");
     const context = h.runtime.runs.dispatchForCall(
       { runId, identity: "owner" },
       "analysis.market",
@@ -199,7 +210,7 @@ describe("persisted research role preparation", () => {
     captured.version = "saved-methods";
     captured.methods[0]!.name = "Saved FCFF method";
     h.input.versions.prompts.valuationMethods = captured.version;
-    const { runId } = h.runtime.runs.open("owner", h.input, "open-methods");
+    const { runId } = openPrepared(h, "owner", h.input, "open-methods");
     captured.methods[0]!.name = "Caller mutation";
     const prepare = (id: string, taskId: string) =>
       prepareResearchRole(
@@ -233,7 +244,8 @@ describe("persisted research role preparation", () => {
         ({ name }) => name === "stock_read_valuation_method",
       ),
     ).toBe(false);
-    const replay = h.runtime.runs.open(
+    const replay = openPrepared(
+      h,
       "owner",
       createReplayInput(h.runtime.runs, runId),
       "replay-methods",
@@ -263,7 +275,7 @@ describe("persisted research role preparation", () => {
       }
       yield* reportSubmission(report, `valuation-${calls}`);
     });
-    const { runId } = h.runtime.runs.open("owner", h.input, "open-valuation");
+    const { runId } = openPrepared(h, "owner", h.input, "open-valuation");
     const parent = await h.runtime.createAgent(
       h.agentOptions("valuation-coordinator"),
       { kind: "coordinator", runIds: [runId] },
@@ -300,7 +312,8 @@ describe("persisted research role preparation", () => {
 
   it("resolves calculations registered after preparation when writing the original draft", async () => {
     const h = await host();
-    const { runId } = h.runtime.runs.open(
+    const { runId } = openPrepared(
+      h,
       "owner",
       h.input,
       "open-late-calculation",
@@ -380,11 +393,7 @@ describe("persisted research role preparation", () => {
     h.input.inputs = h.input.inputs.filter(
       ({ name }) => name !== VALUATION_METHODS_INPUT,
     );
-    const { runId } = h.runtime.runs.open(
-      "owner",
-      h.input,
-      "open-missing-methods",
-    );
+    const { runId } = openPrepared(h, "owner", h.input, "open-missing-methods");
     const context = h.runtime.runs.dispatchForCall(
       { runId, identity: "owner" },
       "analysis.fundamentals",
@@ -401,10 +410,11 @@ describe("persisted research role preparation", () => {
     )!;
     debate.dependsOn = ["analysis.market"];
     debate.inputTasks = ["analysis.market"];
-    const { runId } = h.runtime.runs.open("owner", h.input, "open-reader");
+    const { runId } = openPrepared(h, "owner", h.input, "open-reader");
     const operation = { runId, identity: "owner" };
     const market = h.runtime.runs.claim(operation, "analysis.market", "market");
     const content = analysis();
+    content.inputRefs = market.inputRefs;
     new ArtifactService(
       h.runtime.runs,
       new NumberService(h.runtime.runs),
@@ -481,7 +491,7 @@ describe("persisted research role preparation", () => {
       snapshot.packets.push({ id, envelope });
     }
     attachCollection(h.input, snapshot);
-    const { runId } = h.runtime.runs.open("owner", h.input, "open-benchmarks");
+    const { runId } = openPrepared(h, "owner", h.input, "open-benchmarks");
     for (const [taskId, expected] of [
       ["analysis.market", ["market.daily", "benchmark.shanghai.daily"]],
       [
@@ -534,7 +544,7 @@ describe("persisted research role preparation", () => {
       createDeepInput(h.scope, h.runtime.policy, []),
       collection(h.scope),
     );
-    const { runId } = h.runtime.runs.open("owner", input, "open-deep");
+    const { runId } = openPrepared(h, "owner", input, "open-deep");
     for (const [taskId, table] of [
       ["analysis.business", "financial.indicators"],
       ["analysis.geopolitics", "macro.dgs10"],
@@ -591,7 +601,7 @@ describe("persisted research role preparation", () => {
     ];
     snapshot.packets.push(packet);
     attachCollection(h.input, snapshot);
-    const { runId } = h.runtime.runs.open("owner", h.input, "derived");
+    const { runId } = openPrepared(h, "owner", h.input, "derived");
     const context = h.runtime.runs.dispatchForCall(
       { runId, identity: "owner" },
       "analysis.fundamentals",
@@ -617,7 +627,7 @@ describe("persisted research role preparation", () => {
   it("registers only the current task's fixed datasets without duplicating history in the prompt", async () => {
     const h = await host();
     attachCollection(h.input, collection(h.scope));
-    const { runId } = h.runtime.runs.open("owner", h.input, "open");
+    const { runId } = openPrepared(h, "owner", h.input, "open");
     const context = h.runtime.runs.dispatchForCall(
       { runId, identity: "owner" },
       "analysis.market",
@@ -695,11 +705,12 @@ describe("persisted research role preparation", () => {
       policy: { secCiks: Record<string, string> };
     };
     captured.policy.secCiks[h.scope.security.id] = "0000123456";
-    const { runId } = h.runtime.runs.open("owner", h.input, "open");
+    const { runId } = openPrepared(h, "owner", h.input, "open");
     captured.policy.secCiks = {};
     const operation = { runId, identity: "owner" };
     const market = h.runtime.runs.claim(operation, "analysis.market", "market");
     const content = analysis();
+    content.inputRefs = market.inputRefs;
     new ArtifactService(
       h.runtime.runs,
       new NumberService(h.runtime.runs),
@@ -788,7 +799,7 @@ describe("persisted research role preparation", () => {
 
   it("keeps claim-fixed instructions and read-only tools in replay preparation", async () => {
     const h = await host();
-    const { runId } = h.runtime.runs.open("owner", h.input, "open");
+    const { runId } = openPrepared(h, "owner", h.input, "open");
     const operation = { runId, identity: "owner" };
     const first = h.runtime.runs.dispatchForCall(
       operation,
@@ -825,7 +836,8 @@ describe("persisted research role preparation", () => {
     expect(prompt(prepareResearchRole(h.runtime, second)).task).toMatchObject({
       objective: "Revised necessary market request",
     });
-    const replay = h.runtime.runs.open(
+    const replay = openPrepared(
+      h,
       "owner",
       { replay: { runId }, versions: h.input.versions },
       "replay",
@@ -860,7 +872,7 @@ describe("persisted research role preparation", () => {
       else if (problem === "unsupported")
         h.input.inputs[0]!.content = { schemaVersion: 1 };
       else h.input.inputs[0]!.content = { schemaVersion: 2, policy: {} };
-      const { runId } = h.runtime.runs.open("owner", h.input, "open");
+      const { runId } = openPrepared(h, "owner", h.input, "open");
       const context = h.runtime.runs.dispatchForCall(
         { runId, identity: "owner" },
         "analysis.market",
@@ -878,7 +890,7 @@ describe("persisted research role preparation", () => {
   it("rejects an unrecorded initial instruction without substituting the current template", async () => {
     const h = await host();
     delete h.input.instructions;
-    const { runId } = h.runtime.runs.open("owner", h.input, "open");
+    const { runId } = openPrepared(h, "owner", h.input, "open");
     const context = h.runtime.runs.dispatchForCall(
       { runId, identity: "owner" },
       "analysis.market",
@@ -904,7 +916,7 @@ describe("persisted research role preparation", () => {
       prompts: { analyst: string };
     };
     profile.prompts.analyst = savedPrompt;
-    const { runId } = h.runtime.runs.open("owner", h.input, "open");
+    const { runId } = openPrepared(h, "owner", h.input, "open");
     const parent = await h.runtime.createAgent(
       h.agentOptions("application-coordinator"),
       { kind: "coordinator", runIds: [runId] },
@@ -952,7 +964,7 @@ describe("persisted research role preparation", () => {
       yield* analysisSubmission(report, "stage-analysis");
     });
     attachCollection(h.input, collection(h.scope));
-    const { runId } = h.runtime.runs.open("owner", h.input, "open-stage");
+    const { runId } = openPrepared(h, "owner", h.input, "open-stage");
     const parent = await h.runtime.createAgent(
       h.agentOptions("stage-coordinator"),
       { kind: "coordinator", runIds: [runId] },
@@ -1028,11 +1040,7 @@ describe("persisted research role preparation", () => {
       if (condition === "late-available")
         latest.availableAt = "2024-01-04T00:00:00.000Z";
       attachCollection(h.input, snapshot);
-      const { runId } = h.runtime.runs.open(
-        "owner",
-        h.input,
-        `open-${condition}`,
-      );
+      const { runId } = openPrepared(h, "owner", h.input, `open-${condition}`);
       const parent = await h.runtime.createAgent(
         h.agentOptions(`no-anchor-${condition}`),
         { kind: "coordinator", runIds: [runId] },
@@ -1058,7 +1066,8 @@ describe("persisted research role preparation", () => {
     async (version) => {
       const h = await host();
       h.input.versions.prompts.roles = version;
-      const { runId } = h.runtime.runs.open(
+      const { runId } = openPrepared(
+        h,
         "owner",
         h.input,
         "unknown-role-protocol",

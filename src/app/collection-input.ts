@@ -3,7 +3,7 @@ import type {
   CollectionPacket,
   CollectionSnapshot,
 } from "../contracts/collection.js";
-import type { DataEnvelope } from "../contracts/data.js";
+import type { DataEnvelope, ISOTime } from "../contracts/data.js";
 import { ResearchError } from "../contracts/errors.js";
 import type { EvidenceData } from "../contracts/query.js";
 import type { ReplayEvidenceSource } from "../contracts/replay.js";
@@ -14,6 +14,7 @@ import { collectionSummary } from "../services/collection/view.js";
 import { readQuickSnapshots } from "./quick-snapshots.js";
 import { COLLECTION_INPUT } from "./collection-snapshot.js";
 import { collectionNodeForTable } from "../contracts/collection-node.js";
+import { ANALYST_COLLECTION_NODES } from "./plan/protocol.js";
 
 const text = z.string().pattern(/\S/).required();
 const schema = z
@@ -36,6 +37,7 @@ const schema = z
 export function readCollection(
   runs: Pick<RunReader, "inputCatalog" | "readInput">,
   runId: string,
+  nodes: readonly CollectionSnapshot[] = [],
 ): CollectionSnapshot | null {
   const saved = runs
     .inputCatalog(runId)
@@ -59,7 +61,24 @@ export function readCollection(
     );
   try {
     z.resolve(value, schema, {});
-    return value as CollectionSnapshot;
+    const base = value as CollectionSnapshot;
+    return nodes.length === 0
+      ? base
+      : {
+          schemaVersion: 1,
+          scope: base.scope,
+          ...(base.capturedAt === undefined
+            ? {}
+            : { capturedAt: base.capturedAt }),
+          packets: [
+            ...base.packets,
+            ...nodes.flatMap(({ packets }) => packets),
+          ],
+          failures: [
+            ...base.failures,
+            ...nodes.flatMap(({ failures }) => failures),
+          ],
+        };
   } catch (cause) {
     throw new ResearchError(
       "STORAGE_FAILED",
@@ -77,14 +96,8 @@ function belongsToTask(
   if (dataset !== "market" && dataset !== "fundamentals" && dataset !== "macro")
     return false;
   const node = collectionNodeForTable(id, dataset);
-  if (taskId === "analysis.market" || taskId === "analysis.sentiment") {
-    return node === "required" || node === "market";
-  }
-  if (taskId === "analysis.fundamentals" || taskId === "analysis.business")
-    return node === "fundamentals";
-  if (taskId === "analysis.macro" || taskId === "analysis.geopolitics")
-    return node === "macro";
-  return false;
+  const assigned = ANALYST_COLLECTION_NODES[taskId];
+  return node === assigned || (node === "required" && assigned === "market");
 }
 
 /** Register prepared inputs before the role starts; no query or network capability is exposed. */
@@ -101,6 +114,7 @@ export function registerCollectionSources(
     Pick<RunCommands, "evidenceForCall" | "recordEvidence" | "replayEvidence">,
   operation: TaskOperation,
   snapshot: CollectionSnapshot | null,
+  captureTimes: ReadonlyMap<string, ISOTime> = new Map(),
 ) {
   const scope = runs.view(operation).scope;
   const replay =
@@ -141,6 +155,7 @@ export function registerCollectionSources(
       parameters: packet.parameters,
     };
     const callId = `collection:${packet.id}`;
+    const snapshotAt = captureTimes.get(packet.id) ?? snapshot?.capturedAt;
     let source: ReplayEvidenceSource | null = null;
     if (replay !== null) {
       const selected = originalEvidence.filter(
@@ -166,18 +181,28 @@ export function registerCollectionSources(
         ? runs.recordEvidence(
             operation,
             query,
-            { envelope, candidates: extractCandidates(envelope) },
+            {
+              envelope,
+              candidates: extractCandidates(envelope),
+              ...(snapshotAt === undefined ? {} : { snapshotAt }),
+            },
             callId,
           )
         : runs.replayEvidence(operation, query, callId, source));
     const saved = runs.readEvidence<EvidenceData>(sourceRef).envelope;
     const data = saved.data;
+    const capture = snapshotAt === undefined ? {} : { capturedAt: snapshotAt };
     return "table" in data
-      ? { ...collectionSummary(packet.id, { ...saved, data }), sourceRef }
+      ? {
+          ...collectionSummary(packet.id, { ...saved, data }),
+          sourceRef,
+          ...capture,
+        }
       : {
           id: packet.id,
           dataset: saved.dataset,
           sourceRef,
+          ...capture,
           recordCount:
             "bars" in data
               ? data.bars.length

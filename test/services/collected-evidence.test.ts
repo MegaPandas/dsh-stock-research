@@ -75,6 +75,55 @@ describe("collected evidence quantity contracts", () => {
     expect(() => numberField(frame, "/data/rows/0/asOf")).toThrow();
   });
 
+  it("keeps observations within the fixed range when a node captures later", () => {
+    const frame = envelope();
+    const scope = {
+      security: CN_SECURITY,
+      date: "2024-08-30",
+      cutoff: frame.cutoff,
+    };
+    const ref = {
+      runId: "run",
+      evidenceId: "evidence",
+      selector: "/data/rows/0/values/debt",
+    };
+    const snapshotAt = "2024-08-30T00:03:00.000Z";
+    frame.retrievedAt = "2024-08-30T00:02:00.000Z";
+    expect(() =>
+      verifyEvidence(
+        scope,
+        frame,
+        ref,
+        numberField(frame, ref.selector),
+        [],
+        snapshotAt,
+      ),
+    ).not.toThrow();
+    frame.data.rows[0]!.asOf = "2024-08-30T00:02:00.000Z";
+    expect(() =>
+      verifyEvidence(
+        scope,
+        frame,
+        ref,
+        numberField(frame, ref.selector),
+        [],
+        snapshotAt,
+      ),
+    ).toThrow(/after cutoff/);
+    frame.data.rows[0]!.asOf = "2024-06-30T15:59:59.999Z";
+    frame.retrievedAt = "2024-08-30T00:04:00.000Z";
+    expect(() =>
+      verifyEvidence(
+        scope,
+        frame,
+        ref,
+        numberField(frame, ref.selector),
+        [],
+        snapshotAt,
+      ),
+    ).toThrow(/known by cutoff/);
+  });
+
   it("requires a pre-cutoff capture for a current historical view and rejects incomplete rows", () => {
     const frame = envelope();
     const scope = {

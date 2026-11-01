@@ -1,6 +1,9 @@
 import type { ArtifactPayloads } from "../../contracts/artifact-payloads.js";
-import type { ArtifactRef } from "../../contracts/data.js";
-import type { CollectionAccess } from "../../contracts/collection.js";
+import type { ArtifactRef, ISOTime } from "../../contracts/data.js";
+import type {
+  CollectionAccess,
+  CollectionNode,
+} from "../../contracts/collection.js";
 import type { TaskDefinition } from "../../contracts/workflow.js";
 import { ExecutionStopped, ResearchError } from "../../contracts/errors.js";
 import type { RunCommands, RunReader } from "../../contracts/run-access.js";
@@ -10,6 +13,13 @@ import type {
   RunOperation,
   TaskOperation,
 } from "../../contracts/runs.js";
+
+const NODE_TITLES: Record<CollectionNode, string> = {
+  required: "必需日线",
+  market: "行情",
+  fundamentals: "财务",
+  macro: "宏观",
+};
 
 interface OwnedCollection {
   operation: TaskOperation;
@@ -36,6 +46,7 @@ export class CollectionRunService {
         | "failServiceAttempt"
       >,
     private readonly collection: Pick<CollectionAccess, "collectNode">,
+    private readonly now: () => ISOTime = () => new Date().toISOString(),
   ) {}
 
   async collect(
@@ -120,14 +131,18 @@ export class CollectionRunService {
               "DATA_INSUFFICIENT",
               `No fixed collection output is available for replay task ${taskId}.`,
             );
+          const captured =
+            capturedFrom === null ? null : this.#captured(capturedFrom);
           const snapshot =
-            capturedFrom === null
+            captured === null
               ? await this.collection.collectNode(
                   call.context.scope,
                   executor.node,
                   active,
                 )
-              : structuredClone(this.#captured(capturedFrom).snapshot);
+              : structuredClone(captured.snapshot);
+          const capturedAt =
+            captured === null ? this.now() : captured.capturedAt;
           active.throwIfAborted();
           if (
             executor.node === "required" &&
@@ -142,11 +157,11 @@ export class CollectionRunService {
             [
               {
                 kind: "collection",
-                title: `固定数据：${executor.node}`,
+                title: `固定数据：${NODE_TITLES[executor.node]}`,
                 body: `${snapshot.packets.length} 张固定表，${snapshot.failures.length} 项来源诊断。`,
                 inputRefs: claim.inputRefs,
                 claims: [],
-                payload: { snapshot, capturedFrom },
+                payload: { snapshot, capturedAt, capturedFrom },
               },
             ],
             requestId,

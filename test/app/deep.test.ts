@@ -49,7 +49,7 @@ afterEach(async () => {
 });
 
 describe("stock-deep command and resume", () => {
-  it("opens deep and resumes all twenty-two nodes with plan, risk responses and retained source gaps", async () => {
+  it("opens deep and resumes all twenty-five nodes with plan, risk responses and retained source gaps", async () => {
     let opening = true;
     const model = workflowModel();
     const h = await quickHost(async function* (
@@ -104,9 +104,21 @@ describe("stock-deep command and resume", () => {
     ).toBe(true);
     expect(
       before.tasks
-        .filter(({ taskId }) => !taskId.startsWith("analysis."))
+        .filter(
+          ({ taskId }) =>
+            !taskId.startsWith("analysis.") && !taskId.startsWith("data."),
+        )
         .every(({ status }) => status === "pending"),
     ).toBe(true);
+    expect(
+      before.tasks
+        .filter(({ taskId }) => taskId.startsWith("data."))
+        .map(({ taskId, status, attempt }) => ({ taskId, status, attempt })),
+    ).toEqual([
+      { taskId: "data.market", status: "succeeded", attempt: 1 },
+      { taskId: "data.fundamentals", status: "succeeded", attempt: 1 },
+      { taskId: "data.macro", status: "succeeded", attempt: 1 },
+    ]);
     expect(before.stages!.find(({ id }) => id === "analysis")).toMatchObject({
       readyForReview: true,
       accepted: false,
@@ -127,13 +139,18 @@ describe("stock-deep command and resume", () => {
     expect(view.scope).toEqual(before.scope);
     expect(view.mode).toBe("deep");
     expect(view.status).toBe("completed");
-    expect(view.tasks).toHaveLength(22);
+    expect(view.tasks).toHaveLength(25);
     expect(
       view.tasks.every(
         (task) => task.status === "succeeded" && task.attempt === 1,
       ),
     ).toBe(true);
     expect(model.state.taskIds).toHaveLength(22);
+    expect(model.state.dataTaskIds).toEqual([
+      "data.market",
+      "data.fundamentals",
+      "data.macro",
+    ]);
     const roleRequests = h.adapter.requests.filter(
       (request) => !isMainResearchRequest(request),
     );

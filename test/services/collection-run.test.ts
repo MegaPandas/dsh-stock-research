@@ -27,6 +27,7 @@ const scope: ResearchScope = {
   date: "2026-10-28",
   cutoff: "2026-10-28T10:00:00.000Z",
 };
+const capturedAt = "2026-10-28T10:00:30.000Z";
 const cleanups: (() => Promise<void>)[] = [];
 afterEach(async () => {
   for (const cleanup of cleanups.splice(0).reverse()) await cleanup();
@@ -114,7 +115,8 @@ function setup() {
     },
     snapshots,
   );
-  const runner = new CollectionRunService(runs, collection);
+  const now = vi.fn<() => string>(() => capturedAt);
+  const runner = new CollectionRunService(runs, collection, now);
   const input: OpenRunInput = {
     definition: {
       scope,
@@ -186,6 +188,7 @@ function setup() {
     runs,
     store,
     runner,
+    now,
     snapshots,
     tasks,
     input,
@@ -245,6 +248,7 @@ describe("collection tasks in canonical runs", () => {
       status: "running",
       outputRefs: [],
     });
+    expect(h.now).not.toHaveBeenCalled();
     held.released.resolve();
     const [left, right] = await Promise.all([first, duplicate]);
     expect(left).toEqual(right);
@@ -266,11 +270,14 @@ describe("collection tasks in canonical runs", () => {
     const payload = h.payload(left.refs[0]!);
     expect(payload).toMatchObject({
       capturedFrom: null,
+      capturedAt,
       snapshot: { node: "required", scope, packets: [{ id: "market.daily" }] },
     });
     expect(h.records()).toMatchObject([
       { status: "complete", snapshot: { scope } },
     ]);
+    expect(h.records()[0]!.snapshot).not.toHaveProperty("capturedAt");
+    expect(h.now).toHaveBeenCalledTimes(1);
     expect(
       fs
         .readdirSync(join(h.directory, "runs"), { recursive: true })
@@ -390,7 +397,9 @@ describe("collection tasks in canonical runs", () => {
     expect(
       h.runs.readAttempt(h.attempt("collection.required", 2)),
     ).toMatchObject({ status: "succeeded", outputRefs: fixed.refs });
-    const snapshot = h.payload(fixed.refs[0]!).snapshot;
+    const originalPayload = h.payload(fixed.refs[0]!);
+    const snapshot = originalPayload.snapshot;
+    h.now.mockReturnValue("2026-10-28T11:00:00.000Z");
     h.runs.redo(h.operation, "collection.required", "redo-fixed");
     const copied = await h.runner.collect(
       h.operation,
@@ -400,8 +409,10 @@ describe("collection tasks in canonical runs", () => {
     expect(copied.attempt).toBe(3);
     expect(h.payload(copied.refs[0]!)).toEqual({
       snapshot,
+      capturedAt: originalPayload.capturedAt,
       capturedFrom: fixed.refs[0],
     });
+    expect(h.now).toHaveBeenCalledTimes(1);
     expect(h.tasks[0]!.run).toHaveBeenCalledTimes(2);
   });
 
@@ -413,6 +424,7 @@ describe("collection tasks in canonical runs", () => {
       "capture",
     );
     const sourceView = h.runs.view(h.operation);
+    h.now.mockReturnValue("2026-10-29T10:00:00.000Z");
     const { runId } = h.runs.open(
       "owner",
       { replay: { runId: h.operation.runId }, versions: h.input.versions },
@@ -426,8 +438,10 @@ describe("collection tasks in canonical runs", () => {
     );
     expect(h.payload(copied.refs[0]!)).toEqual({
       snapshot: h.payload(fixed.refs[0]!).snapshot,
+      capturedAt: h.payload(fixed.refs[0]!).capturedAt,
       capturedFrom: fixed.refs[0],
     });
+    expect(h.now).toHaveBeenCalledTimes(1);
     await expect(
       h.runner.collect(replay, "collection.macro", "missing"),
     ).rejects.toMatchObject({ code: "DATA_INSUFFICIENT" });

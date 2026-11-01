@@ -4,6 +4,7 @@ import fs from "node:fs";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import * as Application from "../../src/plugin.js";
+import { completeCollectionTasks } from "../fixtures/collection-tasks.js";
 import { createQuickInput } from "../../src/app/plan/quick.js";
 import {
   analysisReport,
@@ -88,6 +89,18 @@ describe("application bundle role dispatch", () => {
       vi.spyOn(h.ctx.stockResearch.collection, "collect").mockImplementation(
         async (scope) => askCollection(scope),
       );
+      vi.spyOn(
+        h.ctx.stockResearch.collection,
+        "collectNode",
+      ).mockImplementation(async (scope, node) => {
+        const snapshot = askCollection(scope);
+        return {
+          ...snapshot,
+          node,
+          packets: node === "required" ? snapshot.packets : [],
+          failures: node === "macro" ? snapshot.failures : [],
+        };
+      });
       const { executeAndWait: execute } = researchCommands(
         h.ctx,
         h.outside.agent,
@@ -211,6 +224,7 @@ describe("application bundle role dispatch", () => {
       createQuickInput(h.scope, runtime.policy, []),
       "open",
     );
+    completeCollectionTasks(runtime.runs, runId, "owner");
     const parent = await runtime.createAgent(
       h.agentOptions("bundle-coordinator"),
       { kind: "coordinator", runIds: [runId] },

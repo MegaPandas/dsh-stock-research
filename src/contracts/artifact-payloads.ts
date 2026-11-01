@@ -159,6 +159,7 @@ export type ReportPayload = {
 export type ArtifactPayloads = {
   collection: {
     snapshot: CollectionSnapshot;
+    capturedAt: ISOTime;
     capturedFrom: ArtifactRef | null;
   };
   analysis: AnalysisPayload | AnalysisNotePayload | AnalysisAgentPayload;

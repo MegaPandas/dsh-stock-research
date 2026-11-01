@@ -16,6 +16,7 @@ afterEach(async () => {
   } finally {
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
+    vi.useRealTimers();
   }
 });
 
@@ -103,6 +104,8 @@ function observe<T>(work: Promise<T>) {
 }
 
 it("routes a ready collection through the real runtime without a model and skips an obsolete plan", async () => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date("2024-01-03T08:01:00.000Z"));
   const fetch = vi.fn(async () => response());
   vi.stubGlobal("fetch", fetch);
   const h = await host();
@@ -125,6 +128,7 @@ it("routes a ready collection through the real runtime without a model and skips
     kind: "collection",
     payload: {
       capturedFrom: null,
+      capturedAt: "2024-01-03T08:01:00.000Z",
       snapshot: {
         node: "required",
         scope: first.scope,

@@ -310,6 +310,7 @@ export class ArtifactService {
             ref,
             referenceField(record.envelope, ref.selector),
             [],
+            record.snapshotAt,
           );
         } catch (cause) {
           if (

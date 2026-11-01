@@ -1,12 +1,14 @@
 import type {
   CollectionProgress,
   CollectionSnapshot,
+  CollectionNode,
 } from "../../contracts/collection.js";
 import type { ResearchScope } from "../../contracts/data.js";
 import type { QueryPolicy } from "../../contracts/query.js";
 import type { OpenRunInput, RunInput, RunView } from "../../contracts/runs.js";
 import type { SourceDescription } from "../../contracts/sources.js";
 import type { RunDefinition } from "../../contracts/workflow.js";
+import { COLLECTION_SOURCE_VERSIONS } from "../../data/versions.js";
 import { researchCutoff } from "../research-scope.js";
 import {
   attachCollection,
@@ -27,8 +29,9 @@ export interface OpenResearchRequest {
 }
 export interface OpenResearchPorts {
   collection: {
-    collect(
+    collectNode(
       scope: ResearchScope,
+      node: CollectionNode,
       signal: AbortSignal,
       onProgress: (progress: CollectionProgress) => void,
     ): Promise<CollectionSnapshot>;
@@ -44,16 +47,19 @@ export async function openResearch(
   signal: AbortSignal,
   onProgress: (progress: CollectionProgress) => void,
 ): Promise<RunView> {
-  const collection = await ports.collection.collect(
+  const collection = await ports.collection.collectNode(
     request.scope,
+    "required",
     signal,
     onProgress,
   );
   requireCollectionData(collection);
   signal.throwIfAborted();
+  const capturedAt = ports.now();
+  collection.capturedAt = capturedAt.toISOString();
   const scope = {
     ...request.scope,
-    cutoff: researchCutoff(request.scope, ports.now()),
+    cutoff: researchCutoff(request.scope, capturedAt),
   };
   ports.collection.finalizeScope(collection, scope);
   const input = attachResearchStages(
@@ -69,6 +75,10 @@ export async function openResearch(
     ),
     request.mode === "quick" ? QUICK_RESEARCH_STAGES : DEEP_RESEARCH_STAGES,
   );
+  for (const [key, version] of Object.entries(COLLECTION_SOURCE_VERSIONS)) {
+    input.versions.adapters[key] = version.adapterVersion;
+    input.versions.normalization[key] = version.normalizationVersion;
+  }
   input.inputs.push(request.modelInput);
   return ports.openRun(input, request.requestId);
 }
