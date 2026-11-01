@@ -22,13 +22,26 @@ import {
 import {
   createDataTools,
   createReadTools,
-  createRunReadOperations,
   createWriteTools,
   createServiceTaskTools,
-  createServiceTaskOperations,
-  SessionBindings,
 } from "@megapandas/dsh-stock-research/tools";
+import * as toolExports from "@megapandas/dsh-stock-research/tools";
+import {
+  SessionBindings,
+  createRunReadOperations,
+  createServiceTaskOperations,
+} from "@megapandas/dsh-stock-research/runtime";
 import { openDecisionSample } from "./decision-sample.mjs";
+
+for (const name of [
+  "SessionBindings",
+  "ResearchSessions",
+  "DispatchBridge",
+  "createRunReadOperations",
+  "createDispatchOperations",
+  "createServiceTaskOperations",
+])
+  assert.equal(Object.hasOwn(toolExports, name), false);
 
 const directory = mkdtempSync(join(tmpdir(), "dsh-stock-tools-package-"));
 let root;

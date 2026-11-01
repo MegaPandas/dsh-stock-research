@@ -13,8 +13,8 @@ async function boundaryErrors(filePath: string, source: string) {
 describe("dispatch execution boundaries", () => {
   it.each([
     [
-      "src/host/runtime.ts",
-      'import { continueChild } from "./dispatch/child-continuation.js";',
+      "src/host/runtime/index.ts",
+      'import { continueChild } from "../dispatch/child-continuation.js";',
     ],
     [
       "src/tools/index.ts",
@@ -34,9 +34,9 @@ describe("dispatch execution boundaries", () => {
   );
 
   it.each([
-    ["src/host/runtime.ts", "./dispatch/index.js"],
+    ["src/host/runtime/index.ts", "../dispatch/index.js"],
     ["src/host/research-operations.ts", "./dispatch/index.js"],
-    ["src/tools/index.ts", "../host/dispatch/index.js"],
+    ["src/runtime.ts", "./host/dispatch/index.js"],
     ["src/app/role.ts", "../host/dispatch/index.js"],
     ["src/app/role-preparation/index.ts", "../../host/dispatch/index.js"],
     ["src/host/dispatch/index.ts", "./child-continuation.js"],

@@ -10,6 +10,8 @@ import {
 import type { WebSearchRequest } from "@deepseek-ai/dsh-web";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DataRoot } from "../../src/storage/data-root.js";
+import { QueryService } from "../../src/services/query/index.js";
+import { MemoryService } from "../../src/services/memory/index.js";
 import { createQuickInput } from "../../src/app/plan/quick.js";
 import {
   deferred,
@@ -29,6 +31,7 @@ beforeEach(() => {
 });
 afterEach(async () => {
   try {
+    vi.restoreAllMocks();
     for (const cleanup of cleanups.splice(0).reverse()) await cleanup();
   } finally {
     vi.unstubAllGlobals();
@@ -338,6 +341,45 @@ describe("research runtime plugin with the real DSH host", () => {
     expect(stockNames(h)).toEqual([]);
     expect(h.ctx.agents.get(h.outside.agent.id)).toBe(h.outside.agent);
     reacquire(h.directory);
+  });
+
+  it("preserves every producer close failure and still releases the service and writer lock", async () => {
+    const h = await host();
+    const mounted = await h.mount();
+    const queryFailure = new Error("query close failed");
+    const memoryFailure = new Error("memory close failed");
+    const queryClose = QueryService.prototype.close;
+    const memoryClose = MemoryService.prototype.close;
+    vi.spyOn(QueryService.prototype, "close").mockImplementationOnce(
+      async function (this: QueryService) {
+        await queryClose.call(this);
+        throw queryFailure;
+      },
+    );
+    vi.spyOn(MemoryService.prototype, "close").mockImplementationOnce(
+      async function (this: MemoryService) {
+        await memoryClose.call(this);
+        throw memoryFailure;
+      },
+    );
+    const closing = mounted.runtime.close();
+    expect(mounted.runtime.close()).toBe(closing);
+    const result = await observe(closing);
+    expect(result).toMatchObject({
+      kind: "rejected",
+      reason: expect.objectContaining({
+        errors: expect.arrayContaining([queryFailure, memoryFailure]),
+      }),
+    });
+    expect(h.ctx.get("stockResearch")).toBeUndefined();
+    expect(h.ctx.agents.get(h.outside.agent.id)).toBe(h.outside.agent);
+    reacquire(h.directory);
+    const log = vi
+      .spyOn(mounted.fiber.ctx.logger, "error")
+      .mockImplementation(() => {});
+    await mounted.fiber.dispose();
+    if (result.kind !== "rejected") throw new Error("Expected close to reject");
+    expect(log).toHaveBeenCalledWith(result.reason);
   });
 
   it("waits for an asynchronous original setup to finish before releasing its data root", async () => {

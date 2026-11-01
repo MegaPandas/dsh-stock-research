@@ -13,8 +13,8 @@ async function boundaryErrors(
 
 it.each([
   [
-    "src/host/runtime.ts",
-    'import { CollectionSourceRunner } from "../services/collection/source.js";',
+    "src/host/runtime/index.ts",
+    'import { CollectionSourceRunner } from "../../services/collection/source.js";',
   ],
   [
     "src/app/new-use-case.ts",
@@ -65,7 +65,7 @@ it.each([
   ["plan", "node:fs"],
   ["quality", "./table.js"],
   ["view", "../shared-queries.js"],
-  ["errors", "../../host/runtime.js"],
+  ["errors", "../../host/runtime/index.js"],
 ])("keeps collection %s independent of %s", async (file, dependency) => {
   expect(
     await boundaryErrors(

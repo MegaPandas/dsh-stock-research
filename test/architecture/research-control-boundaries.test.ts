@@ -15,7 +15,7 @@ async function boundaryErrors(filePath: string, source: string) {
 describe("research control boundaries", () => {
   it.each([
     "@deepseek-ai/cordis",
-    "../../host/runtime.js",
+    "../../host/runtime/index.js",
     "../../tools/read.js",
   ])("keeps the opening workflow independent of %s", async (dependency) => {
     const errors = await boundaryErrors(

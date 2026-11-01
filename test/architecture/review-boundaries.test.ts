@@ -12,7 +12,7 @@ async function boundaryErrors(source: string) {
 }
 it.each([
   "@deepseek-ai/cordis",
-  "../host/runtime.js",
+  "../host/runtime/index.js",
   "../host/tool-protocol/parameters.js",
   "../runs/store.js",
   "../services/memory/index.js",

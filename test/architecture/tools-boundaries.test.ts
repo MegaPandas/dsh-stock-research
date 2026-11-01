@@ -30,8 +30,8 @@ describe("tool adapter entries", () => {
       'import { researchTool } from "../tools/errors.js";',
     ],
     [
-      "src/host/runtime.ts",
-      'const tool = import("../tools/nested/new-internal.js");',
+      "src/host/runtime/index.ts",
+      'const tool = import("../../tools/nested/new-internal.js");',
     ],
   ])("keeps tool input assembly private from %s", async (file, source) => {
     const errors = await boundaryErrors(file, source);
@@ -40,10 +40,10 @@ describe("tool adapter entries", () => {
   });
 
   it.each([
-    ["src/host/runtime.ts", "../tools/data.js"],
-    ["src/host/runtime.ts", "../tools/write.js"],
-    ["src/host/runtime.ts", "../tools/read.js"],
-    ["src/host/runtime.ts", "../tools/control.js"],
+    ["src/host/runtime/index.ts", "../../tools/data.js"],
+    ["src/host/runtime/index.ts", "../../tools/write.js"],
+    ["src/host/runtime/index.ts", "../../tools/read.js"],
+    ["src/host/runtime/index.ts", "../../tools/control.js"],
     ["src/host/report-draft.ts", "./tool-protocol/parameters.js"],
     ["src/app/report-reader.ts", "../host/tool-protocol/errors.js"],
     ["src/app/role-preparation/role.ts", "../../tools/valuation.js"],

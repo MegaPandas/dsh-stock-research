@@ -20,7 +20,7 @@ describe("shared evidence boundaries", () => {
     ["src/evidence/fields.ts", "../runs/store.js"],
     ["src/evidence/checks.ts", "../cache/index.js"],
     ["src/evidence/checks.ts", "../data/http.js"],
-    ["src/evidence/fields.ts", "../host/runtime.js"],
+    ["src/evidence/fields.ts", "../host/runtime/index.js"],
     ["src/evidence/checks.ts", "../app/reference-price.js"],
     ["src/evidence/price-basis.ts", "../tools/read.js"],
     ["src/evidence/fields.ts", "node:fs"],

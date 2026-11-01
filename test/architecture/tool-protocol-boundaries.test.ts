@@ -76,7 +76,7 @@ it.each([
     "src/host/tool-protocol/errors.ts",
     "../../services/artifact-submission/index.js",
   ],
-  ["src/host/runtime.ts", "../tools/read.js"],
+  ["src/host/runtime/index.ts", "../../tools/read.js"],
 ])("allows the protocol dependency %s → %s", async (file, dependency) => {
   expect(
     await errors(file, `import type { Value } from "${dependency}";`),

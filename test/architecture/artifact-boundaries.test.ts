@@ -19,7 +19,7 @@ describe("artifact rule boundaries", () => {
     ["src/artifacts/risks.ts", "../services/digest/index.js"],
     ["src/artifacts/gaps.ts", "../runs/store.js"],
     ["src/artifacts/risks.ts", "node:fs"],
-    ["src/artifacts/references.ts", "../host/runtime.js"],
+    ["src/artifacts/references.ts", "../host/runtime/index.js"],
     ["src/artifacts/schema.ts", "../services/artifact-submission/index.js"],
     ["src/artifacts/agent-reports.ts", "../storage/data-root.js"],
     ["src/artifacts/stage-handoff.ts", "@deepseek-ai/dsh-agent"],

@@ -13,8 +13,8 @@ async function boundaryErrors(filePath: string, source: string) {
 describe("research session boundaries", () => {
   it.each([
     [
-      "src/host/runtime.ts",
-      'import { setupResearchTools } from "./sessions/tool-policy.js";',
+      "src/host/runtime/index.ts",
+      'import { setupResearchTools } from "../sessions/tool-policy.js";',
     ],
     [
       "src/tools/index.ts",
@@ -31,9 +31,9 @@ describe("research session boundaries", () => {
   });
 
   it.each([
-    ["src/host/runtime.ts", "./sessions/index.js"],
+    ["src/host/runtime/index.ts", "../sessions/index.js"],
     ["src/host/dispatch/index.ts", "../sessions/index.js"],
-    ["src/tools/index.ts", "../host/sessions/index.js"],
+    ["src/runtime.ts", "./host/sessions/index.js"],
     ["src/host/sessions/index.ts", "./tool-policy.js"],
     ["src/host/sessions/tool-policy.ts", "./tool-arguments.js"],
     ["src/host/sessions/index.ts", "../bindings.js"],

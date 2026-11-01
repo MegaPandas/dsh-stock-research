@@ -35,7 +35,7 @@ it.each([
   ["src/host/research-operations.ts", "./dispatch/index.js"],
   ["src/host/research-operations.ts", "../services/decisions.js"],
   ["src/host/valuation-operations.ts", "../services/valuation/calculate.js"],
-  ["src/host/runtime.ts", "../tools/read.js"],
+  ["src/host/runtime/index.ts", "../../tools/read.js"],
 ])("allows %s → %s", async (file, dependency) => {
   expect(await errors(file, `import { Value } from "${dependency}";`)).toEqual(
     [],

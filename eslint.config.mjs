@@ -116,6 +116,10 @@ export default defineConfig(
             ],
           },
           {
+            directory: "src/host/runtime",
+            publicEntries: ["index.js"],
+          },
+          {
             directory: "src/host/dispatch",
             publicEntries: ["index.js"],
           },
@@ -356,6 +360,20 @@ export default defineConfig(
     },
   },
   {
+    files: ["src/tools/index.ts"],
+    rules: {
+      "no-restricted-syntax": [
+        "error",
+        {
+          selector:
+            ":matches(ImportDeclaration, ExportNamedDeclaration, ExportAllDeclaration, ImportExpression)[source.value=/(^|\\u002F)(host(\\u002F|$)|runtime(\\.js)?$)/]",
+          message:
+            "The tools entry must export adapters instead of host ownership or runtime composition.",
+        },
+      ],
+    },
+  },
+  {
     files: ["src/host/**/*.ts"],
     rules: {
       "no-restricted-imports": [
@@ -388,7 +406,7 @@ export default defineConfig(
   },
   {
     files: ["src/host/**/*.ts"],
-    ignores: ["src/host/runtime.ts"],
+    ignores: ["src/host/runtime/**"],
     rules: {
       "no-restricted-syntax": [
         "error",
@@ -544,7 +562,7 @@ export default defineConfig(
               group: [
                 "**/tools/**",
                 "@deepseek-ai/cordis",
-                "**/host/runtime.js",
+                "**/host/runtime/**",
                 "../../runtime.js",
                 "@megapandas/dsh-stock-research/runtime",
                 "@deepseek-ai/dsh-tools",
@@ -635,7 +653,7 @@ export default defineConfig(
               group: [
                 "@deepseek-ai/cordis",
                 "@deepseek-ai/dsh-commands",
-                "**/host/runtime.js",
+                "**/host/runtime/**",
                 "../runtime.js",
                 "../../runtime.js",
                 "@megapandas/dsh-stock-research/runtime",

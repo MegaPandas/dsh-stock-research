@@ -21,7 +21,7 @@ describe("query module boundaries", () => {
     ],
     ["src/tools/read.ts", "../services/query/source-queries.js"],
     ["src/services/numbers/session.ts", "../query/source-queries.js"],
-    ["src/host/runtime.ts", "../services/query/source-queries.js"],
+    ["src/host/runtime/index.ts", "../../services/query/source-queries.js"],
     ["src/client/index.ts", "../services/query/source-queries.js"],
     ["src/core.ts", "./services/query/source-queries.js"],
   ])(
@@ -87,8 +87,8 @@ describe("query module boundaries", () => {
 
   it.each([
     [
-      "src/host/runtime.ts",
-      'import { QueryService } from "../services/query/index.js";',
+      "src/host/runtime/index.ts",
+      'import { QueryService } from "../../services/query/index.js";',
     ],
     [
       "src/services/query-snapshot.ts",

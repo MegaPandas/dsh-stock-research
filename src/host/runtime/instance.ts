@@ -1,10 +1,4 @@
-import { join } from "node:path";
 import type { Context } from "@deepseek-ai/cordis";
-import { createValuationTools } from "../tools/valuation.js";
-import {
-  createValuationOperations,
-  type ValuationOperations,
-} from "./valuation-operations.js";
 import type {
   Agent,
   AgentHandle,
@@ -12,61 +6,56 @@ import type {
   CreateAgentOptions,
 } from "@deepseek-ai/dsh-agent";
 import type { ToolDefinition, ToolRunContext } from "@deepseek-ai/dsh-tools";
-import { SqliteCache } from "../cache/index.js";
-import { ResearchError } from "../contracts/errors.js";
-import type { MemoryAccess, MemoryState } from "../contracts/memory-service.js";
-import type { QuerySnapshot } from "../contracts/query.js";
-import type { QueryAccess } from "../contracts/query-service.js";
-import type { OpenRunInput, RunState, RunView } from "../contracts/runs.js";
-import { HttpClient } from "../data/http.js";
-import { createCollectionTaskFactory } from "../data/collection-tasks.js";
-import { MemoryStore } from "../memory/store.js";
-import { RunStore } from "../runs/store.js";
-import { ArtifactService } from "../services/artifact-submission/index.js";
-import { DecisionService } from "../services/decisions.js";
-import { DigestService } from "../services/digest/index.js";
-import { MemoryService } from "../services/memory/index.js";
-import { NumberService } from "../services/numbers/index.js";
-import { QueryService } from "../services/query/index.js";
-import { TaskQueryService } from "../services/task-query.js";
-import { CollectionService } from "../services/collection/index.js";
-import { CollectionSnapshotStore } from "../storage/collection-snapshots.js";
-import { selectQuerySnapshot } from "../services/query-snapshot.js";
-import { createRunService } from "../services/run/index.js";
-import type { RunAccess } from "../contracts/run-access.js";
-import { DataRoot } from "../storage/data-root.js";
-import { createControlTools } from "../tools/control.js";
-import { createDataTools, type DataToolServices } from "../tools/data.js";
-import type { QueryPolicy } from "../contracts/query.js";
-import { createReadTools } from "../tools/read.js";
-import { createDataHealthTool } from "../tools/data-health.js";
-import { createRecallTool } from "../tools/recall.js";
-import { createWriteTools } from "../tools/write.js";
-import { createServiceTaskTools } from "../tools/service-tasks.js";
+import type { SqliteCache } from "../../cache/index.js";
+import { ResearchError } from "../../contracts/errors.js";
+import type { MemoryAccess } from "../../contracts/memory-service.js";
+import type { QuerySnapshot, QueryPolicy } from "../../contracts/query.js";
+import type { QueryAccess } from "../../contracts/query-service.js";
+import type { OpenRunInput, RunView } from "../../contracts/runs.js";
+import type { RunAccess } from "../../contracts/run-access.js";
+import type { DataEnvelope } from "../../contracts/data.js";
+import type { CollectionAccess } from "../../contracts/collection.js";
+import type { ResearchData } from "../../contracts/research.js";
+import type { HttpClient } from "../../data/http.js";
+import type { ArtifactService } from "../../services/artifact-submission/index.js";
+import type { DecisionService } from "../../services/decisions.js";
+import type { MemoryService } from "../../services/memory/index.js";
+import type { NumberService } from "../../services/numbers/index.js";
+import type { QueryService } from "../../services/query/index.js";
+import type { TaskQueryService } from "../../services/task-query.js";
+import type { CollectionService } from "../../services/collection/index.js";
+import { selectQuerySnapshot } from "../../services/query-snapshot.js";
+import type { DataRoot } from "../../storage/data-root.js";
+import { createValuationTools } from "../../tools/valuation.js";
+import { createControlTools } from "../../tools/control.js";
+import { createDataTools, type DataToolServices } from "../../tools/data.js";
+import { createReadTools } from "../../tools/read.js";
+import { createDataHealthTool } from "../../tools/data-health.js";
+import { createRecallTool } from "../../tools/recall.js";
+import { createWriteTools } from "../../tools/write.js";
+import { createServiceTaskTools } from "../../tools/service-tasks.js";
+import {
+  createValuationOperations,
+  type ValuationOperations,
+} from "../valuation-operations.js";
 import {
   createDispatchOperations,
   createServiceTaskOperations,
   type ResearchOperations,
-} from "./research-operations.js";
-import { SessionBindings, type ResearchBinding } from "./bindings.js";
+} from "../research-operations.js";
+import type { SessionBindings, ResearchBinding } from "../bindings.js";
 import {
   createRunReadOperations,
   type RunReadOperations,
-} from "./run-reading.js";
+} from "../run-reading.js";
 import {
   createReportSubmission,
   type SubmitReport,
-} from "./report-submission.js";
-import { Config } from "./config.js";
-import type { ResearchConfig } from "../contracts/settings.js";
-import { generateHandoffDigest } from "../services/digest/handoff.js";
-import { DispatchBridge, type PrepareRole } from "./dispatch/index.js";
-import { ResearchSessions } from "./sessions/index.js";
-import { createSources } from "./sources.js";
-import { searchPublic, approvePublicSearch } from "./public-search.js";
-import type { DataEnvelope } from "../contracts/data.js";
-import type { CollectionAccess } from "../contracts/collection.js";
-import type { ResearchData } from "../contracts/research.js";
+} from "../report-submission.js";
+import type { DispatchBridge } from "../dispatch/index.js";
+import type { ResearchSessions } from "../sessions/index.js";
+import { searchPublic, approvePublicSearch } from "../public-search.js";
+import { settle, throwFailures, type Dispose } from "./lifecycle.js";
 
 declare module "@deepseek-ai/cordis" {
   interface Context {
@@ -119,50 +108,28 @@ export interface ResearchRuntime {
   close(): Promise<void>;
 }
 
-type Dispose = () => void | Promise<void>;
 interface PendingAgent {
   controller: AbortController;
   drained: Promise<unknown[]>;
 }
 interface Components {
-  root: DataRoot;
-  cache: SqliteCache;
-  http: HttpClient;
+  root: Pick<DataRoot, "close">;
+  cache: Pick<SqliteCache, "close">;
+  http: Pick<HttpClient, "close">;
   runs: RunAccess;
   queries: QueryService;
   taskQueries: TaskQueryService;
   collection: CollectionService;
   memory: MemoryService;
-  numbers: NumberService;
-  artifacts: ArtifactService;
-  decisions: DecisionService;
-  sessions: ResearchSessions;
+  numbers: Pick<NumberService, "checkNumbers">;
+  artifacts: Pick<ArtifactService, "submitArtifact">;
+  decisions: Pick<DecisionService, "decide">;
+  sessions: Pick<ResearchSessions, "setup" | "close" | "dispose">;
   bindings: SessionBindings;
   dispatch: DispatchBridge;
 }
 
-async function settle(actions: readonly Dispose[]): Promise<unknown[]> {
-  return (
-    await Promise.allSettled(
-      actions.map((action) => Promise.resolve().then(action)),
-    )
-  ).flatMap((result) => (result.status === "rejected" ? [result.reason] : []));
-}
-function throwFailures(failures: unknown[]): void {
-  if (failures.length === 1) throw failures[0];
-  if (failures.length > 1)
-    throw new AggregateError(failures, "Research runtime cleanup failed.", {
-      cause: failures[0],
-    });
-}
-async function releaseReverse(actions: readonly Dispose[]): Promise<void> {
-  const failures: unknown[] = [];
-  for (const action of [...actions].reverse())
-    failures.push(...(await settle([action])));
-  throwFailures(failures);
-}
-
-class Runtime implements ResearchRuntime {
+export class Runtime implements ResearchRuntime {
   readonly runs: RunAccess;
   readonly reads: RunReadOperations;
   readonly queries: QueryService;
@@ -467,126 +434,4 @@ class Runtime implements ResearchRuntime {
     if (this.#closing !== undefined)
       throw new ResearchError("ACCESS_DENIED", "Research runtime is closed.");
   }
-}
-
-/** The application supplies role composition; deployment config supplies resources. */
-export function createResearchPlugin(prepareRole: PrepareRole) {
-  return {
-    name: "stock-research",
-    Config,
-    inject: ["tools", "agents", "subagents"],
-    async apply(ctx: Context, config: ResearchConfig): Promise<void> {
-      config = structuredClone(config);
-      const spawn = ctx.subagents.getProvider("spawn");
-      if (
-        spawn === undefined ||
-        spawn.inheritsParentContext ||
-        spawn.prepareContinuable === undefined
-      )
-        throw new ResearchError(
-          "SOURCE_UNAVAILABLE",
-          "Research requires a local spawn provider with independent context.",
-        );
-      await ctx.effect(async function* () {
-        const acquired: Dispose[] = [];
-        let ready = false;
-        yield () => (ready ? undefined : releaseReverse(acquired));
-        const root = new DataRoot(config.dataRoot);
-        acquired.push(() => root.close());
-        const cache = new SqliteCache({
-          path: join(root.path, "cache.sqlite"),
-          maxEntries: config.cache.maxEntries,
-        });
-        acquired.push(() => cache.close());
-        const http = new HttpClient(config.http);
-        acquired.push(() => http.close());
-        const sources = createSources(ctx, http, config);
-        const now = () => new Date().toISOString();
-        const runs = createRunService(new RunStore<RunState>(root), now);
-        const queries = new QueryService(sources, cache, config.cache.ttl);
-        acquired.push(() => queries.close());
-        const taskQueries = new TaskQueryService(queries, runs);
-        acquired.push(() => taskQueries.close());
-        const collection = new CollectionService(
-          createCollectionTaskFactory(
-            http,
-            (scope, request, signal) => queries.query(scope, request, signal),
-            {
-              secCiks: config.policy.secCiks,
-              ...(config.xueqiuCookie === undefined
-                ? {}
-                : { xueqiuCookie: config.xueqiuCookie }),
-            },
-          ),
-          cache,
-          {
-            enabledSources: config.enabledSources,
-            freshness: config.policy.freshness,
-            ttl: config.cache.ttl,
-            requireDailyMarket: true,
-          },
-          new CollectionSnapshotStore(root),
-        );
-        acquired.push(() => collection.close());
-        const memory = new MemoryService(
-          new MemoryStore<MemoryState>(root, () => ({
-            stateVersion: 1,
-            receipts: [],
-          })),
-          runs,
-          (scope, request, signal) => queries.query(scope, request, signal),
-          now,
-        );
-        acquired.push(() => memory.close());
-        const numbers = new NumberService(runs);
-        const artifacts = new ArtifactService(runs, numbers);
-        const digests = new DigestService(
-          runs,
-          artifacts,
-          generateHandoffDigest,
-        );
-        acquired.push(() => digests.close());
-        const decisions = new DecisionService(runs, now);
-        const bindings = new SessionBindings();
-        const sessions = new ResearchSessions(ctx, bindings);
-        acquired.push(sessions.dispose);
-        yield sessions.dispose;
-        const dispatch = new DispatchBridge(
-          ctx,
-          runs,
-          sessions,
-          prepareRole,
-          digests,
-        );
-        const runtime = new Runtime(
-          ctx,
-          {
-            root,
-            cache,
-            http,
-            runs,
-            queries,
-            taskQueries,
-            collection,
-            memory,
-            numbers,
-            artifacts,
-            decisions,
-            bindings,
-            sessions,
-            dispatch,
-          },
-          config.policy,
-          config.enabledSources.includes("dsh-web"),
-        );
-        const withdraw = ctx.provide("stockResearch", runtime);
-        runtime.withdraw = withdraw;
-        acquired.push(withdraw);
-        yield withdraw;
-        // Adopt the exact Cordis effects so they cannot unload beside active work.
-        yield () => runtime.close();
-        ready = true;
-      });
-    },
-  };
 }

@@ -25,8 +25,8 @@ describe("digest boundaries", () => {
     ],
     ["src/services/numbers/session.ts", 'export * from "../digest/draft.js";'],
     [
-      "src/host/runtime.ts",
-      'const value = import("../services/digest/nested/new-internal.js");',
+      "src/host/runtime/index.ts",
+      'const value = import("../../services/digest/nested/new-internal.js");',
     ],
   ])("keeps digest implementation private from %s", async (file, source) => {
     const errors = await boundaryErrors(file, source);
@@ -37,7 +37,7 @@ describe("digest boundaries", () => {
   it.each([
     ["src/core.ts", "./services/digest/index.js"],
     ["src/core.ts", "./services/digest/handoff.js"],
-    ["src/host/runtime.ts", "../services/digest/handoff.js"],
+    ["src/host/runtime/index.ts", "../../services/digest/handoff.js"],
     ["src/host/dispatch/index.ts", "../../services/digest/index.js"],
     ["src/services/digest/index.ts", "./inputs.js"],
     ["src/services/digest/index.ts", "./draft.js"],
@@ -57,7 +57,7 @@ describe("digest boundaries", () => {
     ["src/services/digest/draft.ts", "./index.js"],
     ["src/services/digest/handoff.ts", "../artifact-inputs.js"],
     ["src/services/digest/draft.ts", "../../runs/store.js"],
-    ["src/services/digest/handoff.ts", "../../host/runtime.js"],
+    ["src/services/digest/handoff.ts", "../../host/runtime/index.js"],
     ["src/services/digest/handoff.ts", "node:fs"],
   ])(
     "keeps digest computations in %s independent of %s",

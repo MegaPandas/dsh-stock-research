@@ -21,6 +21,7 @@ import {
   Config,
   createResearchPlugin,
 } from "@megapandas/dsh-stock-research/runtime";
+import * as hostExports from "@megapandas/dsh-stock-research/runtime";
 import * as Ask from "@megapandas/dsh-stock-research/ask";
 import * as Review from "@megapandas/dsh-stock-research/review";
 import {
@@ -28,6 +29,16 @@ import {
   prepareResearchRole,
 } from "@megapandas/dsh-stock-research/application";
 import * as Role from "@megapandas/dsh-stock-research/role";
+
+for (const name of [
+  "SessionBindings",
+  "ResearchSessions",
+  "DispatchBridge",
+  "createRunReadOperations",
+  "createDispatchOperations",
+  "createServiceTaskOperations",
+])
+  assert.equal(typeof hostExports[name], "function");
 
 // Resolve from each consuming SDK package, rather than assume a hoisted copy.
 for (const dependency of [

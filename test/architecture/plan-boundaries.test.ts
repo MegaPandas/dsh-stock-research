@@ -48,7 +48,7 @@ describe("research plan boundaries", () => {
 
   it.each([
     ["src/app/plan/quick.ts", "../../services/query/index.js"],
-    ["src/app/plan/deep.ts", "../../host/runtime.js"],
+    ["src/app/plan/deep.ts", "../../host/runtime/index.js"],
     ["src/app/plan/inputs.ts", "../../tools/query-inputs.js"],
     ["src/app/plan/versions.ts", "../../runs/store.js"],
     ["src/app/plan/protocol.ts", "node:fs"],

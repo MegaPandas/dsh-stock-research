@@ -7,7 +7,7 @@ import type {
 import { createUserMessage } from "@deepseek-ai/dsh-llm";
 import { SessionId } from "@deepseek-ai/dsh-session";
 import type {} from "@deepseek-ai/dsh-system-prompt";
-import type {} from "../host/runtime.js";
+import type {} from "../host/runtime/index.js";
 import { SubmittedAgents } from "../host/submitted-agents.js";
 import type { ModelConfig } from "../contracts/settings.js";
 import { runApplicationCommand } from "./settings.js";

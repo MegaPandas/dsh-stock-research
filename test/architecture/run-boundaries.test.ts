@@ -17,7 +17,7 @@ describe("run capability boundaries", () => {
     ["src/app/research-control/index.ts", "../../services/run/service.js"],
     ["src/tools/read.ts", "../services/run/service.js"],
     ["src/services/numbers/session.ts", "../run/service.js"],
-    ["src/host/runtime.ts", "../services/run/service.js"],
+    ["src/host/runtime/index.ts", "../../services/run/service.js"],
     ["src/host/dispatch/index.ts", "../../services/run/service.js"],
     ["src/client/index.ts", "../services/run/service.js"],
   ])(
@@ -78,7 +78,10 @@ describe("run capability boundaries", () => {
       "src/services/run/service.ts",
       'import { persistEvidence } from "./data.js";',
     ],
-    ["src/host/runtime.ts", 'import { RunStore } from "../runs/store.js";'],
+    [
+      "src/host/runtime/index.ts",
+      'import { RunStore } from "../../runs/store.js";',
+    ],
   ])(
     "allows the declared capability boundary from %s",
     async (file, source) => {
@@ -90,7 +93,7 @@ describe("run capability boundaries", () => {
     "./projections.js",
     "../run/projections.js",
     "../../report/projections.js",
-    "../../host/runtime.js",
+    "../../host/runtime/index.js",
   ])("keeps run transactions independent of %s", async (dependency) => {
     expect(
       await boundaryErrors(

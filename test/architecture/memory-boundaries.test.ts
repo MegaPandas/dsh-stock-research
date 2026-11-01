@@ -15,8 +15,8 @@ async function boundaryErrors(filePath: string, source: string) {
 describe("memory service boundaries", () => {
   it.each([
     [
-      "src/host/runtime.ts",
-      'import { assertMemoryState } from "../services/memory/state.js";',
+      "src/host/runtime/index.ts",
+      'import { assertMemoryState } from "../../services/memory/state.js";',
     ],
     ["src/core.ts", 'export * from "./services/memory/state.js";'],
     [
@@ -31,7 +31,7 @@ describe("memory service boundaries", () => {
 
   it.each([
     ["src/core.ts", "./services/memory/index.js"],
-    ["src/host/runtime.ts", "../services/memory/index.js"],
+    ["src/host/runtime/index.ts", "../../services/memory/index.js"],
     ["src/tools/recall.ts", "../services/memory/index.js"],
     ["src/services/memory/index.ts", "./state.js"],
     ["src/services/memory/index.ts", "../../memory/store.js"],

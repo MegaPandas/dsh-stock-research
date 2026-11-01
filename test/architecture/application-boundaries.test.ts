@@ -15,7 +15,7 @@ async function boundaryErrors(
 }
 it.each([
   "@deepseek-ai/cordis",
-  "../../host/runtime.js",
+  "../../host/runtime/index.js",
   "../../runtime.js",
   "@megapandas/dsh-stock-research/runtime",
   "../settings.js",
@@ -62,7 +62,7 @@ it.each([
   for (const dependency of [
     "@deepseek-ai/cordis",
     "@deepseek-ai/dsh-commands",
-    `${root}/host/runtime.js`,
+    `${root}/host/runtime/index.js`,
     `${root}/runtime.js`,
     "@megapandas/dsh-stock-research/runtime",
   ]) {
@@ -78,7 +78,7 @@ it.each([
   }
 });
 
-it.each(["../host/runtime.js", "../runtime.js", "../storage/cleanup.js"])(
+it.each(["../host/runtime/index.js", "../runtime.js", "../storage/cleanup.js"])(
   "keeps activity tracking independent of resource owner %s",
   async (dependency) => {
     const [result] = await eslint.lintText(
