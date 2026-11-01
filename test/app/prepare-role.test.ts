@@ -352,7 +352,7 @@ describe("persisted research role preparation", () => {
         status: "submitted",
       });
       const ref = h.runtime.runs
-        .view({ runId, identity: "owner" })
+        .view({ runId })
         .tasks.find(({ taskId }) => taskId === context.claim.taskId)!
         .outputRefs[0]!;
       expect(h.runtime.runs.readArtifact(ref).content.payload).toMatchObject({
