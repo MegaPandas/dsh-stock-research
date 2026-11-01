@@ -103,6 +103,7 @@
     "bench:run-projections": "node scripts/benchmark-run-projections.mjs",
     "bench:run-control": "node scripts/benchmark-run-control.mjs",
     "bench:run-data": "node scripts/benchmark-run-data.mjs",
+    "bench:scheduler": "node scripts/benchmark-scheduler.mjs",
     "bench:query": "node scripts/benchmark-query.mjs",
     "bench:collection-freshness": "node scripts/benchmark-collection-freshness.mjs",
     "bench:collection-views": "node --expose-gc scripts/benchmark-collection-views.mjs",
