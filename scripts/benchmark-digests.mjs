@@ -1,20 +1,46 @@
 import assert from "node:assert/strict";
 import { Buffer } from "node:buffer";
 import console from "node:console";
+import fs from "node:fs";
 import { mkdtempSync, rmSync } from "node:fs";
 import { cpus, tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { performance } from "node:perf_hooks";
 import process from "node:process";
-import {
+import { pathToFileURL } from "node:url";
+import { openDigestSample, sampleDigestReply } from "./digest-sample.mjs";
+
+const core =
+  process.argv[2] === undefined
+    ? "@megapandas/dsh-stock-research/core"
+    : pathToFileURL(resolve(process.argv[2])).href;
+const {
   ArtifactService,
   DataRoot,
   DigestService,
   NumberService,
   createRunService,
   RunStore,
-} from "@megapandas/dsh-stock-research/core";
-import { openDigestSample, sampleDigestReply } from "./digest-sample.mjs";
+} = await import(core);
+
+async function measure(action) {
+  const read = fs.readFileSync;
+  const reads = { manifest: 0, evidence: 0, artifact: 0 };
+  fs.readFileSync = function (path, ...args) {
+    const result = read.call(this, path, ...args);
+    const filename = String(path);
+    if (filename.endsWith("/manifest.json")) reads.manifest++;
+    else if (/\/evidence\/.*\.json$/.test(filename)) reads.evidence++;
+    else if (/\/artifacts\/.*\.json$/.test(filename)) reads.artifact++;
+    return result;
+  };
+  const start = performance.now();
+  try {
+    return { result: await action(), ms: performance.now() - start, reads };
+  } finally {
+    fs.readFileSync = read;
+  }
+}
 
 const directory = mkdtempSync(join(tmpdir(), "dsh-digest-bench-"));
 function stats(values) {
@@ -33,9 +59,10 @@ try {
   );
   let modelCalls = 0;
   let contextBytes = 0;
+  const artifacts = new ArtifactService(runs, new NumberService(runs));
   const digests = new DigestService(
     runs,
-    new ArtifactService(runs, new NumberService(runs)),
+    artifacts,
     async (input, _signal, _operation, submit) => {
       modelCalls++;
       contextBytes = Buffer.byteLength(JSON.stringify(input));
@@ -48,37 +75,45 @@ try {
     const repeated = [];
     let sample;
     let committed;
+    let freshReads;
+    let replayReads;
     for (let index = 0; index < 10; index++) {
-      sample = openDigestSample(runs, `sample-${claims}-${index}`, claims);
-      const start = performance.now();
-      committed = await digests.makeDigest(
-        sample.operation,
-        sample.taskId,
-        "digest",
+      sample = openDigestSample(
+        runs,
+        artifacts,
+        `sample-${claims}-${index}`,
+        claims,
       );
-      fresh.push(performance.now() - start);
+      const measured = await measure(() =>
+        digests.makeDigest(sample.operation, sample.taskId, "digest"),
+      );
+      committed = measured.result;
+      fresh.push(measured.ms);
+      freshReads ??= measured.reads;
+      assert.deepEqual(measured.reads, freshReads);
       const content = runs.readArtifact(committed.refs[0]).content;
       assert.equal(content.payload.numbers.length, claims);
       assert.equal(content.payload.gaps.length, 1);
       assert.equal(content.claims.length, 0);
     }
     for (let index = 0; index < 30; index++) {
-      const start = performance.now();
-      const result = await digests.makeDigest(
-        sample.operation,
-        sample.taskId,
-        "digest",
+      const measured = await measure(() =>
+        digests.makeDigest(sample.operation, sample.taskId, "digest"),
       );
-      repeated.push(performance.now() - start);
-      assert.deepEqual(result, committed);
+      repeated.push(measured.ms);
+      replayReads ??= measured.reads;
+      assert.deepEqual(measured.reads, replayReads);
+      assert.deepEqual(measured.result, committed);
     }
     measurements.push({
       claims,
       contextBytes,
       samples: 10,
       fresh: stats(fresh),
+      freshReads,
       replaySamples: 30,
       replay: stats(repeated),
+      replayReads,
       digestBytes: Buffer.byteLength(
         JSON.stringify(runs.readArtifact(committed.refs[0]).content),
       ),

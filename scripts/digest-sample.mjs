@@ -1,8 +1,3 @@
-import {
-  ArtifactService,
-  NumberService,
-} from "@megapandas/dsh-stock-research/core";
-
 export function sampleDigestReply(context) {
   const candidate = context.numbers[0].candidateId;
   return {
@@ -24,7 +19,7 @@ export function sampleDigestReply(context) {
   };
 }
 // Fixed synthetic inputs measure service composition, not a live model or source.
-export function openDigestSample(runs, requestId, claims) {
+export function openDigestSample(runs, artifacts, requestId, claims) {
   const cutoff = "2024-01-03T22:00:00.000Z";
   const definition = {
     scope: {
@@ -138,7 +133,7 @@ export function openDigestSample(runs, requestId, claims) {
     ),
     selector: "/data/bars/0/close",
   };
-  new ArtifactService(runs, new NumberService(runs)).submitArtifact(
+  artifacts.submitArtifact(
     producer,
     [
       {

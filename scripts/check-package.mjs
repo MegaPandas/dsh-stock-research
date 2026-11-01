@@ -484,7 +484,12 @@ try {
     "Package sample",
   );
   assert.equal(service.view({ runId }).tasks[0].status, "succeeded");
-  const digestSample = openDigestSample(service, "digest-sample", 1);
+  const digestSample = openDigestSample(
+    service,
+    artifactService,
+    "digest-sample",
+    1,
+  );
   const digestResult = await new DigestService(
     service,
     artifactService,
