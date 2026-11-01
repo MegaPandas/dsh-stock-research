@@ -98,6 +98,7 @@
     "bench:report": "node scripts/benchmark-report.mjs",
     "bench:inputs": "node scripts/benchmark-input-parsing.mjs",
     "bench:run-service": "node scripts/benchmark-run-service.mjs",
+    "bench:run-claims": "node scripts/benchmark-run-claims.mjs",
     "bench:run-opening": "node scripts/benchmark-run-opening.mjs",
     "bench:run-projections": "node scripts/benchmark-run-projections.mjs",
     "bench:run-control": "node scripts/benchmark-run-control.mjs",
