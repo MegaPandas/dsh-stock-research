@@ -152,7 +152,7 @@ try {
         content.methods.some(({ id }) => id === "fcff_dcf"),
     ),
   );
-  assert.equal(deep.versions.prompts.digest, "12");
+  assert.equal(deep.versions.prompts.digest, "13");
   assert.ok(health.sources.every((source) => source.sourceCalls === 0));
   // Removed entries disappear from Loader.await(); retain the actual disposal.
   const unloading = ctx.loader.resolve("stock-research").fiber.dispose();
