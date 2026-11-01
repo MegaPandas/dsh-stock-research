@@ -121,8 +121,8 @@ function response(url: URL, selected: Category) {
       ? {
           ...values,
           SECUCODE: "002594.SZ",
-          REPORT_DATE: "2023-09-30",
-          NOTICE_DATE: "2023-10-30",
+          REPORT_DATE: "2023-09-30 00:00:00",
+          NOTICE_DATE: "2023-10-30 00:00:00",
           CURRENCY: "CNY",
           BPS: 100,
           TOTALOPERATEREVE: 100,
