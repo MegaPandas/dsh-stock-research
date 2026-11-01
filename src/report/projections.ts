@@ -17,6 +17,7 @@ export function renderRunProjections(
   const named = new Map<string, ProjectionWrite>();
   for (const artifact of artifacts) {
     const kind = artifact.content.kind;
+    if (kind === "collection") continue;
     const content =
       kind === "decision"
         ? `${JSON.stringify(artifact.content.payload, null, 2)}\n`

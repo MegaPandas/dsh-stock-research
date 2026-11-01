@@ -1,4 +1,5 @@
 import { isDeepStrictEqual } from "node:util";
+import type { TaskService } from "../../contracts/workflow.js";
 import type { RunAccess } from "../../contracts/run-access.js";
 import { valuationDependencyIds } from "../../valuation/dependencies.js";
 import type { ValuationCalculation } from "../../contracts/valuation.js";
@@ -457,7 +458,7 @@ export class RunService implements RunAccess {
     operation: RunOperation,
     taskId: string,
     requestId: string,
-    executor?: "role" | "digest" | "finalize",
+    executor?: "role" | TaskService,
   ) {
     return this.transact<ClaimResult>(
       operation,
@@ -574,7 +575,7 @@ export class RunService implements RunAccess {
   claimService(
     operation: RunOperation,
     taskId: string,
-    service: "digest" | "finalize",
+    service: TaskService,
     requestId: string,
   ): ClaimResult {
     return this.claimTask(operation, taskId, requestId, service).result;
@@ -583,7 +584,7 @@ export class RunService implements RunAccess {
   claimServiceForCall(
     operation: RunOperation,
     taskId: string,
-    service: "digest" | "finalize",
+    service: TaskService,
     requestId: string,
   ): { claim: ClaimResult; replayed: boolean } {
     const { result: claim, replayed } = this.claimTask(
@@ -1186,7 +1187,11 @@ export class RunService implements RunAccess {
         runId: run.runId,
         revision: run.revision,
         artifactRefs: run.artifacts
-          .filter((artifact) => currentRefs.has(artifactKey(artifact.ref)))
+          .filter(
+            (artifact) =>
+              artifact.kind !== "collection" &&
+              currentRefs.has(artifactKey(artifact.ref)),
+          )
           .map((artifact) => artifact.ref),
       },
       contents,

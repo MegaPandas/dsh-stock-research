@@ -277,6 +277,7 @@ describe("stage dispatch", () => {
         throw new Error("A replay must not prepare another role");
       },
       h.digests,
+      h.collectionRuns,
     );
     cleanups.push(() => fresh.close());
     expect(

@@ -18,6 +18,7 @@ import { NumberService } from "../../services/numbers/index.js";
 import { QueryService } from "../../services/query/index.js";
 import { TaskQueryService } from "../../services/task-query.js";
 import { CollectionService } from "../../services/collection/index.js";
+import { CollectionRunService } from "../../services/collection-run/index.js";
 import { CollectionSnapshotStore } from "../../storage/collection-snapshots.js";
 import { createRunService } from "../../services/run/index.js";
 import { DataRoot } from "../../storage/data-root.js";
@@ -90,6 +91,8 @@ export function createResearchPlugin(prepareRole: PrepareRole) {
           new CollectionSnapshotStore(root),
         );
         acquired.push(() => collection.close());
+        const collections = new CollectionRunService(runs, collection);
+        acquired.push(() => collections.close());
         const memory = new MemoryService(
           new MemoryStore<MemoryState>(root, () => ({
             stateVersion: 1,
@@ -119,6 +122,7 @@ export function createResearchPlugin(prepareRole: PrepareRole) {
           sessions,
           prepareRole,
           digests,
+          collections,
         );
         const runtime = new Runtime(
           ctx,

@@ -41,6 +41,7 @@ import {
 import {
   createDispatchOperations,
   createServiceTaskOperations,
+  createCollectionTaskOperations,
   type ResearchOperations,
 } from "../research-operations.js";
 import type { SessionBindings, ResearchBinding } from "../bindings.js";
@@ -165,6 +166,7 @@ export class Runtime implements ResearchRuntime {
     this.operations = {
       ...createDispatchOperations(components.dispatch),
       ...createServiceTaskOperations(components.dispatch, components.decisions),
+      ...createCollectionTaskOperations(components.dispatch),
     };
     this.executeScheduled = createScheduledResearchExecutor(
       this.dispatch,

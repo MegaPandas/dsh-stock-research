@@ -4,6 +4,7 @@ import { afterEach, expect, it, vi } from "vitest";
 import { ResearchError } from "../../src/contracts/errors.js";
 import {
   createDispatchOperations,
+  createCollectionTaskOperations,
   createServiceTaskOperations,
 } from "../../src/host/research-operations.js";
 import { createScheduledResearchExecutor } from "../../src/host/scheduled-operations.js";
@@ -11,6 +12,7 @@ import { DispatchBridge } from "../../src/host/dispatch/index.js";
 import type { SchedulerExecution } from "../../src/services/scheduler/index.js";
 import { DecisionService } from "../../src/services/decisions.js";
 import { DigestService } from "../../src/services/digest/index.js";
+import { CollectionRunService } from "../../src/services/collection-run/index.js";
 import { generateHandoffDigest } from "../../src/services/digest/handoff.js";
 import { agentAnalysisReport } from "../fixtures/analysis-report.js";
 import { decisionFixture } from "../fixtures/decision.js";
@@ -32,6 +34,7 @@ async function host(...args: Parameters<typeof dispatchHost>) {
   cleanups.push(h.close);
   const operations = {
     ...createDispatchOperations(h.bridge),
+    ...createCollectionTaskOperations(h.bridge),
     ...createServiceTaskOperations(
       h.bridge,
       new DecisionService(h.runs, () => "2024-01-04T00:00:00.000Z"),
@@ -177,6 +180,11 @@ it("finalizes the validated fixed draft without creating a role execution", asyn
       throw new Error("Finalization must not prepare a role");
     },
     digests,
+    new CollectionRunService(c.runs, {
+      collectNode: async () => {
+        throw new Error("Unexpected fixture collection");
+      },
+    }),
   );
   cleanups.push(() => bridge.close());
   const binding = h.bindings.require(h.parent.agent).binding;
@@ -184,6 +192,7 @@ it("finalizes the validated fixed draft without creating a role execution", asyn
   binding.runIds = [...binding.runIds, c.operation.runId];
   const execute = createScheduledResearchExecutor(bridge, h.bindings, {
     ...createDispatchOperations(bridge),
+    ...createCollectionTaskOperations(bridge),
     ...createServiceTaskOperations(bridge, new DecisionService(c.runs, c.now)),
   });
   await execute(

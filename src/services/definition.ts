@@ -1,5 +1,6 @@
 import type { ArtifactKind } from "../contracts/artifacts.js";
 import { ResearchError } from "../contracts/errors.js";
+import { COLLECTION_NODES } from "../contracts/collection.js";
 import type { RunDefinition, TaskDefinition } from "../contracts/workflow.js";
 
 const ROLE_OUTPUTS = {
@@ -8,6 +9,7 @@ const ROLE_OUTPUTS = {
   manager: ["plan", "decision_draft"],
 } as const satisfies Record<string, readonly ArtifactKind[]>;
 const SERVICE_OUTPUTS = {
+  collection: ["collection"],
   digest: ["digest"],
   finalize: ["decision", "report"],
 } as const satisfies Record<string, readonly ArtifactKind[]>;
@@ -18,6 +20,12 @@ function invalid(taskId: string, reason: string): never {
 
 function checkOutputs(task: TaskDefinition): void {
   const executor = task.executor;
+  if (
+    executor.kind === "service" &&
+    executor.service === "collection" &&
+    !COLLECTION_NODES.includes(executor.node)
+  )
+    invalid(task.id, "collection requires a supported data node.");
   const allowed: readonly ArtifactKind[] =
     executor.kind === "role"
       ? ROLE_OUTPUTS[executor.role]

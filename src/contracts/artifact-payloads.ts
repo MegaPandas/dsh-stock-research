@@ -5,6 +5,7 @@ import type {
   NumberInput,
 } from "./artifacts.js";
 import type { AgentReport } from "./agent-reports.js";
+import type { CollectionSnapshot } from "./collection.js";
 import type { StageHandoff } from "./stage-handoff.js";
 import type {
   ArtifactRef,
@@ -156,6 +157,10 @@ export type ReportPayload = {
   limitations: string[];
 };
 export type ArtifactPayloads = {
+  collection: {
+    snapshot: CollectionSnapshot;
+    capturedFrom: ArtifactRef | null;
+  };
   analysis: AnalysisPayload | AnalysisNotePayload | AnalysisAgentPayload;
   debate: DebatePayload | DebateNotePayload | DebateAgentPayload;
   risk: RiskPayload;

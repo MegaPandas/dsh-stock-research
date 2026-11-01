@@ -3,17 +3,8 @@ import { ResearchError } from "../../contracts/errors.js";
 import type { ResearchRun } from "../../contracts/runs.js";
 import type { RunDefinition } from "../../contracts/workflow.js";
 import { validateRunDefinition } from "../definition.js";
-
-const ARTIFACT_KINDS = [
-  "analysis",
-  "debate",
-  "risk",
-  "plan",
-  "digest",
-  "decision_draft",
-  "decision",
-  "report",
-];
+import { ARTIFACT_KINDS } from "../../contracts/artifacts.js";
+import { COLLECTION_NODES } from "../../contracts/collection.js";
 
 function invalid(field: string): never {
   throw new ResearchError(
@@ -110,12 +101,15 @@ function definition(value: unknown): RunDefinition {
         "definition task.executor.role",
       );
       string(executor.specialty, "definition task.executor.specialty");
-    } else
+    } else {
       oneOf(
         executor.service,
-        ["digest", "finalize"],
+        ["collection", "digest", "finalize"],
         "definition task.executor.service",
       );
+      if (executor.service === "collection")
+        oneOf(executor.node, COLLECTION_NODES, "definition task.executor.node");
+    }
     strings(task.dependsOn, "definition task.dependsOn");
     strings(task.inputTasks, "definition task.inputTasks");
     for (const kind of array(task.outputKinds, "definition task.outputKinds"))

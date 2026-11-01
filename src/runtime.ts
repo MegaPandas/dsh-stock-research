@@ -30,10 +30,12 @@ export type { RunReadOperations } from "./host/run-reading.js";
 export {
   createDispatchOperations,
   createServiceTaskOperations,
+  createCollectionTaskOperations,
 } from "./host/research-operations.js";
 export type {
   DispatchOperations,
   ServiceTaskOperations,
+  CollectionTaskOperations,
   ResearchOperations,
   ResearchTaskRequest,
   ResearchStageRequest,

@@ -264,6 +264,7 @@ export { QueryService } from "./services/query/index.js";
 export type { QueryAccess } from "./contracts/query-service.js";
 export { TaskQueryService } from "./services/task-query.js";
 export { CollectionService } from "./services/collection/index.js";
+export { CollectionRunService } from "./services/collection-run/index.js";
 export { createCollectionTaskFactory } from "./data/collection-tasks.js";
 export type {
   CollectionAccess,

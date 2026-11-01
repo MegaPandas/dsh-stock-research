@@ -88,9 +88,26 @@ export class CollectionService implements CollectionAccess {
     const listener = (progress: CollectionProgress) => onProgress?.(progress);
     observers.waiters++;
     observers.listeners.add(listener);
+    let listening = true;
+    const release = () => {
+      if (!listening) return;
+      listening = false;
+      capturedObservers.listeners.delete(listener);
+      capturedObservers.waiters--;
+      if (
+        capturedObservers.waiters === 0 &&
+        this.#progress.get(identity) === capturedObservers
+      )
+        this.#progress.delete(identity);
+    };
+    signal?.addEventListener("abort", release, { once: true });
     try {
       if (observers.latest !== undefined) listener(observers.latest);
-      const result = await this.#flights.run(
+      const run =
+        node === undefined
+          ? this.#flights.run.bind(this.#flights)
+          : this.#flights.runOwned.bind(this.#flights);
+      const result = await run(
         identity,
         identity,
         (active) =>
@@ -102,10 +119,8 @@ export class CollectionService implements CollectionAccess {
       );
       return structuredClone(result);
     } finally {
-      observers.listeners.delete(listener);
-      observers.waiters--;
-      if (observers.waiters === 0 && this.#progress.get(identity) === observers)
-        this.#progress.delete(identity);
+      signal?.removeEventListener("abort", release);
+      release();
     }
   }
 

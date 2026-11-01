@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { setImmediate } from "node:timers/promises";
 import { SharedQueries } from "../../src/services/shared-queries.js";
 
 const release: (() => void)[] = [];
@@ -248,5 +249,133 @@ describe("shared in-flight queries", () => {
     await expect(queries.run("two", "request", async () => 2)).resolves.toBe(2);
     gate.resolve(1);
     await expect(first).resolves.toBe(1);
+  });
+
+  it("waits for the last owned producer to release before rejecting with the original cancellation", async () => {
+    const queries = shared<number>();
+    const result = deferred(0);
+    const started = deferred<AbortSignal>(new AbortController().signal);
+    const owner = new AbortController();
+    let released = false;
+    let settled = false;
+    const work = queries.runOwned(
+      "call",
+      "request",
+      async (signal) => {
+        started.resolve(signal);
+        try {
+          return await result.promise;
+        } finally {
+          released = true;
+        }
+      },
+      owner.signal,
+    );
+    void work.then(
+      () => {
+        settled = true;
+      },
+      () => {
+        settled = true;
+      },
+    );
+    const producer = await started.promise;
+    const reason = new Error("last owner stopped");
+    const rejected = expect(work).rejects.toBe(reason);
+    owner.abort(reason);
+    await setImmediate();
+    expect(producer.reason).toBe(reason);
+    expect(settled).toBe(false);
+    expect(released).toBe(false);
+    result.resolve(7);
+    await rejected;
+    expect(released).toBe(true);
+  });
+
+  it("detaches a cancelled owned waiter immediately when another consumer still owns the producer", async () => {
+    const queries = shared<number>();
+    const result = deferred(0);
+    const started = deferred<AbortSignal>(new AbortController().signal);
+    const owner = new AbortController();
+    const load = vi.fn(async (signal: AbortSignal) => {
+      started.resolve(signal);
+      return result.promise;
+    });
+    const first = queries.runOwned("call", "request", load, owner.signal);
+    const surviving = queries.runOwned("call", "request", load);
+    const producer = await started.promise;
+    const reason = new Error("one owner stopped");
+    const rejected = expect(first).rejects.toBe(reason);
+    owner.abort(reason);
+    await rejected;
+    expect(producer.aborted).toBe(false);
+    result.resolve(42);
+    await expect(surviving).resolves.toBe(42);
+    expect(load).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps an owned replacement shared while the cancelled producer drains and after its late settlement", async () => {
+    const queries = shared<number>();
+    const oldResult = deferred(0);
+    const oldStarted = deferred<void>(undefined);
+    const owner = new AbortController();
+    const old = queries.runOwned(
+      "call",
+      "request",
+      async () => {
+        oldStarted.resolve();
+        return oldResult.promise;
+      },
+      owner.signal,
+    );
+    await oldStarted.promise;
+    const reason = new Error("replace cancelled owner");
+    const rejected = expect(old).rejects.toBe(reason);
+    owner.abort(reason);
+    const replacementResult = deferred(0);
+    const replacementStarted = deferred<void>(undefined);
+    const load = vi.fn(async () => {
+      replacementStarted.resolve();
+      return replacementResult.promise;
+    });
+    const replacement = queries.runOwned("call", "request", load);
+    await replacementStarted.promise;
+    oldResult.resolve(0);
+    await rejected;
+    const unexpected = vi.fn(async () => 99);
+    const joined = queries.runOwned("call", "request", unexpected);
+    replacementResult.resolve(42);
+    await expect(Promise.all([replacement, joined])).resolves.toEqual([42, 42]);
+    expect(load).toHaveBeenCalledTimes(1);
+    expect(unexpected).not.toHaveBeenCalled();
+  });
+
+  it("preserves both cancellation and a different owned producer release failure", async () => {
+    const queries = shared<number>();
+    const result = deferred(0);
+    const started = deferred<void>(undefined);
+    const owner = new AbortController();
+    const reason = new Error("owner cancelled");
+    const releaseFailure = new Error("producer release failed");
+    const work = queries.runOwned(
+      "call",
+      "request",
+      async () => {
+        started.resolve();
+        await result.promise;
+        throw releaseFailure;
+      },
+      owner.signal,
+    );
+    const outcome = work.catch((cause: unknown) => cause);
+    await started.promise;
+    owner.abort(reason);
+    result.resolve(0);
+    const error = await outcome;
+    expect(error).toBeInstanceOf(AggregateError);
+    const errors = (error as AggregateError).errors;
+    expect(errors).toHaveLength(2);
+    expect(errors[0]).toBe(reason);
+    expect(errors[1]).toBe(releaseFailure);
   });
 });

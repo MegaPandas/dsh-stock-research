@@ -1,14 +1,17 @@
 import type { ArtifactRef, ISOTime, SourceRef } from "./data.js";
 
-export type ArtifactKind =
-  | "analysis"
-  | "debate"
-  | "risk"
-  | "plan"
-  | "digest"
-  | "decision_draft"
-  | "decision"
-  | "report";
+export const ARTIFACT_KINDS = [
+  "collection",
+  "analysis",
+  "debate",
+  "risk",
+  "plan",
+  "digest",
+  "decision_draft",
+  "decision",
+  "report",
+] as const;
+export type ArtifactKind = (typeof ARTIFACT_KINDS)[number];
 
 export type NumberInput =
   | { kind: "local"; claimId: string }

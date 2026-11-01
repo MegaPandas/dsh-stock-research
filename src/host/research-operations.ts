@@ -72,7 +72,16 @@ export interface ServiceTaskOperations {
     signal: AbortSignal,
   ): Promise<ArtifactCommitResult>;
 }
-export type ResearchOperations = DispatchOperations & ServiceTaskOperations;
+export type ResearchOperations = DispatchOperations &
+  ServiceTaskOperations &
+  CollectionTaskOperations;
+export interface CollectionTaskOperations {
+  collectTask(
+    request: ResearchTaskRequest,
+    caller: BoundCaller,
+    signal: AbortSignal,
+  ): Promise<ArtifactCommitResult>;
+}
 
 /** Requests and run permissions are established by the calling entry point. */
 export function createDispatchOperations(
@@ -151,6 +160,21 @@ export function createServiceTaskOperations(
     },
     async decide(request, caller, signal) {
       return decisions.decide(
+        { runId: request.runId, identity: caller.agent.id },
+        request.taskId,
+        request.requestId,
+        signal,
+      );
+    },
+  };
+}
+
+export function createCollectionTaskOperations(
+  bridge: Pick<DispatchBridge, "collect">,
+): CollectionTaskOperations {
+  return {
+    collectTask(request, caller, signal) {
+      return bridge.collect(
         { runId: request.runId, identity: caller.agent.id },
         request.taskId,
         request.requestId,

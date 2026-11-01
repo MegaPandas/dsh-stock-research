@@ -24,7 +24,13 @@ export interface CollectionAccess {
   finalizeScope(snapshot: CollectionSnapshot, scope: ResearchScope): void;
 }
 
-export type CollectionNode = "required" | "market" | "fundamentals" | "macro";
+export const COLLECTION_NODES = [
+  "required",
+  "market",
+  "fundamentals",
+  "macro",
+] as const;
+export type CollectionNode = (typeof COLLECTION_NODES)[number];
 
 export interface CollectionColumn {
   label: string;

@@ -1,5 +1,6 @@
 import type { ArtifactKind } from "./artifacts.js";
 import type { Dataset, ResearchScope } from "./data.js";
+import type { CollectionNode } from "./collection.js";
 
 export interface DataRequirement {
   dataset: Dataset;
@@ -15,7 +16,8 @@ export interface TaskDefinition {
         role: "analyst" | "discussion" | "manager";
         specialty: string;
       }
-    | { kind: "service"; service: "digest" | "finalize" };
+    | { kind: "service"; service: "digest" | "finalize" }
+    | { kind: "service"; service: "collection"; node: CollectionNode };
   dependsOn: string[];
   inputTasks: string[];
   outputKinds: ArtifactKind[];
@@ -23,6 +25,11 @@ export interface TaskDefinition {
   valuation?: "research" | "decision";
   instructionVersion: number;
 }
+
+export type TaskService = Extract<
+  TaskDefinition["executor"],
+  { kind: "service" }
+>["service"];
 
 export interface RunDefinition {
   scope: ResearchScope;

@@ -107,6 +107,7 @@ async function host(
     sessions,
     provision,
     digests,
+    storage.collectionRuns,
   );
   cleanups.push(() => bridge.close());
   const signal = new AbortController().signal;

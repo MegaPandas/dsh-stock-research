@@ -38,6 +38,7 @@ import type {
   ValuationCalculationRegistration,
 } from "./runs.js";
 import type { ContentRef } from "./storage.js";
+import type { TaskService } from "./workflow.js";
 import type {
   EvidenceCall,
   EvidenceInput,
@@ -152,13 +153,13 @@ export interface RunCommands {
   claimService(
     operation: RunOperation,
     taskId: string,
-    service: "digest" | "finalize",
+    service: TaskService,
     requestId: string,
   ): ClaimResult;
   claimServiceForCall(
     operation: RunOperation,
     taskId: string,
-    service: "digest" | "finalize",
+    service: TaskService,
     requestId: string,
   ): { claim: ClaimResult; replayed: boolean };
   serviceForCall(

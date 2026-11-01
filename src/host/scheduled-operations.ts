@@ -18,7 +18,7 @@ export function createScheduledResearchExecutor(
   bindings: SessionBindings,
   operations: Pick<
     ResearchOperations,
-    "dispatchTask" | "dispatchStage" | "makeDigest" | "decide"
+    "dispatchTask" | "dispatchStage" | "makeDigest" | "decide" | "collectTask"
   >,
 ): ScheduledResearchExecutor {
   return async (owner, runId, execution, signal) => {
@@ -53,6 +53,8 @@ export function createScheduledResearchExecutor(
             await operations.dispatchTask(request, caller, signal);
           else if (execution.executor.service === "digest")
             await operations.makeDigest(request, caller, signal);
+          else if (execution.executor.service === "collection")
+            await operations.collectTask(request, caller, signal);
           else await operations.decide(request, caller, signal);
         }
       } catch (cause) {

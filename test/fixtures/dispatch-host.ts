@@ -44,6 +44,7 @@ import { RunStore } from "../../src/runs/store.js";
 import { ArtifactService } from "../../src/services/artifact-submission/index.js";
 import { DecisionService } from "../../src/services/decisions.js";
 import { DigestService } from "../../src/services/digest/index.js";
+import { CollectionRunService } from "../../src/services/collection-run/index.js";
 import { MemoryService } from "../../src/services/memory/index.js";
 import { NumberService } from "../../src/services/numbers/index.js";
 import { createRunService } from "../../src/services/run/index.js";
@@ -371,6 +372,11 @@ export async function dispatchHost(
     const bindings = new SessionBindings();
     const sessions = new ResearchSessions(ctx, bindings);
     const prepared: RoleDispatchContext[] = [];
+    const collectionRuns = new CollectionRunService(runs, {
+      collectNode: async () => {
+        throw new Error("Unexpected fixture collection");
+      },
+    });
     const actualBridge: DispatchBridge = (bridge = new DispatchBridge(
       ctx,
       runs,
@@ -391,6 +397,7 @@ export async function dispatchHost(
         };
       },
       digests,
+      collectionRuns,
     ));
     const writeTools = [
       ...createWriteTools({ artifacts, memory }, bindings, {
@@ -479,6 +486,7 @@ export async function dispatchHost(
       sessions,
       bridge: actualBridge,
       digests,
+      collectionRuns,
       adapter,
       prepared,
       children,

@@ -32,6 +32,7 @@ import type {
 } from "../../contracts/runs.js";
 import type { RunAccess } from "../../contracts/run-access.js";
 import type { DigestService } from "../../services/digest/index.js";
+import type { CollectionRunService } from "../../services/collection-run/index.js";
 import {
   dispatchClaimRequestId,
   RunDispatchPlanner,
@@ -165,6 +166,7 @@ export class DispatchBridge {
     private readonly sessions: ResearchSessions,
     private readonly prepare: PrepareRole,
     private readonly digests: DigestService,
+    private readonly collections: CollectionRunService,
   ) {
     this.#planning = new RunDispatchPlanner(runs);
     this.#unlistenParent = ctx.on("agent/disposed", ({ agent }) => {
@@ -472,6 +474,17 @@ export class DispatchBridge {
     );
   }
 
+  collect(
+    operation: RunOperation,
+    taskId: string,
+    requestId: string,
+    signal?: AbortSignal,
+  ): Promise<ArtifactCommitResult> {
+    return this.#afterStops(operation.runId, taskId, signal, () =>
+      this.collections.collect(operation, taskId, requestId, signal),
+    );
+  }
+
   async redo(
     operation: RunOperation,
     taskId: string,
@@ -553,6 +566,7 @@ export class DispatchBridge {
       if (
         this.#active.has(attemptKey(operation.runId, target)) ||
         this.digests.isExecuting(operation.runId, target) ||
+        this.collections.isExecuting(operation.runId, target) ||
         (sessionId !== null &&
           this.ctx.agents.get(SessionId(sessionId)) !== undefined)
       )
@@ -582,6 +596,7 @@ export class DispatchBridge {
     await finishStops([
       this.#stop([...this.#active.values()]),
       this.digests.close(),
+      this.collections.close(),
     ]);
   }
 
@@ -827,6 +842,7 @@ export class DispatchBridge {
     await finishStops([
       this.#stop(owned),
       this.digests.stop(runId, targets, cancelled),
+      this.collections.stop(runId, targets, cancelled),
     ]);
   }
 

@@ -333,12 +333,26 @@ describe("independent collection nodes", () => {
       const originalRecord = records()[0]!;
       const controller = new AbortController();
       const work = service.collectNode(scope, "macro", controller.signal);
+      let settled = false;
+      void work.then(
+        () => {
+          settled = true;
+        },
+        () => {
+          settled = true;
+        },
+      );
       const rejected = expect(work).rejects.toBe(reason);
-      await pause.started.promise;
-      if (status === "cancelled") controller.abort(reason);
+      const active = await pause.started.promise;
+      if (status === "cancelled") {
+        controller.abort(reason);
+        await setImmediate();
+        expect(active.reason).toBe(reason);
+        expect(settled).toBe(false);
+        expect(records()).toEqual([originalRecord]);
+      }
       pause.released.resolve();
       await rejected;
-      await service.close();
       expect(records()).toHaveLength(2);
       expect(
         records().find(({ snapshot }) => snapshot.node === "required"),
@@ -351,8 +365,43 @@ describe("independent collection nodes", () => {
         error: { name: "Error", message: reason.message },
       });
       expect(saved.packets[0]!.envelope.data.rows[0]!.values.close).toBe(102);
+      await service.close();
     },
   );
+
+  it("returns a cancelled node's record persistence failure together with its original cancellation", async () => {
+    const daily = task("market.daily", "market", "daily");
+    const macro = task("macro.cpi", "macro", "macro");
+    const pause = pauseTask(macro);
+    const { service, records, snapshots } = setup([daily, macro]);
+    await service.collectNode(scope, "required");
+    const original = records()[0]!;
+    const controller = new AbortController();
+    const reason = new Error("cancel macro node");
+    const persistence = new ResearchError(
+      "STORAGE_FAILED",
+      "cancelled node record could not be saved",
+    );
+    const work = service.collectNode(scope, "macro", controller.signal);
+    const outcome = work.catch((cause: unknown) => cause);
+    await pause.started.promise;
+    vi.spyOn(snapshots, "save").mockImplementationOnce(() => {
+      throw persistence;
+    });
+    controller.abort(reason);
+    pause.released.resolve();
+    const error = await outcome;
+    expect(error).toBeInstanceOf(AggregateError);
+    function leafErrors(cause: unknown): unknown[] {
+      return cause instanceof AggregateError
+        ? cause.errors.flatMap(leafErrors)
+        : [cause];
+    }
+    const errors = leafErrors(error);
+    expect(errors).toContain(reason);
+    expect(errors).toContain(persistence);
+    expect(records()).toEqual([original]);
+  });
 
   it("propagates a record write failure without reporting success or damaging other node records", async () => {
     const daily = task("market.daily", "market", "daily");

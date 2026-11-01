@@ -17,11 +17,31 @@ export class SharedQueries<T> {
     return this.#lifetime.signal;
   }
 
-  async run(
+  run(
     key: string,
     identity: string,
     load: (signal: AbortSignal) => Promise<T>,
     signal?: AbortSignal,
+  ): Promise<T> {
+    return this.join(key, identity, load, signal, false);
+  }
+
+  /** The last owner waits for its producer to release before cancellation settles. */
+  runOwned(
+    key: string,
+    identity: string,
+    load: (signal: AbortSignal) => Promise<T>,
+    signal?: AbortSignal,
+  ): Promise<T> {
+    return this.join(key, identity, load, signal, true);
+  }
+
+  private async join(
+    key: string,
+    identity: string,
+    load: (signal: AbortSignal) => Promise<T>,
+    signal: AbortSignal | undefined,
+    drainOnCancel: boolean,
   ): Promise<T> {
     const waiterSignal = signal
       ? AbortSignal.any([this.signal, signal])
@@ -50,7 +70,25 @@ export class SharedQueries<T> {
         }
         complete();
       };
-      const abort = () => finish(() => reject(waiterSignal.reason), true);
+      const abort = () =>
+        finish(() => {
+          const reason = waiterSignal.reason;
+          if (drainOnCancel && current.waiters === 0 && !current.settled)
+            current.promise.then(
+              () => reject(reason),
+              (cause: unknown) =>
+                reject(
+                  cause === reason
+                    ? reason
+                    : new AggregateError(
+                        [reason, cause],
+                        "Cancelled query producer failed during release.",
+                        { cause },
+                      ),
+                ),
+            );
+          else reject(reason);
+        }, true);
       waiterSignal.addEventListener("abort", abort, { once: true });
       current.promise.then(
         (value) => finish(() => resolve(value)),
