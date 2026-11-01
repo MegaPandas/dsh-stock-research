@@ -56,20 +56,53 @@ function stats(values) {
 }
 let root;
 let memory;
-function measureRecall(query, refs, samples = 30) {
+function countReads() {
   const read = fs.readFileSync;
-  let indexReads = 0;
-  let indexBytes = 0;
-  let entryReads = 0;
+  const reads = { indexReads: 0, indexBytes: 0, entryReads: 0 };
   fs.readFileSync = function (path, ...args) {
     const result = read.call(this, path, ...args);
     const filename = String(path);
     if (filename.endsWith("/memory/index.json")) {
-      indexReads++;
-      indexBytes += Buffer.byteLength(result);
-    } else if (filename.includes("/memory/entries/")) entryReads++;
+      reads.indexReads++;
+      reads.indexBytes += Buffer.byteLength(result);
+    } else if (filename.includes("/memory/entries/")) reads.entryReads++;
     return result;
   };
+  return {
+    reads,
+    restore: () => {
+      fs.readFileSync = read;
+    },
+  };
+}
+async function measureWrite(action) {
+  const counter = countReads();
+  const start = performance.now();
+  try {
+    return {
+      result: await action(),
+      ms: performance.now() - start,
+      reads: counter.reads,
+    };
+  } finally {
+    counter.restore();
+  }
+}
+function readStats(samples) {
+  for (const value of samples) {
+    assert.equal(value.indexReads, samples[0].indexReads);
+    assert.equal(value.entryReads, samples[0].entryReads);
+  }
+  return {
+    indexReadsPerCall: samples[0].indexReads,
+    indexBytesPerCall:
+      samples.reduce((sum, value) => sum + value.indexBytes, 0) /
+      samples.length,
+    entryReadsPerCall: samples[0].entryReads,
+  };
+}
+function measureRecall(query, refs, samples = 30) {
+  const counter = countReads();
   const times = [];
   try {
     for (let sample = 0; sample < samples; sample++) {
@@ -85,13 +118,13 @@ function measureRecall(query, refs, samples = 30) {
       assert.ok(found.every((entry) => entry.content.note === note));
     }
   } finally {
-    fs.readFileSync = read;
+    counter.restore();
   }
   return {
     ...stats(times),
-    indexReadsPerRecall: indexReads / samples,
-    indexBytesPerRecall: indexBytes / samples,
-    entryReadsPerRecall: entryReads / samples,
+    indexReadsPerRecall: counter.reads.indexReads / samples,
+    indexBytesPerRecall: counter.reads.indexBytes / samples,
+    entryReadsPerRecall: counter.reads.entryReads / samples,
   };
 }
 try {
@@ -158,32 +191,43 @@ try {
   const additions = [];
   const revisions = [];
   const receiptReplay = [];
+  const additionReads = [];
+  const revisionReads = [];
+  const replayReads = [];
   const snapshots = [];
   const snapshotReplay = [];
   const refs = [];
   for (let index = 0; index < 20; index++) {
-    const start = performance.now();
-    refs.push(await memory.remember(operation, input, `remember-${index}`));
-    additions.push(performance.now() - start);
+    const measured = await measureWrite(() =>
+      memory.remember(operation, input, `remember-${index}`),
+    );
+    refs.push(measured.result);
+    additions.push(measured.ms);
+    additionReads.push(measured.reads);
   }
   const heads = [...refs];
   recordedAt = "2024-01-03T00:00:00.000Z";
   for (let index = 0; index < 5; index++) {
-    const start = performance.now();
-    heads[index] = await memory.remember(
-      operation,
-      { ...input, previous: refs[index], note: "y".repeat(1024) },
-      `revise-${index}`,
+    const measured = await measureWrite(() =>
+      memory.remember(
+        operation,
+        { ...input, previous: refs[index], note: "y".repeat(1024) },
+        `revise-${index}`,
+      ),
     );
-    revisions.push(performance.now() - start);
+    heads[index] = measured.result;
+    revisions.push(measured.ms);
+    revisionReads.push(measured.reads);
   }
   const query = { runId, text: "Synthetic review", limit: 20 };
   const recall = measureRecall(query, refs);
   for (let index = 0; index < 30; index++) {
-    const start = performance.now();
-    const ref = await memory.remember(operation, input, "remember-0");
-    receiptReplay.push(performance.now() - start);
-    assert.deepEqual(ref, refs[0]);
+    const measured = await measureWrite(() =>
+      memory.remember(operation, input, "remember-0"),
+    );
+    receiptReplay.push(measured.ms);
+    replayReads.push(measured.reads);
+    assert.deepEqual(measured.result, refs[0]);
   }
   let snapshot;
   for (let index = 0; index < 10; index++) {
@@ -234,11 +278,14 @@ try {
         noteBytes: Buffer.byteLength(note),
         inputBytes: Buffer.byteLength(JSON.stringify(input)),
         snapshotBytes: Buffer.byteLength(JSON.stringify(snapshot)),
-        remember: stats(additions),
-        revise: stats(revisions),
+        remember: { ...stats(additions), ...readStats(additionReads) },
+        revise: { ...stats(revisions), ...readStats(revisionReads) },
         cutoffRecall: recall,
         historicalRecall,
-        rememberReceiptReplay: stats(receiptReplay),
+        rememberReceiptReplay: {
+          ...stats(receiptReplay),
+          ...readStats(replayReads),
+        },
         taskSnapshot: stats(snapshots),
         taskSnapshotReplay: stats(snapshotReplay),
       },
