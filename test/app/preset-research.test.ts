@@ -93,7 +93,7 @@ it("hides standard-preset tools from research requests and rejects forged delega
       source: { kind: "user" },
     }),
   );
-  await h.outside.agent.whenIdle();
+  expect((await h.waitForResearchCompletion()).kind).toBe("success");
   const view = h.runtime.runs.view({ runId: model.state.runId! });
   expect(
     view.tasks.flatMap((task) => (task.failure === null ? [] : [task.failure])),

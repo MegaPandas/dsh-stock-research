@@ -193,9 +193,11 @@ export function workflowModel(
       }
       const view = current.view!;
       state.runId = view.runId;
-      state.marketRef = view.tasks.find(
+      const marketRef = view.tasks.find(
         ({ taskId }) => taskId === "analysis.market",
       )?.outputRefs[0];
+      if (marketRef !== undefined) state.marketRef = marketRef;
+      else delete state.marketRef;
       for (const task of view.tasks)
         if (task.status !== "pending" && !state.taskIds.includes(task.taskId))
           state.taskIds.push(task.taskId);

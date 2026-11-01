@@ -262,7 +262,8 @@ export class ResearchExecutions {
           operations: new Map(),
         };
         if (selection !== undefined) {
-          research.identity = selection.identity;
+          if (selection.identity !== undefined)
+            research.identity = selection.identity;
           if (selection.runId !== undefined) {
             research.runId = selection.runId;
             this.#runs.set(selection.runId, research);

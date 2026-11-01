@@ -127,9 +127,12 @@ export function researchCommands(ctx: Context, agent: Agent) {
             view?: { runId: string };
             handle?: { jobId: string };
           };
+          const runId =
+            result.runId ?? result.context?.runId ?? result.view?.runId;
+          const jobId = result.jobId ?? result.handle?.jobId;
           activities.push({
-            runId: result.runId ?? result.context?.runId ?? result.view?.runId,
-            jobId: result.jobId ?? result.handle?.jobId,
+            ...(runId === undefined ? {} : { runId }),
+            ...(jobId === undefined ? {} : { jobId }),
           });
         }
       }

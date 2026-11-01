@@ -72,7 +72,7 @@ async function readResearch(h: Awaited<ReturnType<typeof host>>) {
     arguments: { jobId: job.id },
     signal: new AbortController().signal,
   });
-  if (result.isError) throw new Error(result.error.reason);
+  if (result.isError) throw new Error(result.error.message);
   return result.value as unknown as ResearchObservation;
 }
 async function committedMarket(h: Awaited<ReturnType<typeof host>>) {
@@ -83,12 +83,14 @@ async function committedMarket(h: Awaited<ReturnType<typeof host>>) {
       .tasks.find(({ taskId }) => taskId === "analysis.market")!;
   if (market().status !== "succeeded") {
     await new Promise<void>((resolve) => {
-      const release = h.runtime.runs.subscribe(runId!, () => {
-        if (market().status === "succeeded") {
-          release();
-          resolve();
-        }
-      });
+      const release = h.runtime.runs.subscribe(runId!, () =>
+        queueMicrotask(() => {
+          if (market().status === "succeeded") {
+            release();
+            resolve();
+          }
+        }),
+      );
     });
   }
   const marketRef = market().outputRefs[0]!;

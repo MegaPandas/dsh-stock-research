@@ -1,11 +1,16 @@
-import type { GenerateOptions, StreamChunk } from "@deepseek-ai/dsh-llm";
+import {
+  ToolCallId,
+  type GenerateOptions,
+  type StreamChunk,
+} from "@deepseek-ai/dsh-llm";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type {
   ReportPayload,
   ResearchArtifactInput,
 } from "../../src/contracts/artifact-payloads.js";
 import { readCollection } from "../../src/app/collection-input.js";
-import { quickHost, lastToolResult, toolCall } from "../fixtures/quick-host.js";
+import { quickHost } from "../fixtures/quick-host.js";
+import type { ResearchObservation } from "../../src/app/research-actions.js";
 import {
   workflowModel,
   isMainResearchRequest,
@@ -45,39 +50,67 @@ afterEach(async () => {
 
 describe("stock-deep command and resume", () => {
   it("opens deep and resumes all twenty-two nodes with plan, risk responses and retained source gaps", async () => {
-    let openedRunId: string | undefined;
     let opening = true;
     const model = workflowModel();
     const h = await quickHost(async function* (
       request: GenerateOptions,
     ): AsyncIterable<StreamChunk> {
-      if (!opening) {
+      if (!opening || !isMainResearchRequest(request)) {
         yield* model.respond(request);
         return;
       }
-      if (!isMainResearchRequest(request))
-        throw new Error(
-          "Only the existing main Agent should run before explicit continuation.",
-        );
-      if (!request.messages.some((message) => message.role === "tool")) {
-        yield* toolCall("stock_start_research", {
-          security: "SZ.002594",
-          date: "2024-01-03",
-          mode: "deep",
-          requestId: "open-deep",
-        });
-        return;
-      }
-      openedRunId = lastToolResult<{ runId: string }>(request).runId;
-      yield* textResponse("数据已准备，后续任务待继续执行。");
+      const chunks: StreamChunk[] = [];
+      for await (const chunk of model.respond(request)) chunks.push(chunk);
+      if (
+        chunks.some(
+          (chunk) =>
+            chunk.type === "block-end" &&
+            chunk.block.type === "tool-call" &&
+            chunk.block.name === "stock_review_stage",
+        )
+      ) {
+        yield* textResponse("分析产物已准备，阶段验收待继续执行。");
+      } else yield* chunks;
     });
     cleanups.push(h.close);
     const first = await h.executeAndWait("/stock-deep SZ.002594 2024-01-03");
     expect(first?.result.kind).toBe("error");
-    const before = h.runtime.runs.view({ runId: openedRunId! });
+    const job = h.ctx.jobs
+      .list(h.outside.agent.id)
+      .find(({ kind }) => kind === "stock-research")!;
+    const observed = await h.ctx.tools.execute({
+      agent: h.outside.agent,
+      callId: ToolCallId("observe-deep"),
+      name: "stock_read_research",
+      arguments: { jobId: job.id },
+      signal: new AbortController().signal,
+    });
+    expect(observed.isError).toBe(false);
+    const observation = observed.value as unknown as ResearchObservation;
+    expect(observation.job.id).toBe(job.id);
+    expect(observation.runId).toBeDefined();
+    const before = h.runtime.runs.view({ runId: observation.runId! });
+    expect(observation.view).toEqual(before);
     expect(before.mode).toBe("deep");
     expect(before.status).toBe("active");
-    expect(before.tasks.every((task) => task.status === "pending")).toBe(true);
+    const analyses = before.tasks.filter(({ taskId }) =>
+      taskId.startsWith("analysis."),
+    );
+    expect(analyses).toHaveLength(7);
+    expect(
+      analyses.every(
+        ({ status, attempt }) => status === "succeeded" && attempt === 1,
+      ),
+    ).toBe(true);
+    expect(
+      before.tasks
+        .filter(({ taskId }) => !taskId.startsWith("analysis."))
+        .every(({ status }) => status === "pending"),
+    ).toBe(true);
+    expect(before.stages!.find(({ id }) => id === "analysis")).toMatchObject({
+      readyForReview: true,
+      accepted: false,
+    });
     expect(before.blockReasons).toEqual([]);
     const collection = readCollection(h.runtime.runs, before.runId)!;
     expect(collection.packets).toHaveLength(1);

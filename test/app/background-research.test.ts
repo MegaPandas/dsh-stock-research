@@ -88,12 +88,28 @@ async function start(h: Host, signal = new AbortController().signal) {
     signal,
   );
   expect(result.isError).toBe(false);
-  return result.value as ResearchHandle;
+  return result.value as unknown as ResearchHandle;
 }
 async function read(h: Host, handle: ResearchHandle) {
   const result = await call(h, "stock_read_research", handle);
   expect(result.isError).toBe(false);
-  return result.value as ResearchObservation;
+  return result.value as unknown as ResearchObservation;
+}
+async function settledJob(h: Host, handle: ResearchHandle) {
+  const job = h.ctx.jobs.get(JobId(handle.jobId), h.outside.agent.id);
+  if (["completed", "failed", "killed"].includes(job.status)) return job;
+  return new Promise<typeof job>((resolve) => {
+    const release = h.ctx.jobs.events.subscribe(
+      { owner: h.outside.agent.id },
+      (event) => {
+        if (event.type === "settled" && event.job.id === handle.jobId) {
+          release();
+          resolve(event.job);
+        }
+      },
+    );
+    cleanups.push(release);
+  });
 }
 function until(
   h: Host,
@@ -193,8 +209,9 @@ it("returns a detached, idempotent handle and cancels collection through its ind
   paused.released.resolve();
   expect(await stopped).toMatchObject({
     isError: false,
-    value: { job: { id: handle.jobId, status: "killed" } },
+    value: { job: { id: handle.jobId } },
   });
+  expect((await settledJob(h, handle)).status).toBe("killed");
   expect(h.runFiles()).toEqual([]);
   expect(
     h.ctx.agents
@@ -215,7 +232,7 @@ it("keeps the main Agent interactive, stops only a selected branch, and claims r
         (message) => message.role === "user",
       )!;
       if (
-        question.source.kind === "user" &&
+        question.source?.kind === "user" &&
         question.content.some(
           (block) => block.type === "text" && block.text === "普通提问",
         )
@@ -303,7 +320,8 @@ it("keeps the main Agent interactive, stops only a selected branch, and claims r
       instruction,
     }),
   ).toMatchObject({ isError: false });
-  expect(await h.waitForResearchCompletion()).toMatchObject({
+  const completion = await h.waitForResearchCompletion();
+  expect(completion, completion.text).toMatchObject({
     kind: "success",
   });
   const completed = h.runtime.runs.view({ runId });
@@ -386,7 +404,12 @@ it("returns a background revision handle and reserves the original child session
   });
   cleanups.push(h.close, () => revised.released.resolve());
   const root = await start(h);
-  const request = await revised.started.promise;
+  const request = await Promise.race([
+    revised.started.promise,
+    settledJob(h, root).then((job): never => {
+      throw new Error(`Revision did not start: ${job.status}: ${job.detail}`);
+    }),
+  ]);
   await h.outside.agent.whenIdle();
   expect(handle).toEqual({ jobId: expect.any(String) });
   expect(handle!.jobId).not.toBe(root.jobId);
@@ -507,7 +530,9 @@ it.each(["cancel", "resume"] as const)(
         input: { resolvedReasonIds: [], instructions: [] },
       });
       expect(resumed.isError).toBe(false);
-      const current = { jobId: (resumed.value as ResearchHandle).jobId };
+      const current = {
+        jobId: (resumed.value as unknown as ResearchHandle).jobId,
+      };
       expect(current.jobId).not.toBe(handle.jobId);
       const before = h.runtime.runs.view({ runId });
       expect(
@@ -530,8 +555,9 @@ it.each(["cancel", "resume"] as const)(
         }),
       ).toMatchObject({
         isError: false,
-        value: { job: { status: "killed" }, view: { status: "cancelled" } },
+        value: { job: { id: current.jobId }, view: { status: "cancelled" } },
       });
+      expect((await settledJob(h, current)).status).toBe("killed");
     }
     expect(h.ctx.jobs.get(JobId(handle.jobId), h.outside.agent.id)).toEqual(
       job,

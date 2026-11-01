@@ -336,7 +336,6 @@ export class DispatchBridge {
         );
       return receipt.result;
     }
-    let owned!: FollowupReceipt;
     const result = this.#afterStops(runId, taskId, signal, async () => {
       const previous = this.runs
         .view({ runId })
@@ -386,7 +385,7 @@ export class DispatchBridge {
     }).finally(() => {
       owned.settled = true;
     });
-    owned = {
+    const owned: FollowupReceipt = {
       parent,
       runId,
       requestId,
@@ -682,10 +681,10 @@ export class DispatchBridge {
                 request: {
                   parent,
                   ...(agentOptions === undefined ? {} : { agentOptions }),
-                  ...(provision.agentPreset === undefined
+                  ...(currentProvision.agentPreset === undefined
                     ? {}
-                    : { agentPreset: provision.agentPreset }),
-                  prompt: provision.prompt,
+                    : { agentPreset: currentProvision.agentPreset }),
+                  prompt: currentProvision.prompt,
                 },
               })
             : continueChild(

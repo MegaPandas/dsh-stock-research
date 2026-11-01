@@ -284,7 +284,10 @@ export function createResearchTaskTools(
         "Cancel one task and its declared or disclosed dependent branch, retaining independent work. expectedAttempt is the exact current attempt from run view; use 0 for an unclaimed task. Publish cancellation first, then wait for owned execution release.",
       parameters: objectSchema({
         ...fields,
-        expectedAttempt: { type: "integer", minimum: 0 },
+        expectedAttempt: {
+          type: "integer",
+          description: "Non-negative safe integer; 0 means unclaimed.",
+        },
         reason: stringSchema,
       }),
       output: resultOutput(opaqueObjectSchema),

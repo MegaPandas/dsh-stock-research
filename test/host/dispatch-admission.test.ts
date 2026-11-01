@@ -46,6 +46,7 @@ describe("DispatchBridge SDK capacity admission", () => {
       let peak = 0;
       h.ctx.on("agent/created", () => {
         peak = Math.max(peak, activeChildren(h).length);
+        return undefined;
       });
       const rejected = capacityRejected(h);
       const first = h.dispatch("first");

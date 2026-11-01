@@ -372,10 +372,18 @@ describe("explicit run control commands", () => {
     const seeded = seed(h);
     const started = deferred<void>();
     const released = deferred<void>();
+    const publishing = new Set<string>();
+    const readyTaskIds = [
+      "analysis.fundamentals",
+      "analysis.macro",
+      "analysis.public",
+    ];
     cleanups.push(async () => released.resolve());
     h.ctx.on("agent/created", async ({ agent }) => {
       if (agent.session.header.origin !== "subagent") return undefined;
-      started.resolve();
+      publishing.add(agent.id);
+      // All three ready roots must finish SDK setup before cancellation holds publication.
+      if (publishing.size === readyTaskIds.length) started.resolve();
       await released.promise;
       return undefined;
     });
@@ -387,6 +395,13 @@ describe("explicit run control commands", () => {
       ),
     );
     await started.promise;
+    expect(
+      h.runtime.runs
+        .view({ runId: seeded.runId })
+        .tasks.filter(({ status }) => status === "running")
+        .map(({ taskId }) => taskId)
+        .sort(),
+    ).toEqual(readyTaskIds);
     const cancel = h.execute(`/stock-cancel ${seeded.runId}`);
     await setImmediate();
     expect(h.runtime.runs.view({ runId: seeded.runId }).status).toBe(
@@ -431,7 +446,6 @@ describe("explicit run control commands", () => {
 
   it("drains old producer work across overlapping redo and resume while retaining the main Agent", async () => {
     const producer = gate<GenerateOptions>();
-    let runId: string;
     const coordinatorIds: string[] = [];
     const h = await host(async function* (request) {
       if (!isMainResearchRequest(request)) {
@@ -459,7 +473,7 @@ describe("explicit run control commands", () => {
       }
     });
     const seeded = seed(h);
-    runId = seeded.runId;
+    const { runId } = seeded;
     h.runtime.runs.resume(
       { runId: seeded.runId, identity: "seed-owner" },
       {
