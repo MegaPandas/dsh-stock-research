@@ -7,6 +7,7 @@ import type { ArtifactRef } from "../../contracts/data.js";
 import { ResearchError } from "../../contracts/errors.js";
 import type {
   ClaimResult,
+  CancelTaskResult,
   RedoTaskResult,
   ResearchRun,
 } from "../../contracts/runs.js";
@@ -18,6 +19,7 @@ export function affectedTaskIds(
   taskId: string,
   readArtifact: (ref: ArtifactRef) => ArtifactVersion,
 ): Set<string> {
+  const tasks = new Map(run.tasks.map((task) => [task.taskId, task]));
   const dependents = new Map<string, Set<string>>();
   const owners = new Map<string, string>();
   function edge(upstream: string, downstream: string) {
@@ -33,6 +35,16 @@ export function affectedTaskIds(
       owners.set(artifactKey(ref), task.taskId);
   for (const task of run.definition.tasks)
     for (const dependency of task.dependsOn) edge(dependency, task.id);
+  // Cancellation clears current outputs; retain its disclosed branch for explicit redo.
+  for (const receipt of run.receipts) {
+    if (receipt.action !== "cancel_task") continue;
+    const cancelled = receipt.result as CancelTaskResult;
+    const target = tasks.get(cancelled.taskId)!;
+    if (target.cancellationId !== cancelled.cancellationId) continue;
+    for (const id of cancelled.affectedTasks)
+      if (tasks.get(id)!.cancellationId === cancelled.cancellationId)
+        edge(cancelled.taskId, id);
+  }
   const calculations = new Map(
     run.inputs
       .filter((input) => input.calculation !== undefined)
@@ -42,7 +54,7 @@ export function affectedTaskIds(
     for (const id of ids) edge(calculations.get(id)!.taskId, taskId);
   };
   for (const calculation of calculations.values()) {
-    const task = run.tasks.find(({ taskId }) => taskId === calculation.taskId)!;
+    const task = tasks.get(calculation.taskId)!;
     if (task.attempts.at(-1)?.number === calculation.attempt)
       adoptCalculations(calculation.dependencies, calculation.taskId);
   }
@@ -91,8 +103,8 @@ export function assertFreshInputs(
       const claimed = receipt.result as ClaimResult;
       if (claimed.taskId === taskId && claimed.attempt === attempt) return;
     }
-    if (receipt.action !== "redo") continue;
-    const redone = receipt.result as RedoTaskResult;
+    if (receipt.action !== "redo" && receipt.action !== "cancel_task") continue;
+    const redone = receipt.result as RedoTaskResult | CancelTaskResult;
     if (redone.invalidatedRefs.some((ref) => inputs.has(artifactKey(ref))))
       throw new ResearchError(
         "STALE_ATTEMPT",

@@ -367,6 +367,15 @@ describe("stored run restoration boundary", () => {
         status: "cancelled",
         stopAttempts: [{ taskId: "analysis", attempt: 1 }],
       }),
+      controlReceipt("cancel_task", {
+        taskId: "analysis",
+        attempt: 0,
+        cancellationId: "cancel-analysis",
+        status: "active",
+        affectedTasks: ["analysis"],
+        stopAttempts: [],
+        invalidatedRefs: [],
+      }),
       controlReceipt("block", {
         status: "blocked",
         reasonIds: ["source-down"],
@@ -416,6 +425,17 @@ describe("stored run restoration boundary", () => {
   it("rejects malformed control targets, invalidated references and result statuses", () => {
     const value = fixture();
     const receipts = [
+      ...[-1, 1.5, "1"].map((attempt) =>
+        controlReceipt("cancel_task", {
+          taskId: "analysis",
+          attempt,
+          cancellationId: "cancel-analysis",
+          status: "active",
+          affectedTasks: ["analysis"],
+          stopAttempts: [],
+          invalidatedRefs: [],
+        }),
+      ),
       controlReceipt("cancel", {
         status: "cancelled",
         stopAttempts: [{ taskId: "analysis", attempt: 0 }],
@@ -439,6 +459,33 @@ describe("stored run restoration boundary", () => {
       expect(() =>
         assertStoredRun({ ...value, receipts: [...value.receipts, receipt] }),
       ).toThrowError(expect.objectContaining({ code: "STORAGE_FAILED" }));
+  });
+
+  it("rejects cancellation receipts naming unknown tasks and cancellation metadata on active tasks", () => {
+    const value = fixture();
+    for (const [taskId, affectedTasks] of [
+      ["unknown", ["analysis"]],
+      ["analysis", ["unknown"]],
+    ] as const) {
+      const receipt = controlReceipt("cancel_task", {
+        taskId,
+        attempt: 1,
+        cancellationId: "cancel-analysis",
+        status: "active",
+        affectedTasks,
+        stopAttempts: [],
+        invalidatedRefs: [],
+      });
+      expect(() =>
+        assertStoredRun({ ...value, receipts: [...value.receipts, receipt] }),
+      ).toThrowError(expect.objectContaining({ code: "STORAGE_FAILED" }));
+    }
+    expect(() =>
+      assertStoredRun({
+        ...value,
+        tasks: [{ ...value.tasks[0], cancellationId: "cancel-analysis" }],
+      }),
+    ).toThrowError(expect.objectContaining({ code: "STORAGE_FAILED" }));
   });
 
   it("rejects a cancelled task that still retains a running attempt", () => {

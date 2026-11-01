@@ -188,6 +188,12 @@ describe("run control transactions", () => {
     for (const action of [
       () => service.cancel(op, "new-cancel"),
       () =>
+        service.cancelTask(
+          op,
+          { taskId: "a", expectedAttempt: 1, reason: "Stop" },
+          "new-task-cancel",
+        ),
+      () =>
         service.block(
           op,
           [{ taskId: null, attempt: null, code: "blocked", message: "reason" }],
@@ -210,6 +216,182 @@ describe("run control transactions", () => {
     expect(restarted.service.cancel(op, "cancel")).toEqual(result);
     expect(restarted.store.read(runId)).toEqual(state);
   });
+
+  it("cancels an unclaimed branch without starting it or blocking independent work", () => {
+    const { service, store, op, runId } = setup();
+    const input = { taskId: "a", expectedAttempt: 0, reason: "Not needed" };
+    const result = service.cancelTask(op, input, "cancel-a");
+    expect(result).toEqual({
+      runId,
+      taskId: "a",
+      attempt: 0,
+      cancellationId: expect.any(String),
+      status: "active",
+      affectedTasks: ["a", "d"],
+      stopAttempts: [],
+      invalidatedRefs: [],
+    });
+    expect(service.view(op)).toMatchObject({
+      status: "active",
+      readyTasks: ["b"],
+    });
+    expect(store.read(runId).tasks[0]).toMatchObject({
+      status: "cancelled",
+      attempts: [],
+      outputRefs: [],
+    });
+    expect(() => claim(service, runId, "a")).toThrowError(
+      expect.objectContaining({ code: "TASK_NOT_READY" }),
+    );
+    const saved = store.read(runId);
+    expect(service.cancelTask(op, input, "cancel-a")).toEqual(result);
+    expect(store.read(runId)).toEqual(saved);
+    expect(() =>
+      service.cancelTask(op, { ...input, reason: "Changed" }, "cancel-a"),
+    ).toThrowError(expect.objectContaining({ code: "REQUEST_CONFLICT" }));
+    service.redo(op, "a", "redo-a");
+    expect(service.view(op).readyTasks).toEqual(["a", "b"]);
+  });
+
+  it("cancels the exact running attempt while an independent branch completes", () => {
+    const { service, store, op, runId, setTime } = setup();
+    const a = claim(service, runId, "a");
+    const b = claim(service, runId, "b");
+    setTime("2024-07-01T13:00:00.000Z");
+    const result = service.cancelTask(
+      op,
+      { taskId: "a", expectedAttempt: 1, reason: "Reconsider this branch" },
+      "cancel-a",
+    );
+    expect(result.stopAttempts).toEqual([{ taskId: "a", attempt: 1 }]);
+    expect(store.read(runId).tasks[0]!.attempts[0]).toMatchObject({
+      status: "cancelled",
+      endedAt: "2024-07-01T13:00:00.000Z",
+      failure: { code: "CANCELLED", message: "Reconsider this branch" },
+    });
+    expect(() =>
+      service.commitArtifact(a, [content("late")], "late"),
+    ).toThrowError(expect.objectContaining({ code: "STALE_ATTEMPT" }));
+    service.commitArtifact(b, [content("independent")], "submit-b");
+    expect(service.view(op)).toMatchObject({
+      status: "active",
+      readyTasks: ["c"],
+    });
+  });
+
+  it("preserves a cancelled dynamic branch across restart and restores it only through explicit redo", () => {
+    const { service, store, op, runId, root, path } = setup();
+    const a = complete(service, runId, "a");
+    const b = complete(service, runId, "b", "uses a", [a.ref]);
+    const c = claim(service, runId, "c");
+    const input = {
+      taskId: "a",
+      expectedAttempt: 1,
+      reason: "Withdraw assumptions",
+    };
+    const result = service.cancelTask(op, input, "cancel-a");
+    expect(result).toMatchObject({
+      affectedTasks: ["a", "b", "c", "d"],
+      stopAttempts: [{ taskId: "c", attempt: 1 }],
+      invalidatedRefs: [a.ref, b.ref],
+    });
+    expect(store.read(runId).tasks.map(({ status }) => status)).toEqual([
+      "cancelled",
+      "cancelled",
+      "cancelled",
+      "cancelled",
+    ]);
+    expect(service.view(op).readyTasks).toEqual([]);
+    expect(service.readArtifact(a.ref).content.body).toBe("a");
+    expect(
+      fs.existsSync(join(runDirectory(path, runId), "reports", "a.md")),
+    ).toBe(false);
+    expect(
+      fs.existsSync(join(runDirectory(path, runId), "reports", "b.md")),
+    ).toBe(false);
+    expect(() =>
+      service.commitArtifact(c, [content("late")], "late"),
+    ).toThrowError(expect.objectContaining({ code: "STALE_ATTEMPT" }));
+    const saved = store.read(runId);
+    root.close();
+    const restarted = reopen(path);
+    expect(restarted.service.cancelTask(op, input, "cancel-a")).toEqual(result);
+    expect(restarted.store.read(runId)).toEqual(saved);
+    const redone = restarted.service.redo(op, "a", "redo-a");
+    expect(redone.affectedTasks).toEqual(["a", "b", "c", "d"]);
+    expect(
+      restarted.store
+        .read(runId)
+        .tasks.every(({ status }) => status === "pending"),
+    ).toBe(true);
+  });
+
+  it("rejects stale cancellation and replays old cancellation without changing a new attempt", () => {
+    const { service, store, op, runId } = setup();
+    const first = claim(service, runId, "a");
+    const before = store.read(runId);
+    expect(() =>
+      service.cancelTask(
+        op,
+        {
+          taskId: "a",
+          expectedAttempt: 0,
+          reason: "Delayed pending cancellation",
+        },
+        "stale-pending",
+      ),
+    ).toThrowError(expect.objectContaining({ code: "STALE_ATTEMPT" }));
+    expect(store.read(runId)).toEqual(before);
+    const input = {
+      taskId: "a",
+      expectedAttempt: first.attempt,
+      reason: "Stop",
+    };
+    const result = service.cancelTask(op, input, "cancel-a");
+    service.redo(op, "a", "redo-a");
+    const replacement = complete(service, runId, "a", "replacement", [], "2");
+    const saved = store.read(runId);
+    expect(service.cancelTask(op, input, "cancel-a")).toEqual(result);
+    expect(() =>
+      service.cancelTask(op, input, "delayed-new-request"),
+    ).toThrowError(expect.objectContaining({ code: "STALE_ATTEMPT" }));
+    expect(store.read(runId)).toEqual(saved);
+    expect(service.view(op).tasks[0]!.outputRefs).toEqual([replacement.ref]);
+  });
+
+  it.each([false, true])(
+    "keeps a separately cancelled dynamic branch stopped after explicit redo, with a replacement attempt: %s",
+    (replace) => {
+      const { service, store, op, runId } = setup();
+      const a = complete(service, runId, "a");
+      complete(service, runId, "b", "uses a", [a.ref]);
+      service.cancelTask(
+        op,
+        { taskId: "a", expectedAttempt: 1, reason: "Stop original branch" },
+        "cancel-a",
+      );
+      service.redo(op, "b", "redo-independent-b");
+      if (replace)
+        complete(service, runId, "b", "independent replacement", [], "2");
+      service.cancelTask(
+        op,
+        {
+          taskId: "b",
+          expectedAttempt: replace ? 2 : 1,
+          reason: "Keep independent branch stopped",
+        },
+        "cancel-independent-b",
+      );
+      expect(service.redo(op, "a", "redo-a").affectedTasks).toEqual(["a", "d"]);
+      expect(
+        store
+          .read(runId)
+          .tasks.slice(1, 3)
+          .map(({ status }) => status),
+      ).toEqual(["cancelled", "cancelled"]);
+      expect(service.view(op).readyTasks).toEqual(["a"]);
+    },
+  );
 
   it("requires a reason to block, stops new claims, and lets an already claimed attempt submit", () => {
     const { service, store, op, runId } = setup();
@@ -270,6 +452,12 @@ describe("run control transactions", () => {
     const saved = store.read(runId);
     for (const action of [
       () => service.cancel(op, "cancel"),
+      () =>
+        service.cancelTask(
+          op,
+          { taskId: "final", expectedAttempt: 1, reason: "Stop" },
+          "cancel-final",
+        ),
       () =>
         service.block(
           op,
@@ -530,25 +718,34 @@ describe("run control transactions", () => {
     expect(restarted.service.readArtifact(old.ref).content.body).toBe("old");
   });
 
-  it("rejects a newly disclosed input invalidated after claim without creating files or state", () => {
-    const { service, store, op, runId, path } = setup();
-    const a = complete(service, runId, "a");
-    const consumer = claim(service, runId, "b");
-    service.redo(op, "a", "redo");
-    const saved = store.read(runId);
-    const directory = runDirectory(path, runId);
-    const files = fs.readdirSync(directory, { recursive: true });
-    expect(() =>
-      service.commitArtifact(
-        consumer,
-        [content("late dependency", [a.ref])],
-        "late-submit",
-      ),
-    ).toThrowError(expect.objectContaining({ code: "STALE_ATTEMPT" }));
-    expect(store.read(runId)).toEqual(saved);
-    expect(fs.readdirSync(directory, { recursive: true })).toEqual(files);
-    expect(saved.tasks[1]!.status).toBe("running");
-  });
+  it.each(["redo", "cancel_task"] as const)(
+    "rejects a newly disclosed input invalidated by %s after claim without creating files or state",
+    (action) => {
+      const { service, store, op, runId, path } = setup();
+      const a = complete(service, runId, "a");
+      const consumer = claim(service, runId, "b");
+      if (action === "redo") service.redo(op, "a", "redo");
+      else
+        service.cancelTask(
+          op,
+          { taskId: "a", expectedAttempt: 1, reason: "Withdraw" },
+          "cancel-a",
+        );
+      const saved = store.read(runId);
+      const directory = runDirectory(path, runId);
+      const files = fs.readdirSync(directory, { recursive: true });
+      expect(() =>
+        service.commitArtifact(
+          consumer,
+          [content("late dependency", [a.ref])],
+          "late-submit",
+        ),
+      ).toThrowError(expect.objectContaining({ code: "STALE_ATTEMPT" }));
+      expect(store.read(runId)).toEqual(saved);
+      expect(fs.readdirSync(directory, { recursive: true })).toEqual(files);
+      expect(saved.tasks[1]!.status).toBe("running");
+    },
+  );
 
   it("permits references already historical at claim and does not treat them as dependencies on the current version", () => {
     const { service, store, op, runId } = setup();
@@ -664,26 +861,39 @@ describe("run control transactions", () => {
     ).toBe(false);
   });
 
-  it("retries obsolete-view deletion from its receipt without duplicating the control transition", () => {
-    const { service, store, op, runId, path } = setup();
-    complete(service, runId, "a");
-    const unlink = fs.unlinkSync;
-    const failure = new Error("view deletion failed");
-    const view = join(runDirectory(path, runId), "reports", "a.md");
-    vi.spyOn(fs, "unlinkSync").mockImplementation((file) => {
-      if (String(file) === view) throw failure;
-      unlink(file);
-    });
-    expect(caught(() => service.redo(op, "a", "redo"))).toMatchObject({
-      code: "STORAGE_FAILED",
-      cause: failure,
-    });
-    vi.restoreAllMocks();
-    const saved = store.read(runId);
-    expect(saved.tasks[0]!.status).toBe("pending");
-    expect(fs.existsSync(view)).toBe(true);
-    service.redo(op, "a", "redo");
-    expect(store.read(runId)).toEqual(saved);
-    expect(fs.existsSync(view)).toBe(false);
-  });
+  it.each(["redo", "cancel_task"] as const)(
+    "retries obsolete-view deletion after %s from its receipt without duplicating the control transition",
+    (action) => {
+      const { service, store, op, runId, path } = setup();
+      complete(service, runId, "a");
+      const control = () =>
+        action === "redo"
+          ? service.redo(op, "a", "redo")
+          : service.cancelTask(
+              op,
+              { taskId: "a", expectedAttempt: 1, reason: "Withdraw" },
+              "cancel-a",
+            );
+      const unlink = fs.unlinkSync;
+      const failure = new Error("view deletion failed");
+      const view = join(runDirectory(path, runId), "reports", "a.md");
+      vi.spyOn(fs, "unlinkSync").mockImplementation((file) => {
+        if (String(file) === view) throw failure;
+        unlink(file);
+      });
+      expect(caught(control)).toMatchObject({
+        code: "STORAGE_FAILED",
+        cause: failure,
+      });
+      vi.restoreAllMocks();
+      const saved = store.read(runId);
+      expect(saved.tasks[0]!.status).toBe(
+        action === "redo" ? "pending" : "cancelled",
+      );
+      expect(fs.existsSync(view)).toBe(true);
+      control();
+      expect(store.read(runId)).toEqual(saved);
+      expect(fs.existsSync(view)).toBe(false);
+    },
+  );
 });

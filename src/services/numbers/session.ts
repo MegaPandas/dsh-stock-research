@@ -130,7 +130,11 @@ export class NumberCheckSession {
         const latest = context.tasks
           .find((task) => task.taskId === entry.taskId)!
           .attempts.at(-1)!;
-        if (latest.number !== entry.attempt || latest.status === "invalidated")
+        if (
+          latest.number !== entry.attempt ||
+          latest.status === "invalidated" ||
+          latest.status === "cancelled"
+        )
           fail("reference", "The evidence belongs to a superseded attempt.");
       }
       let record = evidence.get(ref.evidenceId);

@@ -7,6 +7,8 @@ import type {
   BlockReasonInput,
   BlockRunResult,
   CancelRunResult,
+  CancelTaskInput,
+  CancelTaskResult,
   RecoverAttemptsResult,
   RedoTaskResult,
   ResearchRun,
@@ -191,13 +193,11 @@ export function resumeRun(
   };
 }
 
-export function redoRun(
+function invalidateBranch(
   run: ResearchRun,
   taskId: string,
   readArtifact: (ref: ArtifactRef) => ArtifactVersion,
 ): RedoTaskResult {
-  mutable(run);
-  taskState(run, taskId);
   const affected = affectedTaskIds(run, taskId, readArtifact);
   const stopAttempts: AttemptTarget[] = [];
   const invalidatedRefs: ArtifactRef[] = [];
@@ -216,6 +216,7 @@ export function redoRun(
     }
     task.status = "pending";
     task.outputRefs = [];
+    delete task.cancellationId;
   }
   run.blockReasons = run.blockReasons.filter(
     (reason) =>
@@ -235,6 +236,45 @@ export function redoRun(
     stopAttempts,
     invalidatedRefs,
   };
+}
+
+export function redoRun(
+  run: ResearchRun,
+  taskId: string,
+  readArtifact: (ref: ArtifactRef) => ArtifactVersion,
+): RedoTaskResult {
+  mutable(run);
+  taskState(run, taskId);
+  return invalidateBranch(run, taskId, readArtifact);
+}
+
+export function cancelTask(
+  run: ResearchRun,
+  input: CancelTaskInput,
+  cancellationId: string,
+  readArtifact: (ref: ArtifactRef) => ArtifactVersion,
+): CancelTaskResult {
+  mutable(run);
+  const task = taskState(run, input.taskId);
+  const attempt = task.attempts.length;
+  if (attempt !== input.expectedAttempt)
+    throw new ResearchError(
+      "STALE_ATTEMPT",
+      `Task ${input.taskId} no longer has attempt ${input.expectedAttempt}.`,
+    );
+  const result = invalidateBranch(run, input.taskId, readArtifact);
+  const affected = new Set(result.affectedTasks);
+  for (const task of run.tasks)
+    if (affected.has(task.taskId)) {
+      task.status = "cancelled";
+      task.cancellationId = cancellationId;
+    }
+  for (const target of result.stopAttempts) {
+    const stopped = taskState(run, target.taskId).attempts.at(-1)!;
+    stopped.status = "cancelled";
+    stopped.failure = { code: "CANCELLED", message: input.reason };
+  }
+  return { ...result, attempt, cancellationId };
 }
 
 export function recoverAttempts(

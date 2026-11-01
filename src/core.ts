@@ -161,6 +161,8 @@ export type {
   BlockReasonInput,
   BlockRunResult,
   CancelRunResult,
+  CancelTaskInput,
+  CancelTaskResult,
   ClaimResult,
   OpenRunInput,
   ReceiptAction,

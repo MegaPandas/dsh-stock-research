@@ -30,6 +30,8 @@ import type {
   BlockReasonInput,
   BlockRunResult,
   CancelRunResult,
+  CancelTaskInput,
+  CancelTaskResult,
   ClaimResult,
   OpenRunInput,
   ReceiptAction,
@@ -78,6 +80,7 @@ import { assertStoredRun } from "./state.js";
 import {
   blockRun,
   cancelRun,
+  cancelTask,
   currentAttempt,
   latestInstruction,
   recoverAttempts,
@@ -743,6 +746,32 @@ export class RunService implements RunAccess {
     );
   }
 
+  cancelTask(
+    operation: RunOperation,
+    input: CancelTaskInput,
+    requestId: string,
+  ): CancelTaskResult {
+    return this.mutate<CancelTaskResult>(
+      operation,
+      controlScope(operation.identity),
+      "cancel_task",
+      requestId,
+      input,
+      (run, contents) =>
+        cancelTask(
+          run,
+          input,
+          JSON.stringify([operation.identity, requestId]),
+          (ref) =>
+            contents.readContent<ArtifactVersion>({
+              kind: "artifact",
+              id: ref.artifactId,
+              revision: ref.revision,
+            }),
+        ),
+    );
+  }
+
   block(
     operation: RunOperation,
     reasons: readonly BlockReasonInput[],
@@ -1394,6 +1423,7 @@ export class RunService implements RunAccess {
     const repairsViews =
       action === "commit_artifact" ||
       action === "finalize" ||
+      action === "cancel_task" ||
       action === "redo";
     let result!: Result;
     let contents!: ContentReader;

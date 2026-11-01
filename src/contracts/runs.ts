@@ -35,6 +35,7 @@ export interface TaskState {
   status: TaskStatus;
   attempts: TaskAttempt[];
   outputRefs: ArtifactRef[];
+  cancellationId?: string;
 }
 export interface RunVersions {
   plugin: string;
@@ -136,6 +137,22 @@ export interface CancelRunResult {
   status: "cancelled";
   stopAttempts: AttemptTarget[];
 }
+export interface CancelTaskInput {
+  taskId: string;
+  /** Zero targets a task that has never been claimed. */
+  expectedAttempt: number;
+  reason: string;
+}
+export interface CancelTaskResult {
+  runId: string;
+  taskId: string;
+  attempt: number;
+  cancellationId: string;
+  status: "active" | "blocked";
+  affectedTasks: string[];
+  stopAttempts: AttemptTarget[];
+  invalidatedRefs: ArtifactRef[];
+}
 export interface BlockRunResult {
   runId: string;
   status: "blocked";
@@ -186,6 +203,7 @@ export type RunWriteResult =
   | ArtifactCommitResult
   | AttemptFailureResult
   | CancelRunResult
+  | CancelTaskResult
   | BlockRunResult
   | ResumeRunResult
   | RedoTaskResult
@@ -206,6 +224,7 @@ export type ReceiptAction =
   | "finalize"
   | "fail_attempt"
   | "cancel"
+  | "cancel_task"
   | "block"
   | "resume"
   | "redo"

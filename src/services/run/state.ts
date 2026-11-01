@@ -206,6 +206,7 @@ function receipt(value: unknown): void {
       "finalize",
       "fail_attempt",
       "cancel",
+      "cancel_task",
       "block",
       "resume",
       "redo",
@@ -251,8 +252,17 @@ function receipt(value: unknown): void {
     oneOf(result.status, ["active", "blocked"], "receipt.result.status");
     strings(result.revisedTasks, "receipt.result.revisedTasks");
     strings(result.remainingReasonIds, "receipt.result.remainingReasonIds");
-  } else if (receipt.action === "redo") {
+  } else if (receipt.action === "redo" || receipt.action === "cancel_task") {
     string(result.taskId, "receipt.result.taskId");
+    if (receipt.action === "cancel_task") {
+      string(result.cancellationId, "receipt.result.cancellationId");
+      if (
+        typeof result.attempt !== "number" ||
+        !Number.isSafeInteger(result.attempt) ||
+        result.attempt < 0
+      )
+        invalid("receipt.result.attempt");
+    }
     oneOf(result.status, ["active", "blocked"], "receipt.result.status");
     strings(result.affectedTasks, "receipt.result.affectedTasks");
     attemptTargets(result.stopAttempts, "receipt.result.stopAttempts");
@@ -349,6 +359,11 @@ export function assertStoredRun(value: unknown): asserts value is ResearchRun {
         invalid("attempt numbers must follow their recorded order");
     }
     artifactRefs(task.outputRefs, "task.outputRefs");
+    if (task.cancellationId !== undefined) {
+      string(task.cancellationId, "task.cancellationId");
+      if (task.status !== "cancelled")
+        invalid("cancellation requires a cancelled task");
+    }
     const latest = attempts.at(-1);
     if (
       task.status === "running" ||
@@ -413,6 +428,14 @@ export function assertStoredRun(value: unknown): asserts value is ResearchRun {
     const result = object(item.result, "receipt.result");
     if (result.runId !== run.runId)
       invalid("receipt result belongs to another run");
+    if (item.action === "cancel_task") {
+      const known = new Set(savedDefinition.tasks.map((task) => task.id));
+      if (
+        !known.has(result.taskId as string) ||
+        (result.affectedTasks as string[]).some((id) => !known.has(id))
+      )
+        invalid("cancellation refers to an unknown task");
+    }
     if (item.action === "open") openReceipts++;
   }
   if (openReceipts !== 1) invalid("exactly one open receipt is required");

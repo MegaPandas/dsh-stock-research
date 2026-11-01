@@ -18,6 +18,8 @@ import type {
   BlockRunResult,
   ClaimResult,
   CancelRunResult,
+  CancelTaskInput,
+  CancelTaskResult,
   OpenRunInput,
   ResearchRun,
   RecoverAttemptsResult,
@@ -99,6 +101,11 @@ export interface RunLifecycle {
   ): RoleDispatchContext;
   bindTaskSession(operation: TaskOperation & { sessionId: string }): void;
   cancel(operation: RunOperation, requestId: string): CancelRunResult;
+  cancelTask(
+    operation: RunOperation,
+    input: CancelTaskInput,
+    requestId: string,
+  ): CancelTaskResult;
   resume(
     operation: RunOperation,
     input: ResumeRunInput,

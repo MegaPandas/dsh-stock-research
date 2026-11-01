@@ -291,7 +291,7 @@ it("checks each value when distinct claims share immutable calculations", () => 
   ]);
 });
 
-it.each(["redo", "cancel", "fail"] as const)(
+it.each(["redo", "cancel", "cancel_task", "fail"] as const)(
   "rejects previously checked calculations after %s on the next call",
   (action) => {
     const f = setup();
@@ -306,6 +306,16 @@ it.each(["redo", "cancel", "fail"] as const)(
     const owner = { runId: f.operation.runId, identity: "coordinator" };
     if (action === "redo") f.runs.redo(owner, f.operation.taskId, "invalidate");
     else if (action === "cancel") f.runs.cancel(owner, "invalidate");
+    else if (action === "cancel_task")
+      f.runs.cancelTask(
+        owner,
+        {
+          taskId: f.operation.taskId,
+          expectedAttempt: f.operation.attempt,
+          reason: "Withdraw",
+        },
+        "invalidate",
+      );
     else
       f.runs.failAttempt(
         f.operation,

@@ -676,6 +676,26 @@ describe("numeric claim gate", () => {
     expect(result.claims[0]!.issues[0]!.code).toBe("time");
   });
 
+  it("rejects direct evidence from a cancelled task while independent work continues", () => {
+    const c = setup();
+    const ref = c.record();
+    const independent = c.claim("b");
+    expect(c.check([observed(ref)]).passed).toBe(true);
+    c.runs.cancelTask(
+      { runId: c.runId, identity: "owner" },
+      { taskId: "a", expectedAttempt: 1, reason: "Withdraw evidence" },
+      "cancel-a",
+    );
+    const result = c.numbers.checkNumbers(independent, {
+      kind: "pending",
+      contentId: "independent",
+      content: content([observed(ref)]),
+    });
+    expect(result.passed).toBe(false);
+    expect(result.claims[0]!.issues[0]!.code).toBe("reference");
+    expect(c.runs.view(independent).tasks[1]!.status).toBe("running");
+  });
+
   it("distinguishes superseded direct evidence from fixed historical artifact inputs", () => {
     const c = setup();
     const ref = c.record();
