@@ -334,3 +334,8 @@ export type {
 export { DigestService } from "./services/digest/index.js";
 export { DIGEST_HANDOFF_VERSION } from "./contracts/digests.js";
 export { generateHandoffDigest } from "./services/digest/handoff.js";
+export { RunScheduler } from "./services/scheduler/index.js";
+export type {
+  SchedulerExecution,
+  SchedulerPorts,
+} from "./services/scheduler/index.js";

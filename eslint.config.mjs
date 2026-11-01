@@ -59,6 +59,10 @@ export default defineConfig(
             publicEntries: ["index.js"],
           },
           {
+            directory: "src/services/scheduler",
+            publicEntries: ["index.js"],
+          },
+          {
             directory: "src/services/valuation",
             publicEntries: ["records.js", "calculate.js", "reports.js"],
           },
@@ -199,6 +203,19 @@ export default defineConfig(
                 "Services must not depend on integration layers or the host SDK.",
             },
           ],
+        },
+      ],
+    },
+  },
+  {
+    files: ["src/services/scheduler/**/*.ts"],
+    rules: {
+      "no-restricted-syntax": [
+        "error",
+        {
+          selector: String.raw`:matches(ImportDeclaration, ExportNamedDeclaration, ExportAllDeclaration, ImportExpression, TSImportType)[source.value=/^(?!\.\u002F[a-z][a-z-]*\.js$|\.\.\u002F\.\.\u002Fcontracts\u002F[a-z][a-z-]*\.js$)/]`,
+          message:
+            "Scheduling must use neutral contracts and its own module instead of execution or persistence implementations.",
         },
       ],
     },
