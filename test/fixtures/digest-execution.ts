@@ -17,7 +17,7 @@ export function digestGate() {
 export function gatedDigest(
   gate: ReturnType<typeof digestGate>,
 ): GenerateDigest {
-  return async (input, signal, _operation, submit) => {
+  return async (input, signal) => {
     const aborted = () => gate.aborted.resolve();
     signal.addEventListener("abort", aborted, { once: true });
     if (signal.aborted) aborted();
@@ -25,7 +25,7 @@ export function gatedDigest(
     try {
       await gate.released.promise;
       signal.throwIfAborted();
-      return submit(handoffDigest(input));
+      return handoffDigest(input);
     } finally {
       signal.removeEventListener("abort", aborted);
     }

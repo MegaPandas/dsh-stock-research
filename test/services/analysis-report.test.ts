@@ -246,26 +246,21 @@ describe("directional analysis reports", () => {
 
   it("hands all six sections to the existing digest service with no invented numeric candidates", async () => {
     const f = stageFixture();
-    const generate: GenerateDigest = async (
-      context,
-      _signal,
-      _operation,
-      submit,
-    ) => {
+    const generate: GenerateDigest = async (context) => {
       expect(context.artifacts).toHaveLength(1);
       expect(context.artifacts[0]!.content.payload).toEqual({
         schemaVersion: 3,
         report: f.report,
       });
       expect(context.numbers).toEqual([]);
-      return submit({
+      return {
         title: "阶段研究摘要",
         body: "综合本方向判断与条件。",
         inputRefs: context.artifacts.map((item) => item.ref),
         facts: [{ text: f.report.summary, inputRefs: [f.ref], numbers: [] }],
         disagreements: f.report.content.handoff.openQuestions,
         riskSummaries: [],
-      });
+      };
     };
     const result = await new DigestService(
       f.runs,

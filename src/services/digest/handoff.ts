@@ -15,14 +15,9 @@ import type { StageHandoff } from "../../contracts/stage-handoff.js";
 import { parseAgentReport } from "../../artifacts/agent-reports.js";
 import { artifactKey } from "../../contracts/artifact-identity.js";
 
-export const generateHandoffDigest: GenerateDigest = async (
-  input,
-  signal,
-  _operation,
-  submit,
-) => {
+export const generateHandoffDigest: GenerateDigest = async (input, signal) => {
   signal.throwIfAborted();
-  return submit(handoffDigest(input));
+  return handoffDigest(input);
 };
 
 /** Assemble accepted role handoffs without generating another interpretation. */

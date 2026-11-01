@@ -60,15 +60,11 @@ try {
   let modelCalls = 0;
   let contextBytes = 0;
   const artifacts = new ArtifactService(runs, new NumberService(runs));
-  const digests = new DigestService(
-    runs,
-    artifacts,
-    async (input, _signal, _operation, submit) => {
-      modelCalls++;
-      contextBytes = Buffer.byteLength(JSON.stringify(input));
-      return submit(sampleDigestReply(input));
-    },
-  );
+  const digests = new DigestService(runs, artifacts, async (input) => {
+    modelCalls++;
+    contextBytes = Buffer.byteLength(JSON.stringify(input));
+    return sampleDigestReply(input);
+  });
   const measurements = [];
   for (const claims of [1, 100]) {
     const fresh = [];

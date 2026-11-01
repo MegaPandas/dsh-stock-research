@@ -5,7 +5,6 @@ import type {
   NumericClaim,
 } from "./artifacts.js";
 import type { GapSummary, RiskIssue } from "./artifact-payloads.js";
-import type { ArtifactCommitResult, TaskOperation } from "./runs.js";
 import type { AgentReport } from "./agent-reports.js";
 
 export const DIGEST_HANDOFF_VERSION = "13";
@@ -37,10 +36,8 @@ export interface DigestDraft {
   disagreements: string[];
   riskSummaries: { issueId: string; text: string }[];
 }
-/** Digest generation publishes through the domain's validation boundary. */
+/** Return a draft for DigestService to validate and publish. */
 export type GenerateDigest = (
   input: DigestModelInput,
   signal: AbortSignal,
-  operation: TaskOperation,
-  submit: (draft: unknown) => ArtifactCommitResult,
-) => Promise<ArtifactCommitResult>;
+) => Promise<unknown>;

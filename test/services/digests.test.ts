@@ -7,7 +7,6 @@ import type {
 import { DigestService } from "../../src/services/digest/index.js";
 import { ResearchError } from "../../src/contracts/errors.js";
 import { NumberService } from "../../src/services/numbers/index.js";
-import { oneDigest } from "../fixtures/digest-conversation.js";
 import {
   decisionFixture,
   type DecisionFixtureOptions,
@@ -72,37 +71,38 @@ describe("DigestService", () => {
       },
     });
     const generate = vi.fn(async (context: DigestModelInput) => draft(context));
-    await new DigestService(
-      c.runs,
-      c.artifacts,
-      oneDigest(generate),
-    ).makeDigest(c.operation, "digest", "recorded-protocol");
+    await new DigestService(c.runs, c.artifacts, generate).makeDigest(
+      c.operation,
+      "digest",
+      "recorded-protocol",
+    );
     expect(generate).toHaveBeenCalledOnce();
     expect(generate.mock.calls[0]![0]).not.toHaveProperty("protocolVersion");
   });
 
-  it("keeps the same attempt running after a rejected draft and publishes its correction", async () => {
+  it("fails a rejected draft and publishes its correction under a new request", async () => {
     const c = setup();
-    const service = new DigestService(
-      c.runs,
-      c.artifacts,
-      async (context, _signal, operation, submit) => {
-        const corrected = draft(context);
-        expect(() => submit({ ...corrected, riskSummaries: [] })).toThrowError(
-          expect.objectContaining({
-            code: "INVALID_ARTIFACT",
-            message: expect.stringContaining("liquidity"),
-          }),
-        );
-        expect(c.runs.readAttempt(operation)).toMatchObject({
-          status: "running",
-          outputRefs: [],
-          failure: null,
-        });
-        return submit(corrected);
-      },
-    );
+    const generate = vi
+      .fn(async (context: DigestModelInput) => draft(context))
+      .mockImplementationOnce(async (context) => ({
+        ...draft(context),
+        riskSummaries: [],
+      }));
+    const service = new DigestService(c.runs, c.artifacts, generate);
+    await expect(
+      service.makeDigest(c.operation, "digest", "rejected"),
+    ).rejects.toMatchObject({
+      code: "INVALID_ARTIFACT",
+      message: expect.stringContaining("liquidity"),
+    });
+    const rejected = task(c);
+    expect(rejected).toMatchObject({
+      status: "failed",
+      outputRefs: [],
+      failure: { code: "INVALID_ARTIFACT" },
+    });
     const saved = await service.makeDigest(c.operation, "digest", "correction");
+    expect(saved.attempt).toBe(rejected.attempt + 1);
     expect(c.runs.readAttempt(saved)).toMatchObject({
       status: "succeeded",
       outputRefs: saved.refs,
@@ -112,6 +112,7 @@ describe("DigestService", () => {
       kind: "digest",
       payload: { risks: [expect.objectContaining({ issueId: "liquidity" })] },
     });
+    expect(generate).toHaveBeenCalledTimes(2);
   });
   it("publishes bound numbers and inherited risk metadata without new claims", async () => {
     const c = setup();
@@ -119,7 +120,7 @@ describe("DigestService", () => {
     const saved = await new DigestService(
       c.runs,
       c.artifacts,
-      oneDigest(generate),
+      generate,
     ).makeDigest(c.operation, "digest", "make");
     const output = content(c, saved.refs);
     expect(output.claims).toEqual([]);
@@ -156,7 +157,7 @@ describe("DigestService", () => {
     const saved = await new DigestService(
       c.runs,
       c.artifacts,
-      oneDigest(generate),
+      generate,
     ).makeDigest(c.operation, "digest", "make");
     const output = content(c, saved.refs);
     expect(output.body).toContain("Price 100 USD/股");
@@ -176,10 +177,18 @@ describe("DigestService", () => {
     "wrong reference",
     "unknown number",
     "raw response",
+    "commit receipt",
   ] as const)("rejects %s without publishing success", async (mode) => {
     const c = setup();
     const generate = async (context: DigestModelInput) => {
       if (mode === "raw response") return "Price 100 USD/share";
+      if (mode === "commit receipt")
+        return {
+          ...c.operation,
+          taskId: "digest",
+          attempt: task(c).attempt,
+          refs: [c.analysisRef],
+        };
       const reply = draft(context);
       if (mode === "missing risk") reply.riskSummaries = [];
       if (mode === "wrong reference")
@@ -188,7 +197,7 @@ describe("DigestService", () => {
       return reply;
     };
     await expect(
-      new DigestService(c.runs, c.artifacts, oneDigest(generate)).makeDigest(
+      new DigestService(c.runs, c.artifacts, generate).makeDigest(
         c.operation,
         "digest",
         "make",
@@ -200,10 +209,8 @@ describe("DigestService", () => {
   it("uses the real number gate once for the new empty claim set", async () => {
     const c = setup();
     const checked = vi.spyOn(NumberService.prototype, "checkNumbersBatch");
-    await new DigestService(
-      c.runs,
-      c.artifacts,
-      oneDigest(async (context) => draft(context)),
+    await new DigestService(c.runs, c.artifacts, async (context) =>
+      draft(context),
     ).makeDigest(c.operation, "digest", "make");
     expect(checked).toHaveBeenCalledTimes(1);
     expect(checked.mock.calls[0]![1]).toMatchObject([
@@ -222,7 +229,7 @@ describe("DigestService", () => {
       await release.promise;
       return draft(context);
     });
-    const service = new DigestService(c.runs, c.artifacts, oneDigest(generate));
+    const service = new DigestService(c.runs, c.artifacts, generate);
     const first = service.makeDigest(c.operation, "digest", "make");
     await ready.promise;
     const second = service.makeDigest(c.operation, "digest", "make");
@@ -233,7 +240,7 @@ describe("DigestService", () => {
   it("replays successful receipts across a new service without invoking the model", async () => {
     const c = setup();
     const generate = vi.fn(async (context: DigestModelInput) => draft(context));
-    const service = new DigestService(c.runs, c.artifacts, oneDigest(generate));
+    const service = new DigestService(c.runs, c.artifacts, generate);
     const saved = await service.makeDigest(c.operation, "digest", "make");
     expect(await service.makeDigest(c.operation, "digest", "make")).toEqual(
       saved,
@@ -242,11 +249,11 @@ describe("DigestService", () => {
       throw new Error("must not generate");
     });
     expect(
-      await new DigestService(
-        c.runs,
-        c.artifacts,
-        oneDigest(unused),
-      ).makeDigest(c.operation, "digest", "make"),
+      await new DigestService(c.runs, c.artifacts, unused).makeDigest(
+        c.operation,
+        "digest",
+        "make",
+      ),
     ).toEqual(saved);
     expect(generate).toHaveBeenCalledTimes(1);
     expect(unused).not.toHaveBeenCalled();
@@ -257,7 +264,7 @@ describe("DigestService", () => {
     const generate = vi
       .fn(async (context: DigestModelInput) => draft(context))
       .mockRejectedValueOnce(error);
-    const service = new DigestService(c.runs, c.artifacts, oneDigest(generate));
+    const service = new DigestService(c.runs, c.artifacts, generate);
     await expect(
       service.makeDigest(c.operation, "digest", "failed"),
     ).rejects.toBe(error);
@@ -269,7 +276,7 @@ describe("DigestService", () => {
   it("repairs a post-publication projection failure without regenerating or failing the published task", async () => {
     const c = setup();
     const generate = vi.fn(async (context: DigestModelInput) => draft(context));
-    const service = new DigestService(c.runs, c.artifacts, oneDigest(generate));
+    const service = new DigestService(c.runs, c.artifacts, generate);
     const failure = new ResearchError(
       "STORAGE_FAILED",
       "Simulated projection write failure",
@@ -305,11 +312,12 @@ describe("DigestService", () => {
         return draft(context);
       },
     );
-    const pending = new DigestService(
-      c.runs,
-      c.artifacts,
-      oneDigest(generate),
-    ).makeDigest(c.operation, "digest", "make", controller.signal);
+    const pending = new DigestService(c.runs, c.artifacts, generate).makeDigest(
+      c.operation,
+      "digest",
+      "make",
+      controller.signal,
+    );
     await ready.promise;
     const reason = new Error("stop generation");
     controller.abort(reason);
@@ -328,7 +336,7 @@ describe("DigestService", () => {
     controller.abort();
     const generate = vi.fn(async (context: DigestModelInput) => draft(context));
     await expect(
-      new DigestService(c.runs, c.artifacts, oneDigest(generate)).makeDigest(
+      new DigestService(c.runs, c.artifacts, generate).makeDigest(
         c.operation,
         "digest",
         "make",
@@ -342,15 +350,11 @@ describe("DigestService", () => {
     const c = setup();
     const ready = deferred<void>();
     const release = deferred<void>();
-    const service = new DigestService(
-      c.runs,
-      c.artifacts,
-      oneDigest(async (context) => {
-        ready.resolve();
-        await release.promise;
-        return draft(context);
-      }),
-    );
+    const service = new DigestService(c.runs, c.artifacts, async (context) => {
+      ready.resolve();
+      await release.promise;
+      return draft(context);
+    });
     const pending = service.makeDigest(c.operation, "digest", "make");
     await ready.promise;
     c.runs.redo(c.operation, "digest", "redo-again");
@@ -369,15 +373,11 @@ describe("DigestService", () => {
     const c = setup();
     const ready = deferred<void>();
     const release = deferred<void>();
-    const pending = new DigestService(
-      c.runs,
-      c.artifacts,
-      oneDigest(async (context) => {
-        ready.resolve();
-        await release.promise;
-        return draft(context);
-      }),
-    ).makeDigest(c.operation, "digest", "make");
+    const pending = new DigestService(c.runs, c.artifacts, async (context) => {
+      ready.resolve();
+      await release.promise;
+      return draft(context);
+    }).makeDigest(c.operation, "digest", "make");
     await ready.promise;
     c.runs.cancel(c.operation, "cancel");
     const rejected = expect(pending).rejects.toBeDefined();
@@ -401,7 +401,7 @@ describe("DigestService", () => {
     const saved = await new DigestService(
       c.runs,
       c.artifacts,
-      oneDigest(async (context) => draft(context)),
+      async (context) => draft(context),
     ).makeDigest(c.operation, "digest", "make");
     expect(
       (content(c, saved.refs).payload as DigestPayload).gaps,
@@ -444,10 +444,8 @@ describe("DigestService", () => {
         },
       ],
     });
-    const service = new DigestService(
-      c.runs,
-      c.artifacts,
-      oneDigest(async (context) => draft(context)),
+    const service = new DigestService(c.runs, c.artifacts, async (context) =>
+      draft(context),
     );
     await service.makeDigest(c.operation, "digest", "first");
     const saved = await service.makeDigest(c.operation, "digest2", "second");
@@ -488,7 +486,7 @@ describe("DigestService", () => {
     const saved = await new DigestService(
       c.runs,
       c.artifacts,
-      oneDigest(generate),
+      generate,
     ).makeDigest(c.operation, "manager-digest", "make");
     expect(
       generate.mock.calls[0]![0].risks.map((risk) => risk.issueId),

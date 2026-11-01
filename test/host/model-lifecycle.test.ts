@@ -26,9 +26,9 @@ const usage = {
 };
 async function host(
   scripts: ModelScript[] = [],
-  generate: GenerateDigest = async (input, signal, _operation, submit) => {
+  generate: GenerateDigest = async (input, signal) => {
     signal.throwIfAborted();
-    return submit(handoffDigest(input));
+    return handoffDigest(input);
   },
 ) {
   const generateDigest = vi.fn(generate);
@@ -128,9 +128,7 @@ describe("host execution ownership through the research service facade", () => {
   });
 
   it("rejects invalid draft fields at the submission boundary without publishing a digest", async () => {
-    const h = await host([], async (_input, _signal, _operation, submit) =>
-      submit({ unexpected: "field" }),
-    );
+    const h = await host([], async () => ({ unexpected: "field" }));
     fixedAnalysis(h);
     await expect(
       h.bridge.makeDigest(h.operation, "digest", "invalid-draft"),
@@ -164,7 +162,7 @@ describe("host execution ownership through the research service facade", () => {
     let calls = 0;
     const waiting = gatedDigest(gate);
     const h = await host([{ kind: "save" }], async (...args) =>
-      ++calls === 1 ? waiting(...args) : args[3](handoffDigest(args[0])),
+      ++calls === 1 ? waiting(...args) : handoffDigest(args[0]),
     );
     cleanups.push(async () => {
       gate.released.resolve();

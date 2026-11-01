@@ -28,7 +28,6 @@ import { createServiceTaskTools } from "../../src/tools/service-tasks.js";
 import { createServiceTaskOperations } from "../../src/host/research-operations.js";
 import { createReportSubmission } from "../../src/host/report-submission.js";
 import { decisionFixture } from "../fixtures/decision.js";
-import { oneDigest } from "../fixtures/digest-conversation.js";
 
 const cleanups: (() => void | Promise<void>)[] = [];
 function note() {
@@ -113,7 +112,7 @@ function setup(
       return digest(context);
     },
   );
-  const digests = new DigestService(f.runs, f.artifacts, oneDigest(generate));
+  const digests = new DigestService(f.runs, f.artifacts, generate);
   const decisions = new DecisionService(f.runs, f.now);
   const bindings = new SessionBindings();
   const tools = [

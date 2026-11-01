@@ -174,7 +174,6 @@ export class DigestService {
     signal: AbortSignal,
     failures: unknown[],
   ): Promise<ArtifactCommitResult> {
-    let published = false;
     try {
       signal.throwIfAborted();
       const inputs = new ArtifactInputs(this.runs);
@@ -198,24 +197,11 @@ export class DigestService {
         risks: inheritRisks(versions),
         gaps: summarizeArtifactGaps(inputs.reportedGaps(versions)),
       };
-      return await this.generate(
-        structuredClone(context),
-        signal,
-        structuredClone(taskOperation),
-        (draft) => {
-          signal.throwIfAborted();
-          const content = assembleDigest(draft, context);
-          const result = this.artifacts.submitArtifact(
-            taskOperation,
-            [content],
-            requestId,
-          );
-          published = true;
-          return result;
-        },
-      );
+      const draft = await this.generate(structuredClone(context), signal);
+      signal.throwIfAborted();
+      const content = assembleDigest(draft, context);
+      return this.artifacts.submitArtifact(taskOperation, [content], requestId);
     } catch (cause) {
-      if (published) throw cause;
       const failure = {
         code:
           cause instanceof ResearchError

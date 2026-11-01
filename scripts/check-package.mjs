@@ -493,8 +493,7 @@ try {
   const digestResult = await new DigestService(
     service,
     artifactService,
-    async (input, _signal, _operation, submit) =>
-      submit(sampleDigestReply(input)),
+    async (input) => sampleDigestReply(input),
   ).makeDigest(digestSample.operation, digestSample.taskId, "digest");
   const digestContent = service.readArtifact(digestResult.refs[0]).content;
   assert.equal(digestContent.payload.numbers.length, 1);

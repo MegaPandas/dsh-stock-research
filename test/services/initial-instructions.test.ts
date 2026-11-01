@@ -366,16 +366,11 @@ describe("initial task instructions", () => {
       "analysis",
     );
     const seen: DigestModelInput[] = [];
-    const generate: GenerateDigest = async (
-      context,
-      signal,
-      _operation,
-      submit,
-    ) => {
+    const generate: GenerateDigest = async (context, signal) => {
       signal.throwIfAborted();
       seen.push(structuredClone(context));
       const refs = context.artifacts.map((artifact) => artifact.ref);
-      return submit({
+      return {
         title: "Digest",
         body: "Fixed summary",
         inputRefs: refs,
@@ -384,7 +379,7 @@ describe("initial task instructions", () => {
         ],
         disagreements: [],
         riskSummaries: [],
-      });
+      };
     };
     const digests = new DigestService(f.runs, f.artifacts, generate);
     cleanups.push(() => digests.close());
