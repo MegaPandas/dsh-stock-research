@@ -78,8 +78,19 @@ export class MemoryService implements MemoryAccess {
             "ACCESS_DENIED",
             "Memory review security must match the linked run.",
           );
-        const index = this.index();
-        this.previous(index, captured.input.previous, bound.runId);
+        const previous = captured.input.previous;
+        if (previous !== null)
+          this.store.inspect((index, reader) => {
+            assertMemoryState(index);
+            this.assertCurrent(index, previous);
+            const value = reader.readEntries<unknown>([previous])[0];
+            assertMemoryEntry(value, previous);
+            if (value.runId !== bound.runId)
+              throw new ResearchError(
+                "ACCESS_DENIED",
+                "Memory revision belongs to another run.",
+              );
+          });
         for (const ref of captured.input.evidence) {
           if (ref.runId !== bound.runId)
             throw new ResearchError(
@@ -135,7 +146,7 @@ export class MemoryService implements MemoryAccess {
         const completed = this.receipt(this.index(), scope, requestId, request);
         if (completed !== null) return completed;
         const saved = this.store.commit((current, writer) => {
-          this.previous(current, captured.input.previous, bound.runId);
+          this.assertCurrent(current, previous);
           const content = captured.input;
           const ref = writer.entry(content.previous, (ref): MemoryEntry => ({
             ...content,
@@ -278,10 +289,9 @@ export class MemoryService implements MemoryAccess {
       );
     return previous.ref;
   }
-  private previous(
+  private assertCurrent(
     index: MemoryIndex<MemoryState>,
     previous: MemoryRef | null,
-    runId: string,
   ): void {
     if (previous === null) return;
     if (
@@ -291,11 +301,6 @@ export class MemoryService implements MemoryAccess {
       throw new ResearchError(
         "REQUEST_CONFLICT",
         "Memory revision is no longer current.",
-      );
-    if (this.read(previous).runId !== runId)
-      throw new ResearchError(
-        "ACCESS_DENIED",
-        "Memory revision belongs to another run.",
       );
   }
 }

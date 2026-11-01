@@ -481,6 +481,103 @@ describe("MemoryService durable review history", () => {
     expect(source).toHaveBeenCalledTimes(1);
     expect(c.recall()).toHaveLength(1);
   });
+  it("reuses a concurrent revision receipt published by another service", async () => {
+    const firstResult = deferred<QueryResponse<PriceReturnsQuery>>();
+    const secondResult = deferred<QueryResponse<PriceReturnsQuery>>();
+    const firstStarted = deferred<void>();
+    const secondStarted = deferred<void>();
+    const c = setup(async () => {
+      firstStarted.resolve();
+      return firstResult.promise;
+    });
+    const other = c.service(async () => {
+      secondStarted.resolve();
+      return secondResult.promise;
+    });
+    const previous = await c.memory.remember(c.operation, input(), "original");
+    const content: RememberInput = {
+      ...input("Concurrent revision"),
+      previous,
+      returns: { kind: "query", request },
+    };
+    const first = c.memory.remember(c.operation, content, "same");
+    const second = other.remember(c.operation, content, "same");
+    try {
+      await Promise.all([firstStarted.promise, secondStarted.promise]);
+      secondResult.resolve(response());
+      const winner = await second;
+      const published = c.store.readIndex();
+      firstResult.resolve(response());
+      expect(await first).toEqual(winner);
+      expect(winner).toEqual({ entryId: previous.entryId, revision: 2 });
+      expect(c.store.readIndex()).toEqual(published);
+      expect(published.receipts).toHaveLength(2);
+      expect(c.memory.read(winner)).toMatchObject({
+        previous,
+        note: "Concurrent revision",
+      });
+    } finally {
+      firstResult.resolve(response());
+      secondResult.resolve(response());
+      await Promise.allSettled([first, second]);
+    }
+  });
+  it("captures the revision and review identity before awaiting returns", async () => {
+    const pending = deferred<QueryResponse<PriceReturnsQuery>>();
+    const started = deferred<void>();
+    const source = vi.fn(async () => {
+      started.resolve();
+      return pending.promise;
+    });
+    const c = setup(source);
+    const previous = await c.memory.remember(c.operation, input(), "original");
+    const operation = structuredClone(c.operation);
+    const content: RememberInput = {
+      ...input("Captured revision"),
+      previous,
+      returns: { kind: "query", request: structuredClone(request) },
+    };
+    const originalOperation = structuredClone(operation);
+    const originalInput = structuredClone(content);
+    const writing = c.memory.remember(operation, content, "captured");
+    try {
+      await started.promise;
+      operation.runId = "changed-run";
+      operation.identity = "changed-identity";
+      operation.scope.security.id = "US:OTHER";
+      operation.scope.cutoff = "2025-01-01T00:00:00.000Z";
+      content.previous = null;
+      content.note = "Changed revision";
+      content.evidence.push({
+        runId: "other-run",
+        evidenceId: "other",
+        selector: "/data",
+      });
+      if (content.returns.kind === "query")
+        content.returns.request.parameters.startDate = "2020-01-01";
+      pending.resolve(response());
+      const saved = await writing;
+      expect(c.memory.read(saved)).toMatchObject({
+        previous,
+        runId: originalOperation.runId,
+        securityId: originalOperation.scope.security.id,
+        identity: originalOperation.identity,
+        note: "Captured revision",
+        evidence: [],
+        returns: {
+          kind: "recorded",
+          snapshot: { scope: originalOperation.scope, request },
+        },
+      });
+      expect(
+        await c.memory.remember(originalOperation, originalInput, "captured"),
+      ).toEqual(saved);
+      expect(source).toHaveBeenCalledTimes(1);
+    } finally {
+      pending.resolve(response());
+      await Promise.allSettled([writing]);
+    }
+  });
   it("propagates source failures without publishing a receipt or entry", async () => {
     const failure = new Error("source unavailable");
     const c = setup(async () => {
