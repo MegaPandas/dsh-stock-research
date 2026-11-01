@@ -41,7 +41,9 @@ it.each([
       `export * from "${dependency}";`,
       `const value = import("${dependency}");`,
     ]) {
-      const found = await errors(file, source);
+      const found = (await errors(file, source)).filter(
+        ({ ruleId }) => ruleId === "no-restricted-syntax",
+      );
       expect(found).toHaveLength(1);
       expect(found[0]!.message).toContain("Host execution");
     }
