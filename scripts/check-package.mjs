@@ -499,7 +499,11 @@ try {
   assert.equal(digestContent.payload.numbers.length, 1);
   assert.equal(digestContent.payload.gaps[0].kind, "source");
   assert.match(digestContent.body, /100 USD\/股/);
-  const sample = openDecisionSample(service, "decision-sample");
+  const sample = openDecisionSample(
+    service,
+    artifactService,
+    "decision-sample",
+  );
   const decided = new DecisionService(
     service,
     () => "2024-01-04T00:00:00.000Z",

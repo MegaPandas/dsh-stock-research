@@ -42,7 +42,9 @@ try {
     new RunStore(root),
     () => "2024-01-04T00:00:00.000Z",
   );
-  const { operation } = openDecisionSample(runs, "read-tools");
+  const numbers = new NumberService(runs);
+  const artifacts = new ArtifactService(runs, numbers);
+  const { operation } = openDecisionSample(runs, artifacts, "read-tools");
   const initial = runs.view(operation);
   const scope = initial.scope;
   const managerRef = initial.tasks.find((task) => task.taskId === "manager")
@@ -97,8 +99,6 @@ try {
   const bindings = new SessionBindings();
   const agent = { id: "package-coordinator" };
   bindings.bind(agent, { kind: "coordinator", runIds: [operation.runId] });
-  const numbers = new NumberService(runs);
-  const artifacts = new ArtifactService(runs, numbers);
   const digests = new DigestService(runs, artifacts, async () => {
     throw new Error("No package fixture model requests");
   });

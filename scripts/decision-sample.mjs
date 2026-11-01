@@ -1,10 +1,5 @@
-import {
-  ArtifactService,
-  NumberService,
-} from "@megapandas/dsh-stock-research/core";
-
 // Three synthetic service inputs, never evidence of full quick-mode/vendor coverage.
-export function openDecisionSample(runs, requestId) {
+export function openDecisionSample(runs, artifacts, requestId) {
   const cutoff = "2024-01-03T22:00:00.000Z";
   const scope = {
     security: {
@@ -75,7 +70,6 @@ export function openDecisionSample(runs, requestId) {
     identity: "sample-worker",
     sessionId: null,
   });
-  const artifacts = new ArtifactService(runs, new NumberService(runs));
   const digestRef = artifacts.submitArtifact(
     claim("risk-summary"),
     [

@@ -8,6 +8,7 @@ import type {
 } from "../../src/contracts/artifact-payloads.js";
 import type { MarketData } from "../../src/contracts/data.js";
 import type { EvidenceInput } from "../../src/contracts/task-data.js";
+import { ResearchError } from "../../src/contracts/errors.js";
 import { parseArtifactInput } from "../../src/artifacts/schema.js";
 import { DecisionService } from "../../src/services/decisions.js";
 import { NumberService } from "../../src/services/numbers/index.js";
@@ -669,6 +670,45 @@ describe("decision finalization", () => {
     );
   });
 
+  it("repairs a post-publication projection failure without rebuilding the final pair", () => {
+    const c = setup();
+    const failure = new ResearchError(
+      "STORAGE_FAILED",
+      "Projection write failed",
+    );
+    vi.spyOn(c.store, "syncProjections").mockImplementationOnce(() => {
+      throw failure;
+    });
+    expect(() =>
+      new DecisionService(c.runs, c.now).decide(c.operation, "final", "decide"),
+    ).toThrow(failure);
+    const published = c.store.read(c.operation.runId);
+    const final = published.tasks.find((task) => task.taskId === "final")!;
+    expect(published.status).toBe("completed");
+    expect(final).toMatchObject({ status: "succeeded" });
+    expect(final.outputRefs).toHaveLength(2);
+    const values = output(c, final.outputRefs);
+    expect(values.report.decision).toEqual(values.decision);
+    const retried = new DecisionService(c.runs, () => {
+      throw new Error("must not rebuild a published decision");
+    }).decide(c.operation, "final", "decide");
+    expect(retried.refs).toEqual(final.outputRefs);
+    expect(output(c, retried.refs)).toEqual(values);
+    expect(c.store.read(c.operation.runId)).toEqual(published);
+    const directory = join(
+      c.directory,
+      "runs",
+      c.scope.date,
+      `US_NVDA-quick-${c.operation.runId}`,
+    );
+    expect(
+      JSON.parse(fs.readFileSync(join(directory, "decision.json"), "utf8")),
+    ).toEqual(values.decision);
+    expect(fs.readFileSync(join(directory, "report.md"), "utf8")).toContain(
+      "评级：买入",
+    );
+  });
+
   it("accepts a corrected manager draft in the same running attempt", () => {
     const c = setup({
       deferDraft: true,
@@ -712,6 +752,34 @@ describe("decision finalization", () => {
     expect(c.store.read(c.operation.runId)).toEqual(before);
   });
 
+  it("rejects cancellation before publication and retries the same claimed attempt", () => {
+    const c = setup();
+    const before = c.store.read(c.operation.runId);
+    const controller = new AbortController();
+    const reason = new Error("cancel prepared decision");
+    const decisions = new DecisionService(c.runs, () => {
+      controller.abort(reason);
+      return c.now();
+    });
+    expect(() =>
+      decisions.decide(c.operation, "final", "decide", controller.signal),
+    ).toThrow(reason);
+    const interrupted = c.store.read(c.operation.runId);
+    const final = interrupted.tasks.find((task) => task.taskId === "final")!;
+    expect(interrupted.status).toBe("active");
+    expect(final).toMatchObject({ status: "running", outputRefs: [] });
+    expect(interrupted.artifacts).toEqual(before.artifacts);
+    const retried = new DecisionService(c.runs, c.now).decide(
+      c.operation,
+      "final",
+      "decide",
+    );
+    expect(retried.attempt).toBe(final.attempts.at(-1)!.number);
+    expect(retried.refs).toHaveLength(2);
+    expect(c.store.read(c.operation.runId).revision).toBe(before.revision + 2);
+    expect(c.runs.view(c.operation).status).toBe("completed");
+  });
+
   it("records a blockage when a nondependent task still prevents final publication", () => {
     const c = setup({
       additionalTasks: [
@@ -744,21 +812,20 @@ describe("decision finalization", () => {
     ).toBe(false);
   });
 
-  it("preserves actual storage failures instead of publishing a default decision", () => {
+  it("preserves storage failures and retries the same attempt after evidence recovery", () => {
     const c = setup();
-    fs.unlinkSync(
-      join(
-        c.directory,
-        "runs",
-        c.scope.date,
-        `US_NVDA-quick-${c.operation.runId}`,
-        "evidence",
-        `${c.source.evidenceId}.json`,
-      ),
+    const path = join(
+      c.directory,
+      "runs",
+      c.scope.date,
+      `US_NVDA-quick-${c.operation.runId}`,
+      "evidence",
+      `${c.source.evidenceId}.json`,
     );
-    expect(() =>
-      new DecisionService(c.runs, c.now).decide(c.operation, "final", "decide"),
-    ).toThrowError(
+    const evidence = fs.readFileSync(path);
+    fs.unlinkSync(path);
+    const decisions = new DecisionService(c.runs, c.now);
+    expect(() => decisions.decide(c.operation, "final", "decide")).toThrowError(
       expect.objectContaining({
         code: "STORAGE_FAILED",
         cause: expect.objectContaining({ code: "ENOENT" }),
@@ -770,5 +837,13 @@ describe("decision finalization", () => {
         .read(c.operation.runId)
         .artifacts.some((entry) => entry.kind === "decision"),
     ).toBe(false);
+    const attempt = c.runs
+      .view(c.operation)
+      .tasks.find((task) => task.taskId === "final")!.attempt;
+    fs.writeFileSync(path, evidence);
+    const retried = decisions.decide(c.operation, "final", "decide");
+    expect(retried.attempt).toBe(attempt);
+    expect(retried.refs).toHaveLength(2);
+    expect(c.runs.view(c.operation).status).toBe("completed");
   });
 });
