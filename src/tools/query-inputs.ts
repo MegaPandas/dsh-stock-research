@@ -16,7 +16,7 @@ import {
   positive,
   stringSchema,
   text,
-} from "./parameters.js";
+} from "../host/tool-protocol/parameters.js";
 
 export type DataToolName =
   | "stock_get_market"

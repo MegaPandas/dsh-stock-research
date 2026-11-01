@@ -10,7 +10,7 @@ import {
   readCollectionData,
   readCollectionTable,
 } from "../services/collection/view.js";
-import { researchTool } from "../tools/errors.js";
+import { researchTool } from "../host/tool-protocol/errors.js";
 import {
   invalid,
   object,
@@ -19,7 +19,7 @@ import {
   text,
   resultOutput,
   opaqueObjectSchema,
-} from "../tools/parameters.js";
+} from "../host/tool-protocol/parameters.js";
 
 const MAX_PAGE_SIZE = 100;
 

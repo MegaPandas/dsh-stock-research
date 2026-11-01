@@ -118,7 +118,10 @@ describe("artifact rule boundaries", () => {
 
   it.each([
     ["src/core.ts", "./services/artifact-submission/index.js"],
-    ["src/tools/errors.ts", "../services/artifact-submission/index.js"],
+    [
+      "src/host/tool-protocol/errors.ts",
+      "../../services/artifact-submission/index.js",
+    ],
     ["src/services/digest/index.ts", "../artifact-submission/index.js"],
     ["src/services/artifact-submission/index.ts", "./requirements.js"],
     ["src/services/artifact-submission/index.ts", "../decision-basics.js"],

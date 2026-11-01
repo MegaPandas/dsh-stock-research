@@ -5,7 +5,7 @@ import {
   objectSchema,
   sourceRefSchema,
   stringSchema,
-} from "./parameters.js";
+} from "../host/tool-protocol/parameters.js";
 
 type RoleArtifactKind = Exclude<ArtifactKind, "digest" | "decision" | "report">;
 const KINDS: readonly RoleArtifactKind[] = [

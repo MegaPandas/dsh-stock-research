@@ -3,7 +3,7 @@ import type { ArtifactRef } from "../contracts/data.js";
 import { ResearchError } from "../contracts/errors.js";
 import { reportMaterial } from "../report/material.js";
 import { artifactKey } from "../contracts/artifact-identity.js";
-import { researchTool } from "../tools/errors.js";
+import { researchTool } from "../host/tool-protocol/errors.js";
 import {
   object,
   objectSchema,
@@ -11,7 +11,7 @@ import {
   resultOutput,
   stringSchema,
   text,
-} from "../tools/parameters.js";
+} from "../host/tool-protocol/parameters.js";
 
 export function createReportReader(
   reports: readonly ArtifactVersion[],

@@ -9,14 +9,14 @@ import {
 import type { QueryAccess } from "../contracts/query-service.js";
 import type { TaskQueryService } from "../services/task-query.js";
 import type { RunReader } from "../contracts/run-access.js";
-import { researchTool } from "./errors.js";
+import { researchTool } from "../host/tool-protocol/errors.js";
 import {
   invalid,
   objectSchema,
   opaqueObjectSchema,
   resultOutput,
   sourceRefSchema,
-} from "./parameters.js";
+} from "../host/tool-protocol/parameters.js";
 import {
   captureQueryPolicy,
   dataSchemas,

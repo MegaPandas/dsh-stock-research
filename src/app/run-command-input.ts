@@ -10,7 +10,7 @@ import {
   positive,
   stringSchema,
   text,
-} from "../tools/parameters.js";
+} from "../host/tool-protocol/parameters.js";
 
 const resumeInputSchema = objectSchema({
   resolvedReasonIds: {

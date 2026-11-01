@@ -3,7 +3,7 @@ import { ResearchError } from "../contracts/errors.js";
 import type { MemoryInputRegistration } from "../contracts/task-data.js";
 import { taskOperation, type SessionBindings } from "../host/bindings.js";
 import type { MemoryAccess } from "../contracts/memory-service.js";
-import { researchTool } from "./errors.js";
+import { researchTool } from "../host/tool-protocol/errors.js";
 import { scopedQueryParameters } from "./query-scope.js";
 import {
   invalid,
@@ -14,7 +14,7 @@ import {
   resultOutput as output,
   stringSchema,
   text,
-} from "./parameters.js";
+} from "../host/tool-protocol/parameters.js";
 
 const kind = (value: string) => ({ type: "string" as const, const: value });
 export function createRecallTool(

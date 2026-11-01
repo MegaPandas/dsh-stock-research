@@ -14,6 +14,8 @@ it.each([
   ["run-reading", "../tools/read.js"],
   ["research-operations", "@megapandas/dsh-stock-research/tools"],
   ["valuation-operations", "../tools/errors.js"],
+  ["run-reading", "./tool-protocol/parameters.js"],
+  ["research-operations", "./tool-protocol/errors.js"],
 ])("keeps host %s independent of %s", async (file, dependency) => {
   for (const source of [
     `import type { Value } from "${dependency}";`,

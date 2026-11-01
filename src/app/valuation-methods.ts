@@ -5,7 +5,7 @@ import type { TaskDefinition } from "../contracts/workflow.js";
 import type { CollectionPacket } from "../contracts/collection.js";
 import { decisionPolicy } from "../valuation/rating-policy.js";
 import { VALUATION_ENGINE_VERSION } from "../contracts/valuation.js";
-import { researchTool } from "../tools/errors.js";
+import { researchTool } from "../host/tool-protocol/errors.js";
 import { valuationMethodDetail } from "../tools/valuation.js";
 import {
   object,
@@ -14,7 +14,7 @@ import {
   resultOutput,
   stringSchema,
   text,
-} from "../tools/parameters.js";
+} from "../host/tool-protocol/parameters.js";
 
 export const VALUATION_METHODS = catalogue;
 export type ValuationMethods = typeof catalogue;

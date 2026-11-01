@@ -1,6 +1,6 @@
 import type { JsonSchemaNode, ToolDefinition } from "@deepseek-ai/dsh-tools";
-import type { ArtifactRef, SourceRef } from "../contracts/data.js";
-import { ResearchError } from "../contracts/errors.js";
+import type { ArtifactRef, SourceRef } from "../../contracts/data.js";
+import { ResearchError } from "../../contracts/errors.js";
 
 export function invalid(detail: string): never {
   throw new ResearchError("INVALID_INPUT", detail);

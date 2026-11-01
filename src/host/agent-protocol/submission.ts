@@ -7,8 +7,8 @@ import {
 } from "../../contracts/agent-reports.js";
 import { ResearchError } from "../../contracts/errors.js";
 import { parseAgentReport } from "../../artifacts/agent-reports.js";
-import { researchTool } from "../../tools/errors.js";
-import { objectSchema, resultOutput } from "../../tools/parameters.js";
+import { researchTool } from "../tool-protocol/errors.js";
+import { objectSchema, resultOutput } from "../tool-protocol/parameters.js";
 
 /** All research roles complete through a validated, successful business commit. */
 export function createSubmissionSession<Kind extends AgentReportKind, Result>(

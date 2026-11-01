@@ -7,7 +7,7 @@ import {
 } from "../host/bindings.js";
 import type { QueryAccess } from "../contracts/query-service.js";
 import type { RunReader } from "../contracts/run-access.js";
-import { researchTool } from "./errors.js";
+import { researchTool } from "../host/tool-protocol/errors.js";
 import {
   invalid,
   object,
@@ -16,7 +16,7 @@ import {
   resultOutput as output,
   stringSchema,
   text,
-} from "./parameters.js";
+} from "../host/tool-protocol/parameters.js";
 
 function scopeFor(
   caller: BoundCaller,

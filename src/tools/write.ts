@@ -4,7 +4,7 @@ import type { SessionBindings } from "../host/bindings.js";
 import { createReportSubmission } from "../host/report-submission.js";
 import type { ArtifactService } from "../services/artifact-submission/index.js";
 import type { MemoryAccess } from "../contracts/memory-service.js";
-import { researchTool } from "./errors.js";
+import { researchTool } from "../host/tool-protocol/errors.js";
 import {
   artifactCommitOutput,
   object,
@@ -12,7 +12,7 @@ import {
   resultOutput,
   stringSchema,
   text,
-} from "./parameters.js";
+} from "../host/tool-protocol/parameters.js";
 import { captureQueryPolicy } from "./query-inputs.js";
 import type { QueryPolicy } from "../contracts/query.js";
 import {

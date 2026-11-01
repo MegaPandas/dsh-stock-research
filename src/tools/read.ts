@@ -21,7 +21,7 @@ import {
   collectionGaps,
   collectionRowSelectors,
 } from "../services/collection/view.js";
-import { researchTool } from "./errors.js";
+import { researchTool } from "../host/tool-protocol/errors.js";
 import { createDataHealthTool } from "./data-health.js";
 import { createRecallTool } from "./recall.js";
 import {
@@ -34,7 +34,7 @@ import {
   stringSchema,
   text,
   resultOutput as output,
-} from "./parameters.js";
+} from "../host/tool-protocol/parameters.js";
 
 export interface ReadToolServices {
   runs: Pick<RunReader, "view" | "readEvidence">;

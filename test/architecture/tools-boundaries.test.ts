@@ -22,6 +22,14 @@ describe("tool adapter entries", () => {
     ],
     ["src/core.ts", 'export * from "./tools/write-inputs.js";'],
     [
+      "src/host/report-draft.ts",
+      'import { objectSchema } from "../tools/parameters.js";',
+    ],
+    [
+      "src/app/report-reader.ts",
+      'import { researchTool } from "../tools/errors.js";',
+    ],
+    [
       "src/host/runtime.ts",
       'const tool = import("../tools/nested/new-internal.js");',
     ],
@@ -36,8 +44,8 @@ describe("tool adapter entries", () => {
     ["src/host/runtime.ts", "../tools/write.js"],
     ["src/host/runtime.ts", "../tools/read.js"],
     ["src/host/runtime.ts", "../tools/control.js"],
-    ["src/host/report-draft.ts", "../tools/parameters.js"],
-    ["src/app/report-reader.ts", "../tools/errors.js"],
+    ["src/host/report-draft.ts", "./tool-protocol/parameters.js"],
+    ["src/app/report-reader.ts", "../host/tool-protocol/errors.js"],
     ["src/app/role-preparation/role.ts", "../../tools/valuation.js"],
     ["src/app/review-preparation/tools.ts", "../../tools/query-inputs.js"],
     ["src/app/review-preparation/tools.ts", "../../tools/query-scope.js"],

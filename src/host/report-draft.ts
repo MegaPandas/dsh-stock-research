@@ -12,8 +12,8 @@ import {
 } from "../contracts/agent-reports.js";
 import { ResearchError } from "../contracts/errors.js";
 import { parseAgentReport } from "../artifacts/agent-reports.js";
-import { researchTool } from "../tools/errors.js";
-import { objectSchema, resultOutput } from "../tools/parameters.js";
+import { researchTool } from "./tool-protocol/errors.js";
+import { objectSchema, resultOutput } from "./tool-protocol/parameters.js";
 import { createSubmissionSession } from "./agent-protocol/submission.js";
 import {
   stageHandoffSchema,

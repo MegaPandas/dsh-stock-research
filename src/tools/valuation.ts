@@ -18,8 +18,8 @@ import {
   resultOutput,
   stringSchema,
   text,
-} from "./parameters.js";
-import { researchTool } from "./errors.js";
+} from "../host/tool-protocol/parameters.js";
+import { researchTool } from "../host/tool-protocol/errors.js";
 import {
   createValuationOperations,
   type ValuationOperations,

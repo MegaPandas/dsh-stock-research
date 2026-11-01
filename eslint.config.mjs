@@ -111,10 +111,8 @@ export default defineConfig(
               "recall.js",
               "service-tasks.js",
               "valuation.js",
-              "parameters.js",
               "query-inputs.js",
               "query-scope.js",
-              "errors.js",
             ],
           },
           {
@@ -128,6 +126,10 @@ export default defineConfig(
           {
             directory: "src/host/agent-protocol",
             publicEntries: ["input.js", "submission.js"],
+          },
+          {
+            directory: "src/host/tool-protocol",
+            publicEntries: ["parameters.js", "errors.js"],
           },
           {
             directory: "src/app/research-execution",
@@ -385,7 +387,8 @@ export default defineConfig(
     },
   },
   {
-    files: ["src/host/{bindings,run-reading,*-operations}.ts"],
+    files: ["src/host/**/*.ts"],
+    ignores: ["src/host/runtime.ts"],
     rules: {
       "no-restricted-syntax": [
         "error",
@@ -393,7 +396,50 @@ export default defineConfig(
           selector:
             ":matches(ImportDeclaration, ExportNamedDeclaration, ExportAllDeclaration, ImportExpression)[source.value=/(^|\\u002F)tools(\\u002F|$)/]",
           message:
-            "Host identity and operations must not depend on tool adapters.",
+            "Host execution must use shared protocols instead of tool adapters.",
+        },
+      ],
+    },
+  },
+  {
+    files: ["src/host/{bindings,run-reading,*-operations}.ts"],
+    rules: {
+      "no-restricted-syntax": [
+        "error",
+        {
+          selector:
+            ":matches(ImportDeclaration, ExportNamedDeclaration, ExportAllDeclaration, ImportExpression)[source.value=/(^|\\u002F)(tools|tool-protocol)(\\u002F|$)/]",
+          message:
+            "Host identity and operations must not depend on tool adapters or parameter protocols.",
+        },
+      ],
+    },
+  },
+  {
+    files: ["src/host/tool-protocol/parameters.ts"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          paths: [
+            {
+              name: "./errors.js",
+              message:
+                "Tool parameters must not load execution error adapters.",
+            },
+          ],
+          patterns: [
+            {
+              group: [...pureImports, "!@deepseek-ai/dsh-tools"],
+              message:
+                "Tool parameters must use contracts and pure validation instead of execution or I/O.",
+            },
+            {
+              regex: "^\\.\\./(?!\\.\\./)",
+              message:
+                "Tool parameters must not depend on host execution modules.",
+            },
+          ],
         },
       ],
     },

@@ -13,7 +13,7 @@ async function boundaryErrors(source: string) {
 it.each([
   "@deepseek-ai/cordis",
   "../host/runtime.js",
-  "../tools/parameters.js",
+  "../host/tool-protocol/parameters.js",
   "../runs/store.js",
   "../services/memory/index.js",
 ])(

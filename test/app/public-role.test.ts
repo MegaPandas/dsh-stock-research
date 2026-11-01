@@ -17,7 +17,7 @@ import {
   opaqueObjectSchema,
   resultOutput,
   stringSchema,
-} from "../../src/tools/parameters.js";
+} from "../../src/host/tool-protocol/parameters.js";
 import {
   analysisReport,
   analysisSubmission,

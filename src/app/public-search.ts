@@ -2,7 +2,7 @@ import type { ToolDefinition, ToolRunContext } from "@deepseek-ai/dsh-tools";
 import type { DataEnvelope } from "../contracts/data.js";
 import type { ResearchData } from "../contracts/research.js";
 import { ResearchError } from "../contracts/errors.js";
-import { researchTool } from "../tools/errors.js";
+import { researchTool } from "../host/tool-protocol/errors.js";
 import {
   object,
   objectSchema,
@@ -10,7 +10,7 @@ import {
   resultOutput,
   stringSchema,
   text,
-} from "../tools/parameters.js";
+} from "../host/tool-protocol/parameters.js";
 import { PUBLIC_SEARCH_LIMITS } from "./public-research.js";
 
 /** Each analyst receives one search budget, including unsuccessful attempts. */

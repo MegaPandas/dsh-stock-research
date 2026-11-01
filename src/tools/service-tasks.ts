@@ -2,14 +2,14 @@ import type { ToolDefinition } from "@deepseek-ai/dsh-tools";
 import { ResearchError } from "../contracts/errors.js";
 import { authorizeRun, type SessionBindings } from "../host/bindings.js";
 import type { ServiceTaskOperations } from "../host/research-operations.js";
-import { researchTool } from "./errors.js";
+import { researchTool } from "../host/tool-protocol/errors.js";
 import {
   artifactCommitOutput,
   object,
   objectSchema,
   stringSchema,
   text,
-} from "./parameters.js";
+} from "../host/tool-protocol/parameters.js";
 
 const parameters = objectSchema({
   runId: stringSchema,

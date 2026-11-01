@@ -1,7 +1,7 @@
 import type { Context } from "@deepseek-ai/cordis";
 import type { ToolDefinition } from "@deepseek-ai/dsh-tools";
 import { ResearchError } from "../contracts/errors.js";
-import { researchTool } from "../tools/errors.js";
+import { researchTool } from "../host/tool-protocol/errors.js";
 import {
   artifactRef,
   artifactRefSchema,
@@ -11,7 +11,7 @@ import {
   resultOutput,
   stringSchema,
   text,
-} from "../tools/parameters.js";
+} from "../host/tool-protocol/parameters.js";
 import type {
   ResearchActions,
   StartResearchRequest,

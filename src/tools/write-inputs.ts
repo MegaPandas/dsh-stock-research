@@ -12,7 +12,7 @@ import {
   sourceRefSchema,
   stringSchema,
   text,
-} from "./parameters.js";
+} from "../host/tool-protocol/parameters.js";
 import { dataSchemas, parseDataRequest } from "./query-inputs.js";
 import type { QueryPolicy } from "../contracts/query.js";
 
