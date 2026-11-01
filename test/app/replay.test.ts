@@ -194,12 +194,10 @@ describe("stock-replay command", () => {
           (task) => task.status === "succeeded" && task.attempt === 1,
         ),
       ).toBe(true);
-      expect(replayModel.state.taskIds).toHaveLength(nodes - 3);
-      expect(replayModel.state.dataTaskIds).toEqual([
-        "data.market",
-        "data.fundamentals",
-        "data.macro",
-      ]);
+      expect(replayModel.state.taskIds).toHaveLength(nodes);
+      expect(
+        replayModel.state.taskIds.filter((id) => id.startsWith("data.")),
+      ).toEqual(["data.market", "data.fundamentals", "data.macro"]);
       expect(
         replay.tasks
           .flatMap((task) => task.outputRefs)
