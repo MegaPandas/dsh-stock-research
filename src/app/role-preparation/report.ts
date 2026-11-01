@@ -1,8 +1,5 @@
 import type { ToolRunContext } from "@deepseek-ai/dsh-tools";
-import type {
-  AgentReport,
-  AgentReportKind,
-} from "../../contracts/agent-reports.js";
+import type { AgentReport } from "../../contracts/agent-reports.js";
 import type { StageHandoff } from "../../contracts/stage-handoff.js";
 import type { RoleDispatchContext } from "../../contracts/runs.js";
 import type { ResearchArtifactVersion } from "../../contracts/artifact-payloads.js";
@@ -16,8 +13,11 @@ import { latestPublicSearchTime } from "./public-search.js";
 import { valuationDraftInput } from "./valuation-draft.js";
 import type { RoleServices } from "./services.js";
 
+export type RoleReportKind =
+  "analysis" | "debate" | "risk" | "plan" | "decision_draft";
+
 export interface RoleReportSeed {
-  report?: AgentReport;
+  report?: AgentReport<RoleReportKind>;
   stageHandoff?: StageHandoff;
   publicSearchAsOf?: string;
 }
@@ -25,7 +25,7 @@ export interface RoleReportSeed {
 export function prepareRoleReport(
   services: Pick<RoleServices, "runs" | "submitReport">,
   { claim, definition, scope }: RoleDispatchContext,
-  kind: AgentReportKind,
+  kind: RoleReportKind,
   inputs: {
     reports: readonly ResearchArtifactVersion[];
     tables: readonly RegisteredTable[];
@@ -45,11 +45,11 @@ export function prepareRoleReport(
     plan: "研究计划",
     decision_draft: "经理决策",
   };
-  let submittedReport: AgentReport | undefined;
+  let submittedReport: AgentReport<RoleReportKind> | undefined;
   let submittedHandoff: StageHandoff | undefined;
   let publicSearchAsOf = previous?.publicSearchAsOf;
   const accept = async (
-    report: AgentReport,
+    report: AgentReport<RoleReportKind>,
     exec: ToolRunContext,
     stageHandoff?: StageHandoff,
   ) => {

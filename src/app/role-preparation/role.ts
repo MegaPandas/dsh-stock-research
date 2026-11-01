@@ -3,7 +3,6 @@ import type {
   RoleDispatchContext,
   TaskInstructionSnapshot,
 } from "../../contracts/runs.js";
-import type { AgentReportKind } from "../../contracts/agent-reports.js";
 import type { EvidenceData } from "../../contracts/query.js";
 import { ResearchError } from "../../contracts/errors.js";
 import { agentInput } from "../../host/agent-protocol/input.js";
@@ -28,7 +27,11 @@ import {
   preparePublicSearch,
   type PublicSearchSession,
 } from "./public-search.js";
-import { prepareRoleReport, type RoleReportSeed } from "./report.js";
+import {
+  prepareRoleReport,
+  type RoleReportKind,
+  type RoleReportSeed,
+} from "./report.js";
 import { prepareRoleValuation } from "./valuation.js";
 
 export function prepareUnifiedRole(
@@ -49,7 +52,7 @@ export function prepareUnifiedRole(
       "INVALID_INPUT",
       "A research role requires one supported business report kind.",
     );
-  const reportKind = kind as AgentReportKind;
+  const reportKind = kind as RoleReportKind;
   const inputs = new ArtifactInputs(services.runs);
   const reports = inputs.closure(claim.inputRefs);
   const reader = createReportReader(reports, claim.inputRefs);

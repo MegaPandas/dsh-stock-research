@@ -10,7 +10,7 @@ import { createDeepInput } from "../../src/app/plan/deep.js";
 import { createReplayInput } from "../../src/app/replay-input.js";
 import { attachCollection } from "../../src/app/collection-snapshot.js";
 import type { CollectionSnapshot } from "../../src/contracts/collection.js";
-import type { ArtifactRef, ResearchScope } from "../../src/contracts/data.js";
+import type { ResearchScope } from "../../src/contracts/data.js";
 import { prepareResearchRole } from "../../src/app/role-preparation/index.js";
 import { RESEARCH_MODELS_INPUT } from "../../src/app/research-models.js";
 import {
@@ -327,7 +327,8 @@ describe("persisted research role preparation", () => {
         agent: handle.agent,
         callId: "late-calculation",
         signal: new AbortController().signal,
-      };
+        concludeTurn: () => undefined,
+      } as unknown as ToolRunContext;
       const execute = (name: string, value: unknown) =>
         provision.tools
           .find((tool) => tool.name === name)!
@@ -347,12 +348,14 @@ describe("persisted research role preparation", () => {
         valuation: selection,
       });
       await execute("stock_write_handoff", reportHandoff(report));
-      const result = (await execute("stock_submit", {})) as {
-        refs: ArtifactRef[];
-      };
-      expect(
-        h.runtime.runs.readArtifact(result.refs[0]!).content.payload,
-      ).toMatchObject({
+      expect(await execute("stock_submit", {})).toEqual({
+        status: "submitted",
+      });
+      const ref = h.runtime.runs
+        .view({ runId, identity: "owner" })
+        .tasks.find(({ taskId }) => taskId === context.claim.taskId)!
+        .outputRefs[0]!;
+      expect(h.runtime.runs.readArtifact(ref).content.payload).toMatchObject({
         report: {
           content: {
             valuation: {
