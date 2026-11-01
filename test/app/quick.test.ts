@@ -236,8 +236,8 @@ describe("stock-quick real command boundary", () => {
     const result = await h.executeAndWait();
     expect(result?.result.kind, result?.result.text).toBe("success");
     const view = h.runtime.runs.view({ runId: model.state.runId! });
-    expect(model.state.taskIds).toHaveLength(12);
-    expect(model.state.dataTaskIds).toEqual([
+    expect(model.state.taskIds).toHaveLength(15);
+    expect(model.state.taskIds.filter((id) => id.startsWith("data."))).toEqual([
       "data.market",
       "data.fundamentals",
       "data.macro",

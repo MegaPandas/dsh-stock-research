@@ -153,6 +153,36 @@ try {
   assert.equal(input.definition.tasks.length, 15);
   assert.equal(input.instructions.length, 15);
   const { runId } = runtime.runs.open("package-owner", input, "open");
+  const dataClaim = runtime.runs.claimService(
+    { runId, identity: "package-owner" },
+    "data.market",
+    "collection",
+    "fixed-data",
+  );
+  runtime.runs.commitArtifact(
+    { ...dataClaim, identity: "package-owner", sessionId: null },
+    [
+      {
+        kind: "collection",
+        title: "固定行情夹具",
+        body: "Package capability fixture.",
+        inputRefs: [],
+        claims: [],
+        payload: {
+          snapshot: {
+            schemaVersion: 1,
+            node: "market",
+            scope,
+            packets: [],
+            failures: [],
+          },
+          capturedAt: scope.cutoff,
+          capturedFrom: null,
+        },
+      },
+    ],
+    "fixed-data",
+  );
   const provision = prepareResearchRole(
     runtime,
     runtime.runs.dispatchForCall(

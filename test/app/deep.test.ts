@@ -145,8 +145,8 @@ describe("stock-deep command and resume", () => {
         (task) => task.status === "succeeded" && task.attempt === 1,
       ),
     ).toBe(true);
-    expect(model.state.taskIds).toHaveLength(22);
-    expect(model.state.dataTaskIds).toEqual([
+    expect(model.state.taskIds).toHaveLength(25);
+    expect(model.state.taskIds.filter((id) => id.startsWith("data."))).toEqual([
       "data.market",
       "data.fundamentals",
       "data.macro",
