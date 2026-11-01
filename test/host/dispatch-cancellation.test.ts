@@ -108,14 +108,18 @@ it("publishes branch cancellation immediately and lets independent work finish w
     status: "active",
     readyTasks: ["parallel"],
   });
-  await expect(
+  const downstream = expect(
     h.dispatch("cancelled-downstream", "dependent"),
   ).rejects.toMatchObject({ code: "TASK_NOT_READY" });
   const independent = await h.dispatch("parallel", "parallel");
   expect(independent.status).toBe("succeeded");
   expect(h.ctx.agents.get(SessionId(String(options.sessionId)))).toBeDefined();
   gate.released.resolve();
-  const [attempt, stopped] = await Promise.all([execution, stopping]);
+  const [attempt, stopped] = await Promise.all([
+    execution,
+    stopping,
+    downstream,
+  ]);
   expect(attempt.status).toBe("cancelled");
   expect(stopped).toMatchObject({
     affectedTasks: ["analysis", "dependent", "digest", "finalize"],
@@ -143,8 +147,13 @@ it("holds replacement dispatch behind the stop barrier and does not stop it when
   };
   const stopping = h.bridge.cancelTask(h.operation, input, "cancel-analysis");
   await firstGate.aborted.promise;
+  expect(
+    h.runs.readAttempt({ ...h.operation, taskId: "analysis", attempt: 1 })
+      .status,
+  ).toBe("cancelled");
   const redo = h.bridge.redo(h.operation, "analysis", "redo-analysis");
   const replacement = h.dispatch("replacement");
+  const replacementResult = Promise.allSettled([replacement]);
   await setImmediate();
   expect(h.adapter.requests).toHaveLength(1);
   expect(h.runs.view(h.operation).tasks[0]).toMatchObject({
@@ -153,7 +162,7 @@ it("holds replacement dispatch behind the stop barrier and does not stop it when
   });
   firstGate.released.resolve();
   const [old, cancelled] = await Promise.all([execution, stopping, redo]);
-  expect(old.status).toBe("cancelled");
+  expect(old.status).toBe("invalidated");
   const request = await replacementGate.started.promise;
   let aborted = false;
   void replacementGate.aborted.promise.then(() => {
@@ -170,7 +179,9 @@ it("holds replacement dispatch behind the stop barrier and does not stop it when
   ).toBe("succeeded");
   expect(h.ctx.agents.get(SessionId(String(request.sessionId)))).toBeDefined();
   replacementGate.released.resolve();
-  expect(await replacement).toMatchObject({ attempt: 2, status: "succeeded" });
+  expect(await replacementResult).toMatchObject([
+    { status: "fulfilled", value: { attempt: 2, status: "succeeded" } },
+  ]);
 });
 
 it("propagates execution release failure while preserving the published cancellation", async () => {
