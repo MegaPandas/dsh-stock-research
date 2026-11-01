@@ -121,6 +121,7 @@ export interface RunLifecycle {
     taskId: string,
     requestId: string,
     reason?: string | null,
+    instruction?: string | null,
   ): RedoTaskResult;
   recoverInterrupted(
     operation: RunOperation,

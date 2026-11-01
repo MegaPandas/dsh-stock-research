@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import { join } from "node:path";
+import { JobId } from "@deepseek-ai/dsh-jobs";
 import type { Agent } from "@deepseek-ai/dsh-agent";
 import type { Context } from "@deepseek-ai/cordis";
 import CommandRuntime from "@deepseek-ai/dsh-commands";
@@ -50,7 +51,21 @@ export function lastToolResult<T>(request: GenerateOptions): T {
 
 /** Keep command acknowledgement and background completion separate in fixtures. */
 export function researchCommands(ctx: Context, agent: Agent) {
-  const activities: { runId?: string }[] = [];
+  const activities: { runId?: string; jobId?: string }[] = [];
+  const notices: { runId?: string; jobId: string; notice: string }[] = [];
+  let wake!: () => void;
+  let changed!: Promise<void>;
+  function resetWake() {
+    changed = new Promise<void>((resolve) => {
+      wake = resolve;
+    });
+  }
+  resetWake();
+  const notify = () => {
+    wake();
+    resetWake();
+  };
+  ctx.effect(() => ctx.jobs.events.subscribe({ owner: agent.id }, notify));
   const failures: unknown[] = [];
   const toolFailures: string[] = [];
   const commands = new Map<
@@ -58,12 +73,35 @@ export function researchCommands(ctx: Context, agent: Agent) {
     {
       line: string;
       activities: number;
+      notices: number;
       failures: number;
       toolFailures: number;
     }
   >();
   ctx.on("session/event", (session, event) => {
     if (session !== agent.session) return;
+    notify();
+    if (
+      event.type === "job/registered" &&
+      ["stock-research", "stock-research-step"].includes(event.data.kind)
+    )
+      activities.push({ jobId: event.data.jobId });
+    if (
+      event.type === "user/message" &&
+      event.data.source?.kind === "stock-research"
+    ) {
+      const text = event.data.content
+        .filter((block) => block.type === "text")
+        .map((block) => block.text)
+        .join("\n");
+      const marker = "Research request: ";
+      const notice = JSON.parse(
+        text.slice(text.lastIndexOf(marker) + marker.length),
+      ) as { runId?: string; jobId: string; notice: string };
+      notice.notice = (event.data.source as { notice: string }).notice;
+      notices.push(notice);
+      activities.push(notice);
+    }
     if (event.type === "tool/result" && event.data.message.isError)
       toolFailures.push(
         event.data.error?.reason ??
@@ -81,17 +119,26 @@ export function researchCommands(ctx: Context, agent: Agent) {
         } catch {
           continue;
         }
-        if (
-          typeof value === "object" &&
-          value !== null &&
-          "runId" in value &&
-          typeof value.runId === "string"
-        )
-          activities.push({ runId: value.runId });
+        if (typeof value === "object" && value !== null) {
+          const result = value as {
+            runId?: string;
+            jobId?: string;
+            context?: { runId: string };
+            view?: { runId: string };
+            handle?: { jobId: string };
+          };
+          activities.push({
+            runId: result.runId ?? result.context?.runId ?? result.view?.runId,
+            jobId: result.jobId ?? result.handle?.jobId,
+          });
+        }
       }
   });
   ctx.on("agent/error", ({ agent: subject, error }) => {
-    if (subject === agent) failures.push(error);
+    if (subject === agent) {
+      failures.push(error);
+      notify();
+    }
   });
   async function execute(
     line = "/stock-quick SZ.002594 2024-01-03",
@@ -100,6 +147,7 @@ export function researchCommands(ctx: Context, agent: Agent) {
     const offset = {
       line,
       activities: activities.length,
+      notices: notices.length,
       failures: failures.length,
       toolFailures: toolFailures.length,
     };
@@ -113,63 +161,134 @@ export function researchCommands(ctx: Context, agent: Agent) {
     const offset = commands.get(execution.commandId)!;
     if (!/^\/stock-(quick|deep|resume|redo|replay)(?:\s|$)/.test(offset.line))
       return execution;
-    await agent.whenIdle();
+    return { ...execution, result: await waitForResearchCompletion(offset) };
+  }
+  async function waitForResearchCompletion(
+    offset = { activities: 0, notices: 0, failures: 0, toolFailures: 0 },
+  ) {
+    let releaseRun: (() => void) | undefined;
+    let observedRun: string | undefined;
+    let observedJob: ReturnType<typeof ctx.jobs.get> | undefined;
+    try {
+      while (true) {
+        const next = changed;
+        await agent.whenIdle();
+        const recent = activities.slice(offset.activities);
+        const runId = recent.findLast(
+          (activity) => activity.runId !== undefined,
+        )?.runId;
+        if (runId !== undefined && runId !== observedRun) {
+          releaseRun?.();
+          observedRun = runId;
+          releaseRun = ctx.stockResearch.runs.subscribe(runId, notify);
+        }
+        const view =
+          runId === undefined
+            ? undefined
+            : ctx.stockResearch.runs.view({ runId });
+        const jobId = recent.find(
+          (activity) => activity.jobId !== undefined,
+        )?.jobId;
+        const job =
+          jobId === undefined
+            ? undefined
+            : ctx.jobs.get(JobId(jobId), agent.id);
+        observedJob = job;
+        const notice = notices
+          .slice(offset.notices)
+          .findLast(
+            (notice) =>
+              notice.jobId === jobId ||
+              (runId !== undefined && notice.runId === runId),
+          );
+        const failedNotice =
+          notice?.notice === "failed" || notice?.notice === "blocked";
+        const waitingReview =
+          notice?.notice === "review" &&
+          view?.stages?.some(
+            (stage) => stage.readyForReview && !stage.accepted,
+          );
+        const failed =
+          view !== undefined &&
+          ((view.status !== "active" && view.status !== "completed") ||
+            view.tasks.some(({ status }) => status === "failed") ||
+            view.blockReasons.length > 0);
+        if (
+          agent.status === "idle" &&
+          (failures.length > offset.failures ||
+            toolFailures.length > offset.toolFailures ||
+            (failedNotice &&
+              (failed ||
+                job?.status === "failed" ||
+                job?.status === "killed")) ||
+            (view?.status === "completed" &&
+              job?.status === "completed" &&
+              notice?.notice === "completed") ||
+            (view?.status === "cancelled" && job?.status === "killed") ||
+            job?.status === "killed" ||
+            job?.status === "failed" ||
+            waitingReview)
+        )
+          break;
+        if (job === undefined && agent.status === "idle") break;
+        await next;
+      }
+    } finally {
+      releaseRun?.();
+    }
     const failure = failures.at(-1);
     if (failures.length > offset.failures)
       return {
-        ...execution,
-        result: {
-          kind: "error" as const,
-          text: failure instanceof Error ? failure.message : String(failure),
-        },
+        kind: "error" as const,
+        text: failure instanceof Error ? failure.message : String(failure),
       };
+    if (toolFailures.length > offset.toolFailures)
+      return { kind: "error" as const, text: toolFailures.at(-1)! };
     const runId = activities
       .slice(offset.activities)
       .findLast((activity) => activity.runId !== undefined)?.runId;
     if (runId === undefined)
       return {
-        ...execution,
-        result: {
-          kind: "error" as const,
-          text:
-            toolFailures.length > offset.toolFailures
-              ? toolFailures.at(-1)!
-              : "主Agent尚未创建正式研究运行。",
-        },
+        kind: "error" as const,
+        text: observedJob?.detail ?? "主Agent尚未创建正式研究运行。",
       };
     const view = ctx.stockResearch.runs.view({ runId });
+    if (observedJob?.status === "failed")
+      return {
+        kind: "error" as const,
+        text: observedJob.detail ?? "后台研究执行失败。",
+      };
     if (view.status !== "completed")
       return {
-        ...execution,
-        result: {
-          kind: "error" as const,
-          text: [
-            `运行 ${runId} 未完成。`,
-            ...view.blockReasons.map(
-              ({ id, code, message }) => `${id}: ${code}: ${message}`,
-            ),
-            ...view.tasks
-              .filter(({ failure }) => failure !== null)
-              .map(({ failure }) => `${failure!.code}: ${failure!.message}`),
-          ].join("\n"),
-        },
+        kind: "error" as const,
+        text: [
+          `运行 ${runId} 未完成。`,
+          ...view.blockReasons.map(
+            ({ id, code, message }) => `${id}: ${code}: ${message}`,
+          ),
+          ...view.tasks
+            .filter(({ failure }) => failure !== null)
+            .map(({ failure }) => `${failure!.code}: ${failure!.message}`),
+        ].join("\n"),
       };
     const report = view.tasks
       .find(({ taskId }) => taskId === "finalize")!
       .outputRefs.map((ref) => ctx.stockResearch.runs.readArtifact(ref).content)
       .find(({ kind }) => kind === "report")!;
     return {
-      ...execution,
-      result: {
-        kind: "success" as const,
-        text: `运行 ${runId} 已完成。\n\n${report.body}`,
-      },
+      kind: "success" as const,
+      text: `运行 ${runId} 已完成。\n\n${report.body}`,
     };
   }
   async function executeAndWait(line?: string, signal?: AbortSignal) {
     return waitForResearch(await execute(line, signal));
   }
-  return { execute, executeAndWait, waitForResearch };
+  return {
+    execute,
+    executeAndWait,
+    waitForResearch,
+    waitForResearchCompletion,
+  };
 }
 export async function quickHost(
   respond: (request: GenerateOptions) => AsyncIterable<StreamChunk>,

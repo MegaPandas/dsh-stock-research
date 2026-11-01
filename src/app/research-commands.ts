@@ -27,7 +27,7 @@ function requestResearch(
       content: [
         {
           type: "text",
-          text: `Research ${selection.security} as of ${selection.scope.date} using the ${mode} workflow. Dispatch tasks, review stages and deliver the final response in Chinese.\nResearch request: ${JSON.stringify({ kind: "fresh", security: selection.security, date: selection.scope.date, mode })}`,
+          text: `Research ${selection.security} as of ${selection.scope.date} using the ${mode} workflow. Start background research, review its stage notifications and deliver the final response in Chinese.\nResearch request: ${JSON.stringify({ kind: "fresh", security: selection.security, date: selection.scope.date, mode })}`,
         },
       ],
       source: { kind: "user" },
@@ -57,7 +57,7 @@ async function controlResearch(
       content: [
         {
           type: "text",
-          text: `Continue this research, dispatching and reviewing tasks according to its current state.\nResearch request: ${JSON.stringify({ kind, operationId, ...context })}`,
+          text: `Background scheduling is active. Review the current results and handle stage notifications.\nResearch request: ${JSON.stringify({ kind, operationId, ...context, ...result.handle })}`,
         },
       ],
       source: { kind: "user" },

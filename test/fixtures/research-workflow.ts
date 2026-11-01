@@ -39,7 +39,8 @@ export function isMainResearchRequest(request: GenerateOptions): boolean {
 }
 
 export interface MainResearchRequest {
-  kind: "fresh" | "resume" | "redo" | "replay";
+  kind: "fresh" | "resume" | "redo" | "replay" | "update";
+  jobId?: string;
   security?: string;
   date?: string;
   mode?: "quick" | "deep";
@@ -53,7 +54,9 @@ export function mainResearchRequest(
   request: GenerateOptions,
 ): MainResearchRequest {
   const message = request.messages.findLast(
-    (message) => message.role === "user" && message.source?.kind === "user",
+    (message) =>
+      message.role === "user" &&
+      ["user", "stock-research"].includes(message.source?.kind ?? ""),
   )!;
   const text = message.content
     .filter((block) => block.type === "text")
@@ -102,7 +105,6 @@ export function workflowModel(
     {
       prompt: number;
       view?: RunView;
-      tasks: ResearchTaskInfo[];
       lastAction?: string;
       pendingRedo?: string;
       inspected: Set<string>;
@@ -118,7 +120,9 @@ export function workflowModel(
     calls.set(session, call);
     if (isMainResearchRequest(request)) {
       const prompt = request.messages.findLastIndex(
-        (message) => message.role === "user" && message.source?.kind === "user",
+        (message) =>
+          message.role === "user" &&
+          ["user", "stock-research"].includes(message.source?.kind ?? ""),
       );
       let current = main.get(session);
       const invoke = (name: string, args: unknown) => {
@@ -127,13 +131,16 @@ export function workflowModel(
       };
       if (current === undefined || current.prompt !== prompt) {
         const input = mainResearchRequest(request);
-        current = {
-          prompt,
-          tasks: input.tasks ?? [],
-          inspected: new Set(),
-          ...(input.view === undefined ? {} : { view: input.view }),
-        };
-        main.set(session, current);
+        if (input.kind === "update" && current !== undefined) {
+          current.prompt = prompt;
+        } else {
+          current = {
+            prompt,
+            inspected: new Set(),
+            ...(input.view === undefined ? {} : { view: input.view }),
+          };
+          main.set(session, current);
+        }
         if (input.kind === "fresh") {
           yield* invoke("stock_start_research", {
             security: input.security,
@@ -143,21 +150,23 @@ export function workflowModel(
           });
           return;
         }
-        state.runId = input.runId!;
+        if (input.runId !== undefined) state.runId = input.runId;
+        if (state.runId === undefined) {
+          yield* textResponse("后台研究未完成，请检查通知中的失败原因。");
+          return;
+        }
+        yield* invoke("stock_read_run", { runId: state.runId });
+        return;
       } else {
         let feedback: {
           runId?: string;
           view?: RunView;
-          tasks?: ResearchTaskInfo[];
           kind?: string;
+          context?: { runId: string; view: RunView };
           artifact?: {
             ref: ArtifactRef;
             content: { kind: string; body: string };
           };
-          taskId?: string;
-          refs?: ArtifactRef[];
-          results?: { taskId: string; refs: ArtifactRef[] }[];
-          readyTasks?: string[];
         };
         try {
           feedback = lastToolResult(request);
@@ -166,41 +175,30 @@ export function workflowModel(
           return;
         }
         if (current.lastAction === "stock_start_research") {
-          if (feedback.runId === undefined) {
-            yield* textResponse(lastToolText(request));
-            return;
-          }
-          state.runId = feedback.runId;
-          current.tasks = feedback.tasks!;
+          yield* textResponse("研究已在后台启动，等待阶段通知。");
+          return;
+        } else if (current.lastAction === "stock_read_run") {
           current.view = feedback.view!;
-        } else if (
-          current.lastAction === "stock_read_run" &&
-          feedback.kind === "run_view"
-        )
-          current.view = feedback.view!;
-        else if (current.lastAction === "stock_review_stage")
+        } else if (current.lastAction === "stock_review_stage") {
           current.view = feedback as unknown as RunView;
-        else if (
-          current.lastAction === "stock_read_artifact" &&
-          feedback.artifact !== undefined
-        ) {
-          if (feedback.artifact.content.kind === "report")
+        } else if (current.lastAction === "stock_read_artifact") {
+          if (feedback.artifact?.content.kind === "report")
             current.finalReport = feedback.artifact.content.body;
-        } else {
-          const market = feedback.results?.find(
-            ({ taskId }) => taskId === "analysis.market",
-          );
-          if (market?.refs[0] !== undefined) state.marketRef = market.refs[0];
-          if (
-            feedback.taskId === "analysis.market" &&
-            feedback.refs?.[0] !== undefined
-          )
-            state.marketRef = feedback.refs[0];
-          yield* invoke("stock_read_run", { runId: state.runId });
+        } else if (current.lastAction === "stock_redo_task") {
+          state.runId = feedback.context!.runId;
+          current.view = feedback.context!.view;
+          yield* textResponse("修订已在后台启动，等待阶段通知。");
           return;
         }
       }
       const view = current.view!;
+      state.runId = view.runId;
+      state.marketRef = view.tasks.find(
+        ({ taskId }) => taskId === "analysis.market",
+      )?.outputRefs[0];
+      for (const task of view.tasks)
+        if (task.status !== "pending" && !state.taskIds.includes(task.taskId))
+          state.taskIds.push(task.taskId);
       if (view.status === "completed") {
         if (current.finalReport === undefined) {
           const reportRef =
@@ -266,46 +264,13 @@ export function workflowModel(
         });
         return;
       }
-      const taskId = view.readyTasks[0];
-      if (taskId === undefined) {
-        yield* textResponse(`运行 ${view.runId} 当前没有可执行的任务。`);
-        return;
-      }
-      const task = current.tasks.find(({ id }) => id === taskId)!;
-      const parallelStage = view.stages?.find(
-        (stage) =>
-          stage.id.startsWith("debate.") &&
-          stage.taskIds.includes(taskId) &&
-          stage.taskIds.length > 1 &&
-          stage.taskIds.every((id) => view.readyTasks.includes(id)),
-      );
-      if (task.executor.kind === "role" && parallelStage !== undefined) {
-        state.taskIds.push(
-          ...parallelStage.taskIds.filter((id) => view.readyTasks.includes(id)),
-        );
-        yield* invoke("stock_dispatch_stage", {
-          runId: view.runId,
-          stageId: parallelStage.id,
-          requestId: `${parallelStage.id}-${call}`,
-        });
-        return;
-      }
-      state.taskIds.push(task.id);
-      const name =
-        task.executor.kind === "role"
-          ? "stock_dispatch_task"
-          : task.executor.service === "digest"
-            ? "stock_make_digest"
-            : "stock_decide";
-      yield* invoke(name, {
-        runId: view.runId,
-        taskId,
-        requestId: `${taskId}-${call}`,
-      });
+      yield* textResponse(`运行 ${view.runId} 正在后台推进，等待阶段通知。`);
       return;
     }
 
     const role = initialInput<RoleInput>(request);
+    if (call === 1 && !state.taskIds.includes(role.task.id))
+      state.taskIds.push(role.task.id);
     if (role.task.role === "digest") {
       const report: AgentReport<"digest"> = {
         summary: "产品组合与终端价格共同决定盈利变化。",

@@ -32,13 +32,12 @@ const attemptsSchema = {
 } as const;
 export type ResearchToolControlKind = Exclude<
   ResearchControlKind,
-  "status" | "redo"
+  "status" | "redo" | "cancel"
 >;
 const controlFields = { runId: stringSchema, requestId: stringSchema };
 export const runControlParameters = {
   resume: objectSchema({ ...controlFields, input: resumeInputSchema }),
   recover: objectSchema({ ...controlFields, attempts: attemptsSchema }),
-  cancel: objectSchema(controlFields),
   replay: objectSchema(controlFields),
 } satisfies Record<ResearchToolControlKind, JsonSchemaNode>;
 
@@ -103,7 +102,6 @@ export function parseRunControl(
     case "recover":
       command = { kind, runId, attempts: attempts(item.attempts) };
       break;
-    case "cancel":
     case "replay":
       command = { kind, runId };
       break;
@@ -132,6 +130,7 @@ export function parseRunCommand(
       runId: match[1]!,
       taskId: match[2]!,
       reason: match[3]?.trim() ?? null,
+      instruction: null,
     };
   }
   const match = /^\s*(\S+)\s+([\s\S]*\S)\s*$/.exec(rawInput);

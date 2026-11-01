@@ -13,7 +13,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import * as Quick from "../../src/quick.js";
 import { createQuickInput } from "../../src/app/plan/quick.js";
 import type { ResearchScope } from "../../src/contracts/data.js";
-import type { OpenRunInput } from "../../src/contracts/runs.js";
+import type { OpenRunInput, RunView } from "../../src/contracts/runs.js";
 import { ArtifactService } from "../../src/services/artifact-submission/index.js";
 import { NumberService } from "../../src/services/numbers/index.js";
 import { analysis } from "../fixtures/dispatch-host.js";
@@ -128,9 +128,38 @@ function observe<T>(work: Promise<T>) {
   );
 }
 
+async function waitForRun(
+  h: Host,
+  runId: string,
+  ready: (view: RunView) => boolean,
+) {
+  await new Promise<void>((resolve) => {
+    const check = () => {
+      if (!ready(h.runtime.runs.view({ runId }))) return;
+      release();
+      resolve();
+    };
+    const release = h.runtime.runs.subscribe(runId, () =>
+      queueMicrotask(check),
+    );
+    check();
+  });
+}
+
 describe("explicit run control commands", () => {
   it("resumes through the model tool with task revisions and retains completed artifacts", async () => {
-    const h = await host();
+    const role = gate<RoleInput>();
+    const h = await host(async function* (request) {
+      if (!isMainResearchRequest(request)) {
+        const input = initialInput<RoleInput>(request);
+        if (input.task.id === "analysis.fundamentals")
+          role.started.resolve(input);
+        await role.released.promise;
+        request.signal?.throwIfAborted();
+      }
+      yield* textResponse("Research remains incomplete.");
+    });
+    cleanups.push(async () => role.released.resolve());
     const seeded = seed(h);
     const result = await h.ctx.tools.execute({
       agent: h.outside.agent,
@@ -153,7 +182,7 @@ describe("explicit run control commands", () => {
     });
     expect(result).toMatchObject({
       isError: false,
-      value: { runId: seeded.runId },
+      value: { runId: seeded.runId, jobId: expect.any(String) },
     });
     const view = h.runtime.runs.view({ runId: seeded.runId });
     expect(view.status).toBe("active");
@@ -170,8 +199,15 @@ describe("explicit run control commands", () => {
       taskId: "analysis.fundamentals",
       instruction: "Reconcile the retained financial evidence.",
     });
+    expect(await role.started.promise).toMatchObject({
+      task: {
+        id: "analysis.fundamentals",
+        objective: "Reconcile the retained financial evidence.",
+      },
+    });
+    role.released.resolve();
+    await h.execute(`/stock-cancel ${seeded.runId}`);
     expect(h.ctx.agents.list()).toEqual([h.outside.agent]);
-    expect(h.adapter.requests).toEqual([]);
     expect(fetch).not.toHaveBeenCalled();
   });
 
@@ -200,25 +236,25 @@ describe("explicit run control commands", () => {
     "resumes coordinator version %s after plugin restart and reuses successful fixed inputs",
     async (version) => {
       const roles: RoleInput[] = [];
-      let coordinatorCalls = 0;
+      const fundamentalsDisposed = deferred<void>();
       let calculationId: string | undefined;
       const h = await host(async function* (request) {
         if (isMainResearchRequest(request)) {
-          const input = mainResearchRequest(request);
-          if (++coordinatorCalls === 1)
-            yield* toolCall("stock_dispatch_task", {
-              runId: input.runId,
-              taskId: "analysis.fundamentals",
-              requestId: `${input.operationId}:analysis.fundamentals`,
-            });
-          else
-            yield* textResponse(
-              "Fundamentals submitted; remaining mandatory research is incomplete.",
-            );
+          yield* textResponse(
+            "Fundamentals submitted; remaining mandatory research is incomplete.",
+          );
         } else {
           const input = initialInput<RoleInput>(request);
+          if (input.task.id !== "analysis.fundamentals") {
+            yield* textResponse("Independent research remains incomplete.");
+            return;
+          }
           if (!request.messages.some((message) => message.role === "tool")) {
             roles.push(input);
+            h.ctx.on("agent/disposed", ({ agent }) => {
+              if (agent.id === request.sessionId)
+                fundamentalsDisposed.resolve();
+            });
             yield* toolCall("stock_calculate_valuation", calculationRequest());
             return;
           }
@@ -251,6 +287,14 @@ describe("explicit run control commands", () => {
       const result = await h.executeAndWait(
         `/stock-resume ${seeded.runId} ${JSON.stringify({ resolvedReasonIds: seeded.reasons.map((reason) => reason.id), instructions: [{ taskId: "analysis.fundamentals", instruction: "Read only the fixed successful market analysis." }] })}`,
       );
+      await waitForRun(
+        h,
+        seeded.runId,
+        (view) =>
+          view.tasks.find(({ taskId }) => taskId === "analysis.fundamentals")!
+            .status === "succeeded",
+      );
+      await fundamentalsDisposed.promise;
       expect(result?.result.kind).toBe("error");
       expect(roles).toHaveLength(1);
       expect(roles[0]).toMatchObject({
@@ -282,7 +326,11 @@ describe("explicit run control commands", () => {
       expect(
         h.runtime.runs.readArtifact(fundamentalsRef).content.inputRefs,
       ).toEqual([seeded.marketRef]);
-      const coordinator = h.adapter.requests[0]!;
+      const coordinator = h.adapter.requests.find(
+        (request) =>
+          request.sessionId === h.outside.agent.id &&
+          mainResearchRequest(request).kind === "resume",
+      )!;
       const saved = h.runtime.runs
         .inputCatalog(seeded.runId)
         .inputs.find(({ name }) => name === "prompt:coordinator")!;
@@ -293,12 +341,10 @@ describe("explicit run control commands", () => {
       expect(coordinator.tools!.map((tool) => tool.name).sort()).toEqual([
         "host_marker",
         "stock_cancel_research",
-        "stock_decide",
-        "stock_dispatch_stage",
-        "stock_dispatch_task",
+        "stock_cancel_task",
         "stock_followup_task",
-        "stock_make_digest",
         "stock_read_artifact",
+        "stock_read_research",
         "stock_read_run",
         "stock_recover_research",
         "stock_redo_task",
@@ -318,17 +364,10 @@ describe("explicit run control commands", () => {
   );
 
   it("cancels an existing run while subagent publication is still awaiting the host", async () => {
-    let call = 0;
     const h = await host(async function* (request) {
       if (!isMainResearchRequest(request))
         throw new Error("Cancelled child must not call the model.");
-      if (++call === 1)
-        yield* toolCall("stock_dispatch_task", {
-          runId: mainResearchRequest(request).runId,
-          taskId: "analysis.fundamentals",
-          requestId: "fundamentals",
-        });
-      else yield* textResponse("研究已取消。");
+      yield* textResponse("研究已取消。");
     });
     const seeded = seed(h);
     const started = deferred<void>();
@@ -392,9 +431,18 @@ describe("explicit run control commands", () => {
 
   it("drains old producer work across overlapping redo and resume while retaining the main Agent", async () => {
     const producer = gate<GenerateOptions>();
+    let runId: string;
     const coordinatorIds: string[] = [];
     const h = await host(async function* (request) {
       if (!isMainResearchRequest(request)) {
+        const input = initialInput<RoleInput>(request);
+        const attempt = h.runtime.runs
+          .view({ runId })
+          .tasks.find(({ taskId }) => taskId === input.task.id)!.attempt;
+        if (input.task.id !== "analysis.fundamentals" || attempt !== 1) {
+          yield* textResponse("Replacement research remains incomplete.");
+          return;
+        }
         const aborted = () => producer.aborted.resolve();
         request.signal?.addEventListener("abort", aborted, { once: true });
         producer.started.resolve(request);
@@ -411,6 +459,7 @@ describe("explicit run control commands", () => {
       }
     });
     const seeded = seed(h);
+    runId = seeded.runId;
     h.runtime.runs.resume(
       { runId: seeded.runId, identity: "seed-owner" },
       {
@@ -566,51 +615,23 @@ describe("explicit run control commands", () => {
   });
 });
 
-async function* parallelDispatch(runId: string): AsyncIterable<StreamChunk> {
-  for (const [index, taskId] of [
-    "analysis.market",
-    "analysis.fundamentals",
-  ].entries()) {
-    const id = ToolCallId(taskId);
-    const args = JSON.stringify({ runId, taskId, requestId: taskId });
-    yield { type: "block-start", index, blockType: "tool-call" };
-    yield {
-      type: "tool-call-delta",
-      index,
-      id,
-      name: "stock_dispatch_task",
-      argumentsDelta: args,
-    };
-    yield {
-      type: "block-end",
-      index,
-      block: {
-        type: "tool-call",
-        id,
-        name: "stock_dispatch_task",
-        arguments: args,
-      },
-    };
-  }
-  yield { type: "finish", reason: { kind: "tool-calls" } };
-}
-
 describe("run commands during real producers", () => {
   it.each(["redo", "cancel", "redo-cancel"] as const)(
     "%s waits for producers, preserves independent work and retains coordinator ownership",
     async (action) => {
       const market = gate<GenerateOptions>();
       const fundamentals = gate<GenerateOptions>();
+      const replacement = gate<GenerateOptions>();
       let runId: string | undefined;
       let rootId: string | undefined;
       let coordinatorCalls = 0;
       let marketReleased = false;
+      let replacementStarted = false;
       let fundamentalsReleased = false;
       let fundamentalsAborted = false;
       let fundamentalsCalculation: string | undefined;
       const attempts: (RoleInput & { task: { attempt: number } })[] = [];
       const coordinatorIds: string[] = [];
-      const handledControls = new Set<string>();
       async function* wait(
         request: GenerateOptions,
         pause: ReturnType<typeof gate<GenerateOptions>>,
@@ -641,27 +662,29 @@ describe("run commands during real producers", () => {
               mode: "quick",
               requestId: "open",
             });
-          else if (coordinatorCalls === 2) {
-            runId = lastToolResult<{ runId: string }>(request).runId;
-            yield* parallelDispatch(runId);
-          } else {
-            const update = mainResearchRequest(request);
-            if (
-              update.kind === "redo" &&
-              !handledControls.has(update.operationId!)
-            ) {
-              handledControls.add(update.operationId!);
-              yield* toolCall("stock_dispatch_task", {
-                runId,
-                taskId: "analysis.market",
-                requestId: `${update.operationId}:analysis.market`,
-              });
-            } else
-              yield* textResponse(
-                "本次控制操作已处理，后续研究任务待继续执行。",
-              );
-          }
+          else
+            yield* textResponse("本次控制操作已处理，后续研究任务待继续执行。");
           return;
+        }
+        if (runId === undefined) {
+          const job = h.ctx.jobs
+            .list(h.outside.agent.id)
+            .find(({ kind }) => kind === "stock-research")!;
+          const observation = await h.ctx.tools.execute({
+            agent: h.outside.agent,
+            callId: ToolCallId(`observe-${request.sessionId}`),
+            name: "stock_read_research",
+            arguments: { jobId: job.id },
+            signal: new AbortController().signal,
+          });
+          expect(observation).toMatchObject({
+            isError: false,
+            value: {
+              runId: expect.any(String),
+              job: { owner: h.outside.agent.id },
+            },
+          });
+          runId = (observation.value as { runId: string }).runId;
         }
         const role = initialInput<RoleInput>(request);
         const saved = request.messages.some(
@@ -677,6 +700,12 @@ describe("run commands during real producers", () => {
             marketReleased = true;
           });
           return;
+        }
+        if (role.task.id === "analysis.market" && attempt === 2 && !saved) {
+          replacementStarted = true;
+          replacement.started.resolve(request);
+          await replacement.released.promise;
+          request.signal?.throwIfAborted();
         }
         if (role.task.id === "analysis.fundamentals" && !saved) {
           const agent = h.ctx.agents
@@ -738,6 +767,7 @@ describe("run commands during real producers", () => {
       cleanups.push(async () => {
         market.released.resolve();
         fundamentals.released.resolve();
+        replacement.released.resolve();
       });
       fetch.mockResolvedValueOnce(
         new Response(
@@ -783,7 +813,12 @@ describe("run commands during real producers", () => {
       await setImmediate();
       expect(finished).toBe(false);
       expect(marketReleased).toBe(false);
+      expect(replacementStarted).toBe(false);
       expect(fundamentalsReleased).toBe(false);
+      expect(
+        attempts.filter((attempt) => attempt.task.id === "analysis.market"),
+      ).toHaveLength(1);
+      expect(rootId).toBe(h.outside.agent.id);
       expect(
         h.ctx.agents.list().some((agent) => String(agent.id) === rootId),
       ).toBe(true);
@@ -798,10 +833,19 @@ describe("run commands during real producers", () => {
         ).toEqual(priorFundamentals);
         expect(fundamentalsAborted).toBe(false);
         market.released.resolve();
-        await setImmediate();
-        expect(
-          attempts.filter((attempt) => attempt.task.id === "analysis.market"),
-        ).toHaveLength(1);
+        await replacement.started.promise;
+        expect(marketReleased).toBe(true);
+        expect(fundamentalsReleased).toBe(false);
+        expect(fundamentalsAborted).toBe(false);
+        replacement.released.resolve();
+        await waitForRun(
+          h,
+          runId!,
+          (view) =>
+            view.tasks.find(({ taskId }) => taskId === "analysis.market")!
+              .status === "succeeded",
+        );
+        expect(fundamentalsReleased).toBe(false);
       } else {
         await fundamentals.aborted.promise;
         expect(h.runtime.runs.view({ runId: runId! }).status).toBe("cancelled");
@@ -867,6 +911,12 @@ describe("run commands during real producers", () => {
             .map((input) => input.task.attempt),
         ).toEqual([1]);
       }
+      expect(
+        h.runtime.runs
+          .view({ runId: runId! })
+          .tasks.find(({ taskId }) => taskId === "analysis.fundamentals")!
+          .outputRefs,
+      ).toEqual(priorFundamentals);
       expect(
         h.runtime.runs.readArtifact(priorFundamentals[0]!).content.kind,
       ).toBe("analysis");

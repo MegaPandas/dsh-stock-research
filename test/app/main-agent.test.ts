@@ -51,6 +51,7 @@ describe("research from an ordinary DSH chat", () => {
     cleanups.push(h.close);
     const entryTools = [
       "stock_start_research",
+      "stock_read_research",
       "stock_resume_research",
       "stock_cancel_research",
       "stock_recover_research",
@@ -60,11 +61,8 @@ describe("research from an ordinary DSH chat", () => {
       ...entryTools,
       "stock_read_run",
       "stock_read_artifact",
-      "stock_dispatch_task",
-      "stock_dispatch_stage",
       "stock_followup_task",
-      "stock_make_digest",
-      "stock_decide",
+      "stock_cancel_task",
       "stock_redo_task",
       "stock_review_stage",
     ].sort();
@@ -86,7 +84,7 @@ describe("research from an ordinary DSH chat", () => {
         source: { kind: "user" },
       }),
     );
-    await h.outside.agent.whenIdle();
+    expect((await h.waitForResearchCompletion()).kind).toBe("success");
     expect(model.state.runId).toBeDefined();
     const view = h.runtime.runs.view({ runId: model.state.runId! });
     expect(view.status).toBe("completed");
@@ -172,7 +170,7 @@ describe("research from an ordinary DSH chat", () => {
           source: { kind: "user" },
         }),
       );
-      await h.outside.agent.whenIdle();
+      expect((await h.waitForResearchCompletion()).kind).toBe("success");
       const view = h.runtime.runs.view({ runId: model.state.runId! });
       expect(view.status).toBe("completed");
       const reviews = view.stageReviews!.filter(
@@ -232,7 +230,7 @@ describe("research from an ordinary DSH chat", () => {
     } finally {
       release.resolve();
     }
-    await h.outside.agent.whenIdle();
+    expect((await h.waitForResearchCompletion()).kind).toBe("success");
     expect(isApplicationBusy(h.runtime)).toBe(false);
   });
 });

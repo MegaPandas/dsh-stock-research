@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { setImmediate } from "node:timers/promises";
 import {
   HarnessError,
+  ToolCallId,
   type GenerateOptions,
   type StreamChunk,
 } from "@deepseek-ai/dsh-llm";
@@ -10,7 +11,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createQuickInput } from "../../src/app/plan/quick.js";
 import type { CollectionRecord } from "../../src/contracts/collection.js";
 import { readCollection } from "../../src/app/collection-input.js";
-import { attachCollection } from "../../src/app/collection-snapshot.js";
+import type { ResearchObservation } from "../../src/app/research-actions.js";
 import { researchLog } from "../../src/client/research-log.js";
 import {
   quickHost,
@@ -19,7 +20,7 @@ import {
   lastToolText,
   toolCall,
 } from "../fixtures/quick-host.js";
-import { gate, textResponse } from "../fixtures/runtime-host.js";
+import { deferred, gate, textResponse } from "../fixtures/runtime-host.js";
 import {
   workflowModel,
   isMainResearchRequest,
@@ -59,6 +60,39 @@ async function host(respond: Parameters<typeof quickHost>[0]) {
   const h = await quickHost(respond);
   cleanups.push(h.close);
   return h;
+}
+async function readResearch(h: Awaited<ReturnType<typeof host>>) {
+  const job = h.ctx.jobs
+    .list(h.outside.agent.id)
+    .find(({ kind }) => kind === "stock-research")!;
+  const result = await h.ctx.tools.execute({
+    agent: h.outside.agent,
+    callId: ToolCallId("observe-research"),
+    name: "stock_read_research",
+    arguments: { jobId: job.id },
+    signal: new AbortController().signal,
+  });
+  if (result.isError) throw new Error(result.error.reason);
+  return result.value as unknown as ResearchObservation;
+}
+async function committedMarket(h: Awaited<ReturnType<typeof host>>) {
+  const { runId } = await readResearch(h);
+  const market = () =>
+    h.runtime.runs
+      .view({ runId: runId! })
+      .tasks.find(({ taskId }) => taskId === "analysis.market")!;
+  if (market().status !== "succeeded") {
+    await new Promise<void>((resolve) => {
+      const release = h.runtime.runs.subscribe(runId!, () => {
+        if (market().status === "succeeded") {
+          release();
+          resolve();
+        }
+      });
+    });
+  }
+  const marketRef = market().outputRefs[0]!;
+  return { runId: runId!, marketRef };
 }
 function observe<T>(work: Promise<T>) {
   return work.then(
@@ -135,67 +169,57 @@ describe("stock-quick real command boundary", () => {
   });
 
   it("blocks a role's completion prose when no canonical artifact was submitted", async () => {
-    let coordinatorCalls = 0;
-    let runId: string | undefined;
+    const model = workflowModel();
     const h = await host(async function* (request) {
-      if (!isMainResearchRequest(request)) {
-        yield* textResponse("分析已经完成，但未提交产物。");
-        return;
-      }
-      if (++coordinatorCalls === 1)
-        yield* toolCall("stock_start_research", {
-          security: "SZ.002594",
-          date: "2024-01-03",
-          mode: "quick",
-          requestId: "open",
-        });
-      else if (coordinatorCalls === 2) {
-        runId = lastToolResult<{ runId: string }>(request).runId;
-        yield* toolCall("stock_dispatch_task", {
-          runId,
-          taskId: "analysis.market",
-          requestId: "market",
-        });
-      } else yield* textResponse("分析师执行结束，但研究尚未完成。");
+      if (isMainResearchRequest(request)) yield* model.respond(request);
+      else yield* textResponse("分析已经完成，但未提交产物。");
     });
     const result = (await h.executeAndWait())?.result;
+    const { runId, view } = await readResearch(h);
     expect(result?.kind).toBe("error");
     expect(result?.text).toContain(`运行 ${runId} 未完成。`);
     expect(result?.text).toContain("NO_ARTIFACT");
-    const view = h.runtime.runs.view({ runId: runId! });
-    expect(view.status).not.toBe("completed");
+    expect(view!.status).not.toBe("completed");
     expect(
-      view.tasks.find((task) => task.taskId === "analysis.market"),
+      view!.tasks.find((task) => task.taskId === "analysis.market"),
     ).toMatchObject({ status: "failed", outputRefs: [] });
     expect(
-      view.tasks.find((task) => task.taskId === "digest.analysis")!.status,
+      view!.tasks.find((task) => task.taskId === "digest.analysis")!.status,
     ).toBe("pending");
     expect(fetch).toHaveBeenCalledTimes(3);
   });
 
   it("keeps canonical research incomplete when the main Agent only claims completion in prose", async () => {
-    let calls = 0;
-    let runId: string | undefined;
+    const model = workflowModel();
+    const claimed = gate<void>();
     const h = await host(async function* (request) {
-      if (++calls === 1) {
-        yield* toolCall("stock_start_research", {
-          security: "SZ.002594",
-          date: "2024-01-03",
-          mode: "quick",
-          requestId: "open",
-        });
-      } else {
-        runId = lastToolResult<{ runId: string }>(request).runId;
+      const chunks: StreamChunk[] = [];
+      for await (const chunk of model.respond(request)) chunks.push(chunk);
+      if (
+        isMainResearchRequest(request) &&
+        chunks.some(
+          (chunk) =>
+            chunk.type === "block-end" &&
+            chunk.block.type === "tool-call" &&
+            chunk.block.name === "stock_review_stage",
+        )
+      ) {
         yield* textResponse("研究已完成。");
-      }
+        claimed.started.resolve();
+      } else yield* chunks;
     });
-    expect((await h.executeAndWait())?.result).toMatchObject({
-      kind: "error",
-      text: expect.stringContaining("未完成"),
+    expect((await h.execute())?.result.kind).toBe("success");
+    await claimed.started.promise;
+    await h.outside.agent.whenIdle();
+    const { view } = await readResearch(h);
+    expect(view).toMatchObject({ status: "active" });
+    expect(view!.stages!.find(({ id }) => id === "analysis")).toMatchObject({
+      readyForReview: true,
+      accepted: false,
     });
-    expect(h.runtime.runs.view({ runId: runId! })).toMatchObject({
-      status: "active",
-    });
+    expect(
+      view!.tasks.find(({ taskId }) => taskId === "digest.analysis")!.status,
+    ).toBe("pending");
     expect(h.ctx.agents.list()).toEqual([h.outside.agent]);
   });
 
@@ -467,8 +491,13 @@ describe("stock-quick real command boundary", () => {
       let received: unknown;
       let names: string[] = [];
       const h = await host(async function* (request) {
-        received = mainResearchRequest(request);
-        names = request.tools!.map(({ name }) => name);
+        if (
+          isMainResearchRequest(request) &&
+          mainResearchRequest(request).kind === "resume"
+        ) {
+          received = mainResearchRequest(request);
+          names = request.tools!.map(({ name }) => name);
+        }
         yield* textResponse("本次调度已停止。");
       });
       const scope = {
@@ -511,9 +540,19 @@ describe("stock-quick real command boundary", () => {
 
   it("validates preparation arguments and replays one request while rejecting conflicting reuse", async () => {
     let call = 0;
-    let runId: string | undefined;
+    const scripted = deferred<void>();
+    const backgroundFailed = deferred<void>();
     const results: unknown[] = [];
     const h = await host(async function* (request) {
+      if (!isMainResearchRequest(request)) {
+        await scripted.promise;
+        yield* textResponse("角色未提交产物。");
+        return;
+      }
+      if (mainResearchRequest(request).kind === "update") {
+        yield* textResponse("研究仍未完成。");
+        return;
+      }
       const selection = {
         security: "SZ.002594",
         date: "2024-01-03",
@@ -538,13 +577,25 @@ describe("stock-quick real command boundary", () => {
           requestId: "open",
         });
       else if (call === 5) {
-        runId = lastToolResult<{ runId: string }>(request).runId;
         yield* toolCall("stock_start_research", {
           ...selection,
           security: "SH.600000",
           requestId: "open",
         });
-      } else yield* textResponse("结束本次调度，研究仍未完成。");
+      } else {
+        scripted.resolve();
+        yield* textResponse("结束本次调度，研究仍未完成。");
+      }
+    });
+    cleanups.push(async () => scripted.resolve());
+    h.ctx.on("session/event", (session, event) => {
+      if (
+        session === h.outside.agent.session &&
+        event.type === "user/message" &&
+        event.data.source?.kind === "stock-research" &&
+        ["failed", "blocked"].includes(String(event.data.source.notice))
+      )
+        backgroundFailed.resolve();
     });
     const result = await h.executeAndWait();
     expect(result?.result.kind).toBe("error");
@@ -552,9 +603,14 @@ describe("stock-quick real command boundary", () => {
     expect(JSON.stringify(results[0])).toContain("INVALID_INPUT");
     expect(JSON.stringify(results[1])).toContain("INVALID_INPUT");
     expect(JSON.stringify(results[4])).toContain("REQUEST_CONFLICT");
-    expect(h.runtime.runs.view({ runId: runId! })).toMatchObject({
-      status: "active",
+    await backgroundFailed.promise;
+    await h.outside.agent.whenIdle();
+    const observation = await readResearch(h);
+    expect(observation.runId).toBeDefined();
+    expect(JSON.parse(results[2] as string)).toEqual({
+      jobId: observation.job.id,
     });
+    expect(observation.view!.status).toBe("active");
     expect(
       h.runFiles().filter((path) => String(path).endsWith("manifest.json")),
     ).toHaveLength(1);
@@ -563,6 +619,7 @@ describe("stock-quick real command boundary", () => {
     ).toEqual([
       "host_marker",
       "stock_cancel_research",
+      "stock_read_research",
       "stock_recover_research",
       "stock_replay_research",
       "stock_resume_research",
@@ -699,19 +756,20 @@ describe("stock-quick real command boundary", () => {
     const controller = new AbortController();
     const command = observe(h.executeAndWait(undefined, controller.signal));
     await pause.started.promise;
+    const { runId, marketRef } = await committedMarket(h);
     for (const agent of h.ctx.agents.list())
       if (agent !== h.outside.agent) agent.cancel({ kind: "user" });
     await pause.aborted.promise;
     pause.released.resolve();
     await command;
-    const view = h.runtime.runs.view({ runId: model.state.runId! });
+    const view = h.runtime.runs.view({ runId });
     expect(controller.signal.aborted).toBe(false);
     expect(view.status).not.toBe("completed");
     expect(
       view.tasks.find((task) => task.taskId === "analysis.market"),
     ).toMatchObject({
       status: "succeeded",
-      outputRefs: [model.state.marketRef],
+      outputRefs: [marketRef],
     });
     expect(
       view.tasks.find((task) => task.taskId === "analysis.fundamentals")!
@@ -721,7 +779,7 @@ describe("stock-quick real command boundary", () => {
     expect(h.ctx.agents.list()).toEqual([h.outside.agent]);
   });
 
-  it("starts a new quick from a cancelled run's captures through stock-resume with no new source fetch", async () => {
+  it("replays a cancelled run's captures with no new source fetch", async () => {
     const pause = gate<GenerateOptions>();
     const original = workflowModel({ pauseFundamentals: pause });
     let current = original;
@@ -730,33 +788,20 @@ describe("stock-quick real command boundary", () => {
     const controller = new AbortController();
     const command = observe(h.executeAndWait(undefined, controller.signal));
     await pause.started.promise;
-    const cancelling = h.execute(`/stock-cancel ${original.state.runId}`);
+    const { runId } = await committedMarket(h);
+    const cancelling = h.execute(`/stock-cancel ${runId}`);
     await pause.aborted.promise;
     pause.released.resolve();
     await cancelling;
     await command;
-    const source = h.runtime.runs.view({ runId: original.state.runId! });
+    const source = h.runtime.runs.view({ runId });
     expect(source.status).toBe("cancelled");
     const collection = readCollection(h.runtime.runs, source.runId)!;
-    const fresh = attachCollection(
-      createQuickInput(
-        source.scope,
-        h.runtime.policy,
-        h.runtime.queries.health(source.scope).sources,
-      ),
-      collection,
-    );
-    const opened = h.runtime.runs.open(
-      h.outside.agent.id,
-      fresh,
-      "captured-case",
-    );
     current = workflowModel();
-    const result = await h.executeAndWait(
-      `/stock-resume ${opened.runId} {"resolvedReasonIds":[],"instructions":[]}`,
-    );
+    const result = await h.executeAndWait(`/stock-replay ${source.runId}`);
     expect(result?.result.kind, result?.result.text).toBe("success");
-    const view = h.runtime.runs.view({ runId: opened.runId });
+    const view = h.runtime.runs.view({ runId: current.state.runId! });
+    expect(view.runId).not.toBe(source.runId);
     expect(view.scope).toEqual(source.scope);
     expect(view.tasks).toHaveLength(12);
     expect(
@@ -765,7 +810,7 @@ describe("stock-quick real command boundary", () => {
       ),
     ).toBe(true);
     expect(h.runtime.runs.view({ runId: source.runId })).toEqual(source);
-    expect(readCollection(h.runtime.runs, opened.runId)).toEqual(collection);
+    expect(readCollection(h.runtime.runs, view.runId)).toEqual(collection);
     expect(fetch).toHaveBeenCalledTimes(3);
   });
 
@@ -779,6 +824,7 @@ describe("stock-quick real command boundary", () => {
       const controller = new AbortController();
       const command = observe(h.executeAndWait(undefined, controller.signal));
       await pause.started.promise;
+      const { runId, marketRef } = await committedMarket(h);
       let unloaded = false;
       const unloading =
         action === "unload"
@@ -787,9 +833,7 @@ describe("stock-quick real command boundary", () => {
             })
           : undefined;
       const cancelling =
-        action === "cancel"
-          ? h.execute(`/stock-cancel ${model.state.runId}`)
-          : undefined;
+        action === "cancel" ? h.execute(`/stock-cancel ${runId}`) : undefined;
       const nativeJob =
         action === "native-cancel"
           ? h.ctx.jobs
@@ -801,19 +845,21 @@ describe("stock-quick real command boundary", () => {
         h.ctx.jobs.kill(nativeJob.id, h.outside.agent.id);
       }
       await pause.aborted.promise;
-      expect(h.runtime.runs.view({ runId: model.state.runId! }).status).toBe(
-        "cancelled",
-      );
+      expect(h.runtime.runs.view({ runId }).status).toBe("cancelled");
       await setImmediate();
       expect(model.state.released).toBe(false);
       if (action === "unload") expect(unloaded).toBe(false);
-      expect(model.state.taskIds).toEqual([
-        "analysis.market",
-        "analysis.fundamentals",
-      ]);
-      expect(
-        h.runtime.runs.readArtifact(model.state.marketRef!).content.kind,
-      ).toBe("analysis");
+      const started = h.adapter.requests
+        .filter((request) => !isMainResearchRequest(request))
+        .map(
+          (request) => initialInput<{ task: { id: string } }>(request).task.id,
+        );
+      expect(new Set(started)).toEqual(
+        new Set(["analysis.market", "analysis.fundamentals"]),
+      );
+      expect(h.runtime.runs.readArtifact(marketRef).content.kind).toBe(
+        "analysis",
+      );
       pause.released.resolve();
       await command;
       await cancelling;

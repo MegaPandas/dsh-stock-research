@@ -1,4 +1,5 @@
 import { continueChild } from "./child-continuation.js";
+import { admitChild } from "./admission.js";
 import { randomUUID } from "node:crypto";
 import type { Context } from "@deepseek-ai/cordis";
 import type { Agent, AgentOptions } from "@deepseek-ai/dsh-agent";
@@ -79,6 +80,8 @@ interface FollowupReceipt {
   runId: string;
   requestId: string;
   payload: string;
+  taskId: string;
+  settled: boolean;
   result: Promise<DispatchResult>;
 }
 interface StageReceipt {
@@ -177,12 +180,20 @@ export class DispatchBridge {
   }
 
   /** Recheck a planned attempt after stop barriers; start must claim synchronously. */
-  admitScheduled<Result>(
+  async admitScheduled<Result>(
     runId: string,
     targets: readonly AttemptTarget[],
     signal: AbortSignal,
     start: () => Promise<Result>,
   ): Promise<Result | undefined> {
+    const continuations = this.#followupReceipts.filter(
+      (receipt) =>
+        receipt.runId === runId &&
+        !receipt.settled &&
+        targets.some(({ taskId }) => receipt.taskId === taskId),
+    );
+    if (continuations.length > 0)
+      await Promise.all(continuations.map(({ result }) => result));
     return this.#afterStops<Result | undefined>(
       runId,
       targets.map(({ taskId }) => taskId),
@@ -325,7 +336,16 @@ export class DispatchBridge {
         );
       return receipt.result;
     }
+    let owned!: FollowupReceipt;
     const result = this.#afterStops(runId, taskId, signal, async () => {
+      const previous = this.runs
+        .view({ runId })
+        .tasks.find((task) => task.taskId === taskId);
+      if (previous?.status === "succeeded") {
+        const finishing = this.#active.get(attemptKey(runId, previous));
+        if (finishing !== undefined) await finishing.result;
+        signal.throwIfAborted();
+      }
       const session = this.#roleSessions.get(JSON.stringify([runId, taskId]));
       const task = this.runs
         .view({ runId })
@@ -350,16 +370,9 @@ export class DispatchBridge {
         taskId,
         JSON.stringify(["followup-redo", requestId]),
         message,
+        message,
       );
       signal.throwIfAborted();
-      this.runs.resume(
-        operation,
-        {
-          resolvedReasonIds: [],
-          instructions: [{ taskId, instruction: message }],
-        },
-        JSON.stringify(["followup-resume", requestId]),
-      );
       return this.#afterStops(runId, taskId, signal, () =>
         this.#startRole(
           parent,
@@ -370,8 +383,19 @@ export class DispatchBridge {
           { session, message, resumeSearch },
         ),
       );
+    }).finally(() => {
+      owned.settled = true;
     });
-    this.#followupReceipts.push({ parent, runId, requestId, payload, result });
+    owned = {
+      parent,
+      runId,
+      requestId,
+      payload,
+      taskId,
+      result,
+      settled: false,
+    };
+    this.#followupReceipts.push(owned);
     return result;
   }
 
@@ -454,10 +478,17 @@ export class DispatchBridge {
     taskId: string,
     requestId: string,
     reason: string | null = null,
+    instruction: string | null = null,
   ): Promise<RedoTaskResult> {
     let result: RedoTaskResult;
     try {
-      result = this.runs.redo(operation, taskId, requestId, reason);
+      result = this.runs.redo(
+        operation,
+        taskId,
+        requestId,
+        reason,
+        instruction,
+      );
       this.#forgetStoppedSessions(operation.runId, result.affectedTasks);
     } catch (cause) {
       return this.#controlFailure(operation.runId, cause);
@@ -640,9 +671,9 @@ export class DispatchBridge {
           this.runs.bindTaskSession({ ...operation, sessionId: agent.id });
           observeModelCalls(agent, operation, "role");
         });
-        activation =
+        activation = await admitChild(this.ctx, signal, () =>
           continuation === undefined
-            ? await this.ctx.subagents.startActivation({
+            ? this.ctx.subagents.startActivation({
                 provider: "spawn",
                 childId,
                 label: `${claim.taskId} #${claim.attempt}`,
@@ -657,7 +688,7 @@ export class DispatchBridge {
                   prompt: provision.prompt,
                 },
               })
-            : await continueChild(
+            : continueChild(
                 this.ctx,
                 parent,
                 childId,
@@ -668,7 +699,8 @@ export class DispatchBridge {
                   },
                 ],
                 signal,
-              );
+              ),
+        );
         if (signal.aborted) dispose();
         execution = { status: "fulfilled", value: await activation.result };
       } catch (reason) {

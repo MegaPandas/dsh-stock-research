@@ -823,21 +823,30 @@ export class RunService implements RunAccess {
     taskId: string,
     requestId: string,
     reason: string | null = null,
+    instruction: string | null = null,
   ): RedoTaskResult {
     return this.mutate<RedoTaskResult>(
       operation,
       controlScope(operation.identity),
       "redo",
       requestId,
-      { taskId, reason },
-      (run, contents) =>
-        redoRun(run, taskId, (ref) =>
+      { taskId, reason, instruction },
+      (run, contents) => {
+        const result = redoRun(run, taskId, (ref) =>
           contents.readContent<ArtifactVersion>({
             kind: "artifact",
             id: ref.artifactId,
             revision: ref.revision,
           }),
-        ),
+        );
+        if (instruction !== null)
+          resumeRun(
+            run,
+            { resolvedReasonIds: [], instructions: [{ taskId, instruction }] },
+            contents,
+          );
+        return result;
+      },
     );
   }
 

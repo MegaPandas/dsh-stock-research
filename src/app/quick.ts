@@ -6,12 +6,13 @@ import { COORDINATOR_PROMPT } from "./coordinator-prompt.js";
 import { ResearchApplication } from "./research-control/index.js";
 import { createResearchCommands } from "./research-commands.js";
 import {
-  applicationTool,
   createResearchTools,
   createResearchReviewTool,
+  createResearchTaskTools,
 } from "./research-tools.js";
 import { createResearchReadTools } from "./research-read-tools.js";
 import { holdActivity } from "./activity.js";
+import { notifyResearch } from "./research-notices.js";
 
 export const Config = ModelConfigSchema.required(false);
 export const name = "stock-quick";
@@ -30,6 +31,8 @@ export function apply(ctx: Context, config?: ModelConfig): void {
       jobs: ctx.jobs,
       runs: runtime.runs,
       operations: runtime.operations,
+      executeScheduled: runtime.executeScheduled,
+      notify: notifyResearch,
       collection: runtime.collection,
       settings: () => ctx.get("stockResearchSettings"),
       policy: () => runtime.policy,
@@ -43,22 +46,28 @@ export function apply(ctx: Context, config?: ModelConfig): void {
       releaseRun: (runId) => runtime.dispatch.releaseRun(runId),
       recoverInterrupted: (operation, targets, requestId) =>
         runtime.dispatch.recoverInterrupted(operation, targets, requestId),
-      redoRun: (operation, taskId, requestId, reason) =>
-        runtime.dispatch.redo(operation, taskId, requestId, reason),
+      redoRun: (operation, taskId, requestId, reason, instruction) =>
+        runtime.dispatch.redo(
+          operation,
+          taskId,
+          requestId,
+          reason,
+          instruction,
+        ),
       holdActivity: () => holdActivity(runtime),
       isOwnerLive: (owner) => ctx.agents.get(owner.id) === owner,
     },
     structuredClone(config),
     {
       bind: (owner) => runtime.bindCoordinator(owner),
-      register: (owner, actions, operations, retain) => {
+      register: (owner, actions, retain) => {
         retain(
           owner.ctx.tools.register(createResearchReviewTool(ctx, actions)),
         );
         for (const tool of createResearchReadTools(runtime.reads))
           retain(owner.ctx.tools.register(tool));
-        for (const tool of runtime.createCoordinatorTools(operations))
-          retain(owner.ctx.tools.register(applicationTool(ctx, tool)));
+        for (const tool of createResearchTaskTools(ctx, actions))
+          retain(owner.ctx.tools.register(tool));
       },
     },
   );

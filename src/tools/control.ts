@@ -80,7 +80,7 @@ export function createControlTools(
                 [...Object.keys(fields), "message"],
               )
             : objectSchema(
-                { ...fields, reason: stringSchema },
+                { ...fields, reason: stringSchema, instruction: stringSchema },
                 Object.keys(fields),
               ),
       output: name === "stock_redo_task" ? redoOutput : dispatchOutput,
@@ -100,7 +100,7 @@ export function createControlTools(
             ? Object.keys(fields)
             : name === "stock_followup_task"
               ? [...Object.keys(fields), "message", "resumeSearch"]
-              : [...Object.keys(fields), "reason"],
+              : [...Object.keys(fields), "reason", "instruction"],
         );
         const runId = text(item.runId, "runId");
         authorizeRun(caller.binding, runId);
@@ -142,6 +142,10 @@ export function createControlTools(
                   item.reason === undefined
                     ? null
                     : text(item.reason, "reason"),
+                instruction:
+                  item.instruction === undefined
+                    ? null
+                    : text(item.instruction, "instruction"),
               },
               caller,
               exec.signal,

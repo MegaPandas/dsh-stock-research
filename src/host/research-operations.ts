@@ -29,6 +29,7 @@ export interface ResearchFollowupRequest extends ResearchTaskRequest {
 }
 export interface ResearchRedoRequest extends ResearchTaskRequest {
   reason: string | null;
+  instruction?: string | null;
 }
 export type ResearchCancelRequest = ResearchTaskRequest & CancelTaskInput;
 
@@ -117,6 +118,7 @@ export function createDispatchOperations(
         request.taskId,
         request.requestId,
         request.reason,
+        request.instruction ?? null,
       );
     },
     cancelTask(request, caller, signal) {

@@ -22,7 +22,6 @@ describe("model-facing research control", () => {
     { action: "resume", input },
     { action: "resume", input: { resolvedReasonIds: [], instructions: [] } },
     { action: "recover", attempts: [{ taskId: "risk.finance", attempt: 2 }] },
-    { action: "cancel" },
     { action: "replay" },
   ] as const)(
     "exposes the complete supported $action contract",

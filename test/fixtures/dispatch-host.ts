@@ -243,6 +243,7 @@ export async function dispatchHost(
     runs: Pick<RunReader, "inputCatalog" | "readInput">,
     context: RoleDispatchContext,
   ) => AgentOptions | undefined,
+  subagentOptions: { maxActiveSubagents?: number } = {},
 ) {
   const directory = fs.mkdtempSync(join(tmpdir(), "dsh-dispatch-"));
   const root = new DataRoot(directory);
@@ -365,7 +366,7 @@ export async function dispatchHost(
     const adapter = new DispatchAdapter([...scripts]);
     ctx.llm.registerAdapter(["fixture"], adapter);
     await mountAgentLoopTestHarness(ctx);
-    await ctx.plugin(SubagentRuntime, {});
+    await ctx.plugin(SubagentRuntime, subagentOptions);
     await ctx.plugin(SpawnInProcess, { providerName: "spawn" });
     const bindings = new SessionBindings();
     const sessions = new ResearchSessions(ctx, bindings);

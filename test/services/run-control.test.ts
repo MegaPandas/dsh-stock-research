@@ -140,6 +140,59 @@ afterEach(() => {
 });
 
 describe("run control transactions", () => {
+  it("publishes redo and its replacement instruction together before the next claim", () => {
+    const { service, op, runId } = setup();
+    const original = complete(service, runId, "a");
+    let refreshes = 0;
+    const release = service.subscribe(runId, () => {
+      refreshes++;
+    });
+    const instruction =
+      "Reconcile the revised assumptions with the saved evidence.";
+    const result = service.redo(
+      op,
+      "a",
+      "redo",
+      "Correct assumptions",
+      instruction,
+    );
+    expect(refreshes).toBe(1);
+    const catalog = service.inputCatalog(runId);
+    const recorded = catalog.inputs.find(
+      ({ name }) => name === "instruction:a",
+    )!;
+    expect(
+      service.readInput<TaskInstructionSnapshot>(runId, recorded.ref),
+    ).toMatchObject({ taskId: "a", version: 2, instruction });
+    expect(service.readAttempt(original.operation)).toMatchObject({
+      status: "invalidated",
+      outputRefs: [original.ref],
+    });
+    expect(
+      service.redo(op, "a", "redo", "Correct assumptions", instruction),
+    ).toEqual(result);
+    expect(service.inputCatalog(runId)).toEqual(catalog);
+    expect(refreshes).toBe(1);
+    release();
+    const next = service.claim(op, "a", "replacement");
+    expect(next).toMatchObject({
+      attempt: 2,
+      instructionVersion: 2,
+      instructionRef: recorded.ref,
+    });
+    const before = service.view(op);
+    expect(() =>
+      service.redo(
+        op,
+        "a",
+        "redo",
+        "Correct assumptions",
+        "Different objective",
+      ),
+    ).toThrowError(expect.objectContaining({ code: "REQUEST_CONFLICT" }));
+    expect(service.view(op)).toEqual(before);
+  });
+
   it("notifies only the subscribed run after a new transaction and not on reads, rejected claims or receipt replay", () => {
     const { service, op, runId } = setup();
     const snapshots: RunView[] = [];

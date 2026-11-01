@@ -1,6 +1,10 @@
 import type { Agent } from "@deepseek-ai/dsh-agent";
 import type { ResearchScope } from "../../contracts/data.js";
-import type { RunReader, RunLifecycle } from "../../contracts/run-access.js";
+import type {
+  RunReader,
+  RunLifecycle,
+  RunChanges,
+} from "../../contracts/run-access.js";
 import type { QueryPolicy } from "../../contracts/query.js";
 import type { SourceDescription } from "../../contracts/sources.js";
 import type {
@@ -11,8 +15,15 @@ import type {
   RunOperation,
   RunView,
 } from "../../contracts/runs.js";
-import type { BoundCaller, ResearchCaller } from "../../host/bindings.js";
-import type { ResearchOperations } from "../../host/research-operations.js";
+import type { ResearchCaller } from "../../host/bindings.js";
+import type {
+  ResearchOperations,
+  ResearchFollowupRequest,
+  ResearchCancelRequest,
+  ResearchRedoRequest,
+} from "../../host/research-operations.js";
+import type { ScheduledResearchExecutor } from "../../host/scheduled-operations.js";
+import { RunScheduler } from "../../services/scheduler/index.js";
 import { ResearchError } from "../../contracts/errors.js";
 import { serializeJson } from "../../json/serialize.js";
 import { readCollection } from "../collection-input.js";
@@ -40,6 +51,9 @@ import type {
   ResearchContext,
   ResearchControl,
   ResearchControlResult,
+  ResearchHandle,
+  ResearchObservation,
+  ResearchNotice,
 } from "../research-actions.js";
 
 interface ResearchCoordinator {
@@ -47,21 +61,23 @@ interface ResearchCoordinator {
   register(
     owner: Agent,
     actions: ResearchActions,
-    operations: ResearchOperations,
     retain: (release: () => void) => void,
   ): void;
 }
 
 export interface ResearchApplicationPorts extends Omit<
   ResearchExecutionPorts,
-  "runs" | "isClosing"
+  "runs" | "isClosing" | "onError"
 > {
   runs: Pick<
     RunReader,
     "view" | "readDefinition" | "inputCatalog" | "readInput"
   > &
-    Pick<RunLifecycle, "open" | "reviewStage" | "resume">;
-  operations: ResearchOperations;
+    Pick<RunLifecycle, "open" | "reviewStage" | "resume"> &
+    RunChanges;
+  operations: Pick<ResearchOperations, "followupTask" | "cancelTask">;
+  executeScheduled: ScheduledResearchExecutor;
+  notify(owner: Agent, notice: ResearchNotice): void;
   collection: OpenResearchPorts["collection"];
   settings():
     | {
@@ -83,18 +99,23 @@ export interface ResearchApplicationPorts extends Omit<
     taskId: string,
     requestId: string,
     reason: string | null,
+    instruction: string | null,
   ): Promise<RedoTaskResult>;
 }
 
-/** The receiving host Agent drives every transition through individual tools. */
+/** Owns application decisions; background scheduling owns mechanical dispatch. */
 export class ResearchApplication implements ResearchActions {
   readonly #coordinators = new Map<Agent, (() => void)[]>();
   readonly #executions: ResearchExecutions;
-  readonly #starts = new Map<
-    string,
-    { owner: Agent; request: string; work: Promise<ResearchContext> }
+  readonly #starts = new WeakMap<
+    Agent,
+    Map<string, { request: string; handle: ResearchHandle }>
   >();
   readonly #disposing = new Map<Agent, Promise<void>>();
+  readonly #revisions = new WeakMap<
+    Agent,
+    Map<string, { request: string; handle: ResearchHandle }>
+  >();
   #closed = false;
   constructor(
     private readonly ports: ResearchApplicationPorts,
@@ -109,6 +130,14 @@ export class ResearchApplication implements ResearchActions {
       holdActivity: ports.holdActivity,
       isOwnerLive: ports.isOwnerLive,
       isClosing: () => this.#closed,
+      onError: (owner, handle, detail) => {
+        if (this.#closed || !this.ports.isOwnerLive(owner)) return;
+        this.ports.notify(owner, {
+          kind: "failed",
+          ...handle,
+          detail,
+        });
+      },
     });
   }
 
@@ -123,46 +152,11 @@ export class ResearchApplication implements ResearchActions {
     if (!this.#coordinators.has(agent)) {
       const releases = [this.coordinator.bind(agent)];
       this.#coordinators.set(agent, releases);
-      this.coordinator.register(agent, this, this.#operations(), (release) =>
+      this.coordinator.register(agent, this, (release) =>
         releases.push(release),
       );
     }
     return agent;
-  }
-
-  #operations(): ResearchOperations {
-    const wrap =
-      <Input extends { runId: string }, Result>(
-        label: string,
-        action: (
-          request: Input,
-          caller: BoundCaller,
-          signal: AbortSignal,
-        ) => Promise<Result>,
-      ) =>
-      (
-        request: Input,
-        caller: BoundCaller,
-        signal: AbortSignal,
-      ): Promise<Result> => {
-        this.#owned(caller.agent, request.runId);
-        return this.#executions.perform(
-          request.runId,
-          label,
-          signal,
-          (active) => action(request, caller, active),
-        );
-      };
-    const operations = this.ports.operations;
-    return {
-      dispatchTask: wrap("stock_dispatch_task", operations.dispatchTask),
-      dispatchStage: wrap("stock_dispatch_stage", operations.dispatchStage),
-      followupTask: wrap("stock_followup_task", operations.followupTask),
-      makeDigest: wrap("stock_make_digest", operations.makeDigest),
-      decide: wrap("stock_decide", operations.decide),
-      redoTask: wrap("stock_redo_task", operations.redoTask),
-      cancelTask: wrap("stock_cancel_task", operations.cancelTask),
-    };
   }
 
   #owned(agent: Agent | undefined, runId: string): Agent {
@@ -176,23 +170,20 @@ export class ResearchApplication implements ResearchActions {
     return owner;
   }
 
-  start(
-    input: StartResearchRequest,
-    caller: ResearchCaller,
-  ): Promise<ResearchContext> {
+  start(input: StartResearchRequest, caller: ResearchCaller): ResearchHandle {
     const owner = this.#main(caller.agent);
     const { scope, mode, requestId } = input;
     const { security, date } = scope;
     const request = serializeJson({ security: security.id, date, mode });
-    const key = JSON.stringify([owner.id, requestId]);
-    const existing = this.#starts.get(key);
+    const starts = this.#starts.get(owner);
+    const existing = starts?.get(requestId);
     if (existing !== undefined) {
       if (existing.request !== request)
         throw new ResearchError(
           "REQUEST_CONFLICT",
           "The research request ID was already used for another selection.",
         );
-      return existing.work;
+      return existing.handle;
     }
     const settings = this.ports.settings();
     const models = captureResearchModels(owner, this.model ?? settings?.model);
@@ -200,7 +191,7 @@ export class ResearchApplication implements ResearchActions {
       settings?.publicSearchLimit ?? PUBLIC_SEARCH_LIMITS.maxSearches;
     const policy = this.ports.policy();
     const sources = this.ports.describeSources(scope);
-    const work = this.#executions.start(
+    const handle = this.#executions.start(
       owner,
       {
         label: researchStartLabel(scope, mode),
@@ -234,11 +225,178 @@ export class ResearchApplication implements ResearchActions {
           signal,
           onProgress,
         );
-        return this.#context(view.runId);
+        await this.#schedule(owner, view.runId, signal);
       },
     );
-    this.#starts.set(key, { owner, request, work });
-    return work;
+    const saved = starts ?? new Map();
+    saved.set(requestId, { request, handle });
+    this.#starts.set(owner, saved);
+    return handle;
+  }
+
+  observe(jobId: string, caller: ResearchCaller): ResearchObservation {
+    const owner = this.#main(caller.agent);
+    caller.signal.throwIfAborted();
+    return this.#executions.read(jobId, owner);
+  }
+
+  async cancel(
+    jobId: string,
+    caller: ResearchCaller,
+    requestId: string,
+  ): Promise<ResearchObservation> {
+    const owner = this.#main(caller.agent);
+    caller.signal.throwIfAborted();
+    await this.#executions.cancelJob(jobId, owner, requestId);
+    return this.#executions.read(jobId, owner);
+  }
+
+  revise(
+    input: ResearchFollowupRequest,
+    caller: ResearchCaller,
+  ): ResearchHandle {
+    const owner = this.#owned(caller.agent, input.runId);
+    caller.signal.throwIfAborted();
+    const key = JSON.stringify([input.runId, input.requestId]);
+    const request = serializeJson(input);
+    const revisions = this.#revisions.get(owner);
+    const existing = revisions?.get(key);
+    if (existing !== undefined) {
+      if (existing.request !== request)
+        throw new ResearchError(
+          "REQUEST_CONFLICT",
+          "The revision request ID was already used with different input.",
+        );
+      return existing.handle;
+    }
+    const handle = this.#executions.launch(
+      input.runId,
+      `修订 ${input.taskId}`,
+      caller.signal,
+      (signal) =>
+        this.ports.operations.followupTask(
+          input,
+          {
+            agent: owner,
+            binding: { kind: "coordinator", runIds: [input.runId] },
+          },
+          signal,
+        ),
+    );
+    const saved = revisions ?? new Map();
+    saved.set(key, { request, handle });
+    this.#revisions.set(owner, saved);
+    return handle;
+  }
+
+  redoTask(
+    input: ResearchRedoRequest,
+    caller: ResearchCaller,
+  ): Promise<ResearchControlResult> {
+    this.#owned(caller.agent, input.runId);
+    return this.control(
+      {
+        kind: "redo",
+        runId: input.runId,
+        taskId: input.taskId,
+        reason: input.reason,
+        instruction: input.instruction ?? null,
+      },
+      caller,
+      input.requestId,
+    );
+  }
+
+  cancelTask(input: ResearchCancelRequest, caller: ResearchCaller) {
+    const owner = this.#owned(caller.agent, input.runId);
+    return this.ports.operations.cancelTask(
+      input,
+      { agent: owner, binding: { kind: "coordinator", runIds: [input.runId] } },
+      caller.signal,
+    );
+  }
+
+  async #schedule(
+    owner: Agent,
+    runId: string,
+    signal: AbortSignal,
+  ): Promise<void> {
+    signal.throwIfAborted();
+    const notices = new Set<string>();
+    let firstScan = true;
+    const scheduler = new RunScheduler(runId, {
+      runs: this.ports.runs,
+      execute: (execution, active) =>
+        this.ports.executeScheduled(owner, runId, execution, active),
+      onChange: (view) => {
+        const initial = firstScan;
+        firstScan = false;
+        if (!this.#closed && this.ports.isOwnerLive(owner)) {
+          const notify = (
+            key: string,
+            notice: Omit<ResearchNotice, "jobId" | "runId">,
+          ) => {
+            if (notices.has(key)) return;
+            notices.add(key);
+            this.ports.notify(owner, {
+              ...notice,
+              runId,
+              ...this.#executions.handleFor(runId),
+            });
+          };
+          for (const stage of view.stages ?? [])
+            if (
+              (view.status === "active" || view.status === "blocked") &&
+              stage.readyForReview &&
+              !stage.accepted
+            )
+              notify(JSON.stringify(["review", stage.id, stage.refs]), {
+                kind: "review",
+                stageId: stage.id,
+              });
+          const failed = view.tasks.filter(({ status }) => status === "failed");
+          // An explicit blocked resume already returns the unresolved reasons.
+          if ((view.status === "blocked" && !initial) || failed.length > 0)
+            notify(
+              JSON.stringify([
+                "blocked",
+                view.blockReasons,
+                failed.map(({ taskId, attempt }) => ({ taskId, attempt })),
+              ]),
+              { kind: "blocked" },
+            );
+          if (view.status === "completed")
+            notify("completed", { kind: "completed" });
+        }
+        this.#executions.publish(runId, view);
+      },
+    });
+    const abort = () => {
+      void scheduler.close();
+    };
+    signal.addEventListener("abort", abort, { once: true });
+    try {
+      await scheduler.start();
+      signal.throwIfAborted();
+    } finally {
+      signal.removeEventListener("abort", abort);
+      await scheduler.close();
+    }
+  }
+
+  #continue(owner: Agent, runId: string, signal: AbortSignal): ResearchHandle {
+    if (this.#executions.running(runId))
+      return this.#executions.handleFor(runId);
+    const released = this.#executions.settled(runId);
+    return this.#executions.start(
+      owner,
+      { label: researchContinueLabel(runId), runId },
+      signal,
+      async (active) => {
+        await released;
+        await this.#schedule(owner, runId, active);
+      },
+    );
   }
 
   review(input: ReviewResearchRequest, caller: ResearchCaller): RunView {
@@ -336,6 +494,7 @@ export class ResearchApplication implements ResearchActions {
         input.taskId,
         requestId,
         input.reason,
+        input.instruction,
       );
     this.ports.authorizeRun(owner, runId);
     const existing = this.#executions.ownerOf(runId);
@@ -344,18 +503,9 @@ export class ResearchApplication implements ResearchActions {
         "ACCESS_DENIED",
         "Continue this live research in its owning chat.",
       );
-    if (existing === undefined)
-      await this.#executions.start(
-        owner,
-        { label: researchContinueLabel(runId) },
-        signal,
-        async (_signal, attach) => {
-          attach(runId);
-          return this.#context(runId);
-        },
-      );
-    else this.#executions.publish(runId);
-    return { kind: "continuation", context: this.#context(runId) };
+    const handle = this.#continue(owner, runId, signal);
+    this.#executions.publish(runId);
+    return { kind: "continuation", context: this.#context(runId), handle };
   }
 
   disposeOwner(owner: Agent): Promise<void> {
@@ -377,8 +527,8 @@ export class ResearchApplication implements ResearchActions {
           }
         }
         this.#coordinators.delete(owner);
-        for (const [key, start] of this.#starts)
-          if (start.owner === owner) this.#starts.delete(key);
+        this.#starts.delete(owner);
+        this.#revisions.delete(owner);
         if (failures.length > 0)
           throw new AggregateError(
             failures,

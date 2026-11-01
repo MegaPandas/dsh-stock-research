@@ -101,18 +101,19 @@ export function createResearchReviewTool(
       requestId: stringSchema,
     }),
     output: resultOutput(opaqueObjectSchema),
+    isConcurrencySafe: () => true,
     execute: async (value, exec) => actions.review(reviewRequest(value), exec),
   });
 }
 
 export function createResearchTools(
   ctx: Context,
-  actions: Pick<ResearchActions, "start" | "control">,
+  actions: Pick<ResearchActions, "start" | "control" | "observe" | "cancel">,
 ): ToolDefinition[] {
   const start = applicationTool(ctx, {
     name: "stock_start_research",
     description:
-      "Start requested quick/deep single-stock research: collect fixed data and return runId, tasks and acceptance requirements for the primary agent to execute. date defaults to today in the security's market. Reuse requestId for retries; use a new ID for a new request.",
+      "Start quick/deep research in the background and immediately return jobId. Use stock_read_research for its runId and progress, or stock_cancel_research to stop it during collection or execution. Ready tasks run automatically; stage review remains the primary agent's decision. Date defaults to today in the security's market. Reuse requestId for retries.",
     parameters: objectSchema(
       {
         security: stringSchema,
@@ -123,16 +124,13 @@ export function createResearchTools(
       ["security", "mode", "requestId"],
     ),
     output: resultOutput(opaqueObjectSchema),
-    execute: (value, exec) => actions.start(startRequest(value), exec),
+    isConcurrencySafe: () => true,
+    execute: async (value, exec) => actions.start(startRequest(value), exec),
   });
   const definitions = {
     resume: [
       "stock_resume_research",
-      "Resume research, revise pending tasks and return the plan. Use [] for unchanged input.resolvedReasonIds and input.instructions.",
-    ],
-    cancel: [
-      "stock_cancel_research",
-      "Cancel the selected research and stop its executions, retaining submitted content.",
+      "Resume background scheduling with saved inputs and revised pending-task instructions. Return a background handle and current context. Use [] for unchanged input.resolvedReasonIds and input.instructions.",
     ],
     recover: [
       "stock_recover_research",
@@ -140,18 +138,50 @@ export function createResearchTools(
     ],
     replay: [
       "stock_replay_research",
-      "Create a derived run from the selected research's fixed inputs and return its plan for the primary agent to execute.",
+      "Create a derived run from fixed inputs and start background scheduling. Return its handle and context; no new collection is performed.",
     ],
   } as const;
   return [
     start,
-    ...(["resume", "cancel", "recover", "replay"] as const).map((kind) => {
+    applicationTool(ctx, {
+      name: "stock_read_research",
+      description:
+        "Read a background research handle owned by this chat. Returns native Job lifecycle and, after collection, the canonical runId and view.",
+      parameters: objectSchema({ jobId: stringSchema }),
+      output: resultOutput(opaqueObjectSchema),
+      isConcurrencySafe: () => true,
+      execute: async (value, exec) => {
+        const item = object(value, ["jobId"]);
+        return actions.observe(text(item.jobId, "jobId"), exec);
+      },
+    }),
+    applicationTool(ctx, {
+      name: "stock_cancel_research",
+      description:
+        "Stop the entire research associated with an owned jobId, including collection before runId exists. Publish cancellation first and wait for execution release; submitted artifacts remain saved.",
+      parameters: objectSchema({
+        jobId: stringSchema,
+        requestId: stringSchema,
+      }),
+      output: resultOutput(opaqueObjectSchema),
+      isConcurrencySafe: () => true,
+      execute: async (value, exec) => {
+        const item = object(value, ["jobId", "requestId"]);
+        return actions.cancel(
+          text(item.jobId, "jobId"),
+          exec,
+          text(item.requestId, "requestId"),
+        );
+      },
+    }),
+    ...(["resume", "recover", "replay"] as const).map((kind) => {
       const [name, description] = definitions[kind];
       return applicationTool(ctx, {
         name,
         description,
         parameters: runControlParameters[kind],
         output: resultOutput(opaqueObjectSchema),
+        isConcurrencySafe: () => true,
         execute: async (value, exec) => {
           const { command, requestId } = parseRunControl(kind, value);
           if (exec.agent === undefined)
@@ -162,9 +192,128 @@ export function createResearchTools(
           const result = await actions.control(command, exec, requestId);
           return result.kind === "status"
             ? { kind: "success", text: runStatus(result.view) }
-            : result.context;
+            : { ...result.context, ...result.handle };
         },
       });
+    }),
+  ];
+}
+
+export function createResearchTaskTools(
+  ctx: Context,
+  actions: Pick<ResearchActions, "redoTask" | "revise" | "cancelTask">,
+): ToolDefinition[] {
+  const fields = {
+    runId: stringSchema,
+    taskId: stringSchema,
+    requestId: stringSchema,
+  };
+  return [
+    applicationTool(ctx, {
+      name: "stock_redo_task",
+      description:
+        "Invalidate an owned task and its dependent branch, preserve history, and restart eligible tasks automatically. Optional instruction replaces the target's objective in the same transaction, before any new claim. reason records why it is redone. A cancelled branch requires explicit redo.",
+      parameters: objectSchema(
+        { ...fields, reason: stringSchema, instruction: stringSchema },
+        Object.keys(fields),
+      ),
+      output: resultOutput(opaqueObjectSchema),
+      isConcurrencySafe: () => true,
+      execute: async (value, exec) => {
+        const item = object(value, [
+          ...Object.keys(fields),
+          "reason",
+          "instruction",
+        ]);
+        const result = await actions.redoTask(
+          {
+            runId: text(item.runId, "runId"),
+            taskId: text(item.taskId, "taskId"),
+            requestId: text(item.requestId, "requestId"),
+            reason:
+              item.reason === undefined ? null : text(item.reason, "reason"),
+            instruction:
+              item.instruction === undefined
+                ? null
+                : text(item.instruction, "instruction"),
+          },
+          exec,
+        );
+        return result;
+      },
+    }),
+    applicationTool(ctx, {
+      name: "stock_followup_task",
+      description:
+        "Start a background revision in the original successful child session, retaining its draft. Return jobId immediately. Explain the issue and acceptance criteria in message. resumeSearch=true explicitly resumes paused search while retaining usage and per-search approval beyond budget.",
+      parameters: objectSchema(
+        { ...fields, message: stringSchema, resumeSearch: { type: "boolean" } },
+        [...Object.keys(fields), "message"],
+      ),
+      output: resultOutput(opaqueObjectSchema),
+      isConcurrencySafe: () => true,
+      execute: async (value, exec) => {
+        const item = object(value, [
+          ...Object.keys(fields),
+          "message",
+          "resumeSearch",
+        ]);
+        if (
+          item.resumeSearch !== undefined &&
+          typeof item.resumeSearch !== "boolean"
+        )
+          throw new ResearchError(
+            "INVALID_INPUT",
+            "resumeSearch must be boolean.",
+          );
+        return actions.revise(
+          {
+            runId: text(item.runId, "runId"),
+            taskId: text(item.taskId, "taskId"),
+            requestId: text(item.requestId, "requestId"),
+            message: text(item.message, "message"),
+            resumeSearch: item.resumeSearch === true,
+          },
+          exec,
+        );
+      },
+    }),
+    applicationTool(ctx, {
+      name: "stock_cancel_task",
+      description:
+        "Cancel one task and its declared or disclosed dependent branch, retaining independent work. expectedAttempt is the exact current attempt from run view; use 0 for an unclaimed task. Publish cancellation first, then wait for owned execution release.",
+      parameters: objectSchema({
+        ...fields,
+        expectedAttempt: { type: "integer", minimum: 0 },
+        reason: stringSchema,
+      }),
+      output: resultOutput(opaqueObjectSchema),
+      isConcurrencySafe: () => true,
+      execute: (value, exec) => {
+        const item = object(value, [
+          ...Object.keys(fields),
+          "expectedAttempt",
+          "reason",
+        ]);
+        if (
+          !Number.isSafeInteger(item.expectedAttempt) ||
+          (item.expectedAttempt as number) < 0
+        )
+          throw new ResearchError(
+            "INVALID_INPUT",
+            "expectedAttempt must be a non-negative safe integer.",
+          );
+        return actions.cancelTask(
+          {
+            runId: text(item.runId, "runId"),
+            taskId: text(item.taskId, "taskId"),
+            requestId: text(item.requestId, "requestId"),
+            expectedAttempt: item.expectedAttempt as number,
+            reason: text(item.reason, "reason"),
+          },
+          exec,
+        );
+      },
     }),
   ];
 }

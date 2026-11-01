@@ -11,7 +11,16 @@ import type {
   CollectionCounts,
   ResearchIdentity,
 } from "../../contracts/research-progress.js";
-import type { CancelRunResult, RunOperation } from "../../contracts/runs.js";
+import type {
+  CancelRunResult,
+  RunOperation,
+  RunView,
+} from "../../contracts/runs.js";
+import { ResearchError } from "../../contracts/errors.js";
+import type {
+  ResearchHandle,
+  ResearchObservation,
+} from "../research-actions.js";
 import { serializeJson } from "../../json/serialize.js";
 import { failureDetail } from "./progress.js";
 import {
@@ -27,8 +36,10 @@ import {
   type ResearchPreparationStatus,
 } from "./view.js";
 
-const JOB_WAIT_MS = 60_000;
-
+interface Operation {
+  controller: AbortController;
+  work: Promise<JobOutcome>;
+}
 interface ResearchExecution {
   owner: Agent;
   job: JobHandle;
@@ -39,19 +50,21 @@ interface ResearchExecution {
   publishedProgress?: string;
   identity?: ResearchIdentity;
   collection?: CollectionCounts;
-  finishedAt?: number;
+  outcome?: JobOutcome;
   runId?: string;
   preparationStatus: ResearchPreparationStatus;
   release: () => void;
   resourcesReleased: boolean;
-  operations: Map<
-    JobId,
-    { controller: AbortController; work: Promise<unknown> }
-  >;
+  finished: boolean;
+  deliverySettled: boolean;
+  terminal: boolean;
+  errors: unknown[];
+  cancellation?: Promise<void>;
+  cancelling: boolean;
+  operations: Map<JobId, Operation>;
 }
-
 export interface ResearchExecutionPorts {
-  jobs: Pick<JobRegistry, "start" | "wait">;
+  jobs: Pick<JobRegistry, "start" | "get" | "kill">;
   runs: Pick<RunReader, "view">;
   cancelRun(
     operation: RunOperation,
@@ -61,8 +74,8 @@ export interface ResearchExecutionPorts {
   holdActivity(): () => void;
   isOwnerLive(owner: Agent): boolean;
   isClosing(): boolean;
+  onError(owner: Agent, handle: ResearchHandle, detail: string): void;
 }
-
 function researchCompletion(): ResearchExecution["completion"] {
   let resolve!: (outcome: JobOutcome) => void;
   const promise = new Promise<JobOutcome>((done) => {
@@ -71,38 +84,54 @@ function researchCompletion(): ResearchExecution["completion"] {
   return { promise, resolve };
 }
 
-/** Owns research Jobs and their execution resources; callers own canonical mutations. */
+/** Owns background Jobs and resources; canonical mutations belong to callers. */
 export class ResearchExecutions {
   readonly #executions = new Set<ResearchExecution>();
   readonly #runs = new Map<string, ResearchExecution>();
+  readonly #jobs = new Map<string, ResearchExecution>();
   readonly #pending = new Set<Promise<unknown>>();
-
   constructor(private readonly ports: ResearchExecutionPorts) {}
 
   ownerOf(runId: string): Agent | undefined {
     return this.#runs.get(runId)?.owner;
   }
+  running(runId: string): boolean {
+    const research = this.#runs.get(runId);
+    return (
+      research !== undefined &&
+      !research.terminal &&
+      !research.finished &&
+      !research.cancelling
+    );
+  }
+  settled(runId: string): Promise<void> {
+    return (
+      this.#runs.get(runId)?.completion.promise.then(() => {}) ??
+      Promise.resolve()
+    );
+  }
+  handleFor(runId: string): ResearchHandle {
+    return { jobId: this.#runs.get(runId)!.job.id };
+  }
 
-  start<T>(
+  start(
     owner: Agent,
-    selection: { label: string; identity?: ResearchIdentity },
-    signal: AbortSignal,
+    selection: { label: string; identity?: ResearchIdentity; runId?: string },
+    callerSignal: AbortSignal,
     action: (
       signal: AbortSignal,
       attach: (runId: string) => void,
       onProgress: (progress: CollectionProgress) => void,
-    ) => Promise<T>,
-  ): Promise<T> {
-    return this.#perform(
+    ) => Promise<void>,
+  ): ResearchHandle {
+    return this.#launch(
       owner,
       undefined,
       selection.label,
-      signal,
-      (research, job, active) => {
-        if (selection.identity !== undefined)
-          research.identity = selection.identity;
+      callerSignal,
+      (research, job, signal) => {
         return action(
-          active,
+          signal,
           (runId) => {
             research.runId = runId;
             this.#runs.set(runId, research);
@@ -132,36 +161,75 @@ export class ResearchExecutions {
           },
         );
       },
+      selection,
     );
   }
 
-  perform<T>(
+  launch(
     runId: string,
     label: string,
-    signal: AbortSignal,
-    action: (signal: AbortSignal) => Promise<T>,
-  ): Promise<T> {
+    callerSignal: AbortSignal,
+    action: (signal: AbortSignal) => Promise<unknown>,
+  ): ResearchHandle {
     const research = this.#runs.get(runId)!;
-    return research.finishedAt !== undefined
-      ? action(signal)
-      : this.#perform(
-          research.owner,
-          research,
-          label,
-          signal,
-          (_research, _job, active) => action(active),
-        );
+    if (research.terminal || research.finished || research.cancelling)
+      throw new ResearchError(
+        "TASK_NOT_READY",
+        "Research execution is no longer accepting work.",
+      );
+    return this.#launch(
+      research.owner,
+      research,
+      label,
+      callerSignal,
+      (_research, _job, signal) => action(signal),
+    );
   }
 
-  publish(runId: string): void {
-    this.#publish(this.#runs.get(runId)!);
+  read(jobId: string, owner: Agent): ResearchObservation {
+    const research = this.#owned(jobId, owner);
+    const view =
+      research.runId === undefined
+        ? undefined
+        : this.ports.runs.view({ runId: research.runId });
+    return {
+      job: this.ports.jobs.get(jobId as JobId, owner.id),
+      ...(research.runId === undefined ? {} : { runId: research.runId }),
+      ...(view === undefined ? {} : { view }),
+    };
   }
-
+  #owned(jobId: string, owner: Agent): ResearchExecution {
+    const research = this.#jobs.get(jobId);
+    if (research === undefined || research.owner !== owner)
+      throw new ResearchError(
+        "ACCESS_DENIED",
+        "Research Job is not owned by this Agent.",
+      );
+    return research;
+  }
+  cancelJob(jobId: string, owner: Agent, requestId: string): Promise<void> {
+    const research = this.#owned(jobId, owner);
+    if (
+      research.cancellation === undefined &&
+      research.runId !== undefined &&
+      this.#runs.get(research.runId) !== research
+    )
+      throw new ResearchError(
+        "STALE_ATTEMPT",
+        "Use the current research handle to cancel its execution.",
+      );
+    return this.#requestCancel(research, requestId);
+  }
   cancel(runId: string, requestId: string): Promise<void> {
-    return this.#cancel(this.#runs.get(runId)!, requestId);
+    return this.#requestCancel(this.#runs.get(runId)!, requestId);
+  }
+  publish(runId: string, view?: RunView): void {
+    const research = this.#runs.get(runId);
+    if (research !== undefined && !research.finished)
+      this.#publish(research, view);
   }
 
-  async #perform<T>(
+  #launch(
     owner: Agent,
     previous: ResearchExecution | undefined,
     label: string,
@@ -170,141 +238,147 @@ export class ResearchExecutions {
       research: ResearchExecution,
       job: JobHandle,
       signal: AbortSignal,
-    ) => Promise<T>,
-  ): Promise<T> {
+    ) => Promise<unknown>,
+    selection?: { identity?: ResearchIdentity; runId?: string },
+  ): ResearchHandle {
     callerSignal.throwIfAborted();
-    const controller = new AbortController();
-    const signal = AbortSignal.any([callerSignal, controller.signal]);
-    let work!: Promise<T>;
-    let research!: ResearchExecution;
     const id = this.ports.jobs.start({
       kind: previous === undefined ? RESEARCH_JOB_KIND : RESEARCH_STEP_JOB_KIND,
       label,
       owner: owner.id,
       run: (job) => {
-        research = previous ?? {
+        const research: ResearchExecution = previous ?? {
           owner,
           job,
           completion: researchCompletion(),
           preparationStatus: "preparing",
           release: this.ports.holdActivity(),
           resourcesReleased: false,
+          finished: false,
+          deliverySettled: false,
+          terminal: false,
+          errors: [],
+          cancelling: false,
           operations: new Map(),
         };
+        if (selection !== undefined) {
+          research.identity = selection.identity;
+          if (selection.runId !== undefined) {
+            research.runId = selection.runId;
+            this.#runs.set(selection.runId, research);
+          }
+        }
         this.#executions.add(research);
-        job.updateProgress(
-          previous === undefined ? "准备采集数据" : "执行研究任务",
-        );
-        const release = this.ports.holdActivity();
-        work = Promise.resolve()
-          .then(async () => {
-            try {
-              const pending = action(research, job, signal);
-              this.#publish(research);
-              return await pending;
-            } catch (cause) {
-              if (research.runId === undefined) {
-                research.preparationStatus = signal.aborted
-                  ? "cancelled"
-                  : "failed";
-                this.#publish(research);
-              }
-              appendResearchRecord(job, {
-                type: "research/message",
-                text: failureDetail(cause),
-              });
-              throw cause;
-            } finally {
-              research.operations.delete(job.id);
-              this.#publish(research);
+        this.#jobs.set(job.id, research);
+        const controller = new AbortController();
+        const work = Promise.resolve().then(async (): Promise<JobOutcome> => {
+          let outcome: JobOutcome;
+          try {
+            controller.signal.throwIfAborted();
+            job.updateProgress(
+              previous === undefined ? "准备采集数据" : "执行研究任务",
+            );
+            const result = await action(research, job, controller.signal);
+            outcome = {
+              status: "completed",
+              ...(result === undefined
+                ? {}
+                : { result: serializeJson(result) }),
+            };
+          } catch (cause) {
+            if (
+              controller.signal.aborted &&
+              cause === controller.signal.reason
+            ) {
+              outcome = { status: "killed", detail: failureDetail(cause) };
+            } else {
+              this.#error(research, job, cause);
+              outcome = { status: "failed", detail: failureDetail(cause) };
             }
-          })
-          .finally(release);
+            if (research.runId === undefined)
+              research.preparationStatus =
+                outcome.status === "killed" ? "cancelled" : "failed";
+          }
+          research.operations.delete(job.id);
+          if (research.errors.length === 0)
+            try {
+              this.#publish(research);
+            } catch (cause) {
+              this.#error(research, job, cause);
+              outcome = { status: "failed", detail: failureDetail(cause) };
+            }
+          return outcome;
+        });
         research.operations.set(job.id, { controller, work });
         this.#pending.add(work);
         void work.then(
-          () => this.#pending.delete(work),
-          () => this.#pending.delete(work),
+          () => {
+            this.#pending.delete(work);
+            this.#finish(research);
+          },
+          (cause) => {
+            this.#pending.delete(work);
+            this.#error(research, job, cause);
+            research.operations.delete(job.id);
+            this.#finish(research);
+          },
         );
         return {
           cancel: (reason) => {
-            controller.abort(
-              new DOMException(
-                reason ?? "Research operation cancelled.",
-                "AbortError",
-              ),
-            );
-            if (previous === undefined && research.finishedAt === undefined)
-              void this.#cancel(research, "job-cancelled").catch((cause) =>
-                research.completion.resolve({
-                  status: "failed",
-                  detail: failureDetail(cause),
-                }),
+            if (previous === undefined)
+              void this.#cancel(research, "job-cancelled").catch(() => {});
+            else
+              controller.abort(
+                new DOMException(
+                  reason ?? "Research step cancelled.",
+                  "AbortError",
+                ),
               );
           },
-          done:
-            previous === undefined
-              ? research.completion.promise
-              : work.then(
-                  (result) => ({
-                    status: "completed" as const,
-                    result: serializeJson(result),
-                  }),
-                  (cause) => ({
-                    status: signal.aborted
-                      ? ("killed" as const)
-                      : ("failed" as const),
-                    detail: failureDetail(cause),
-                  }),
-                ),
+          done: previous === undefined ? research.completion.promise : work,
         };
       },
     });
-    if (previous === undefined) return work;
-    // The Agent tool, rather than the browser command request, owns this wait.
-    let view = await this.ports.jobs.wait(id, JOB_WAIT_MS, owner.id);
-    while (view.status === "running" || view.status === "stopping")
-      view = await this.ports.jobs.wait(id, JOB_WAIT_MS, owner.id);
-    return work;
+    return { jobId: id };
   }
 
-  #finish(research: ResearchExecution): void {
-    if (research.finishedAt !== undefined) return;
-    research.finishedAt = Date.now();
-    if (research.runId !== undefined) this.ports.releaseRun(research.runId);
+  #error(research: ResearchExecution, job: JobHandle, cause: unknown): void {
+    research.errors.push(cause);
+    research.terminal = true;
+    research.deliverySettled = false;
+    for (const operation of research.operations.values())
+      operation.controller.abort(cause);
+    const detail = failureDetail(cause);
+    try {
+      appendResearchRecord(job, {
+        type: "research/message",
+        text: detail,
+      });
+    } catch (error) {
+      research.errors.push(error);
+    }
+    try {
+      this.ports.onError(research.owner, { jobId: job.id }, detail);
+    } catch (error) {
+      research.errors.push(error);
+      research.deliverySettled = true;
+    }
+  }
+
+  #publish(research: ResearchExecution, supplied?: RunView): void {
+    if (research.finished) return;
     const view =
-      research.runId === undefined
+      supplied ??
+      (research.runId === undefined
         ? undefined
-        : this.ports.runs.view({ runId: research.runId });
-    const outcome = researchJobOutcome(research.preparationStatus, view);
-    void Promise.allSettled(
-      [...research.operations.values()].map(({ work }) => work),
-    ).then(() => research.completion.resolve(outcome));
+        : this.ports.runs.view({ runId: research.runId }));
+    research.outcome = researchJobOutcome(research.preparationStatus, view);
     if (
-      this.ports.isClosing() ||
-      research.owner.status === "idle" ||
-      !this.ports.isOwnerLive(research.owner)
+      view?.status === "completed" ||
+      view?.status === "cancelled" ||
+      (view === undefined && research.preparationStatus !== "preparing")
     )
-      this.#release(research);
-  }
-
-  #release(research: ResearchExecution): void {
-    if (research.resourcesReleased) return;
-    research.resourcesReleased = true;
-    research.release();
-  }
-
-  idleOwner(owner: Agent): void {
-    for (const research of this.#executions)
-      if (research.owner === owner && research.finishedAt !== undefined)
-        this.#release(research);
-  }
-
-  #publish(research: ResearchExecution): void {
-    const view =
-      research.runId === undefined
-        ? undefined
-        : this.ports.runs.view({ runId: research.runId });
+      research.terminal = true;
     const progress = researchJobView({
       preparationStatus: research.preparationStatus,
       view,
@@ -323,72 +397,172 @@ export class ResearchExecutions {
         progress,
       });
     }
-    if (
-      view?.status === "completed" ||
-      view?.status === "cancelled" ||
-      (view === undefined && research.preparationStatus !== "preparing")
-    )
-      this.#finish(research);
+    this.#finish(research);
   }
 
-  async #cancel(research: ResearchExecution, requestId: string): Promise<void> {
+  #finish(research: ResearchExecution): void {
+    if (
+      !research.terminal ||
+      research.finished ||
+      research.cancelling ||
+      research.operations.size > 0
+    )
+      return;
+    try {
+      if (research.runId !== undefined) this.ports.releaseRun(research.runId);
+    } catch (cause) {
+      this.#error(research, research.job, cause);
+    }
+    research.finished = true;
+    const outcome =
+      research.errors.length > 0
+        ? {
+            status: "failed" as const,
+            detail: research.errors.map(failureDetail).join("\n"),
+          }
+        : (research.outcome ??
+          researchJobOutcome(research.preparationStatus, undefined));
+    if (
+      this.ports.isClosing() ||
+      !this.ports.isOwnerLive(research.owner) ||
+      (research.owner.status === "idle" &&
+        (outcome.status === "killed" || research.deliverySettled))
+    ) {
+      try {
+        this.#release(research);
+      } catch (cause) {
+        this.#error(research, research.job, cause);
+        outcome.status = "failed";
+        outcome.detail = research.errors.map(failureDetail).join("\n");
+      }
+    }
+    research.completion.resolve(outcome);
+  }
+
+  #requestCancel(
+    research: ResearchExecution,
+    requestId: string,
+  ): Promise<void> {
+    const work = this.#cancel(research, requestId);
+    try {
+      this.ports.jobs.kill(
+        research.job.id,
+        research.owner.id,
+        "Research cancelled.",
+      );
+    } catch (cause) {
+      this.#error(research, research.job, cause);
+      return work.then(() => {
+        throw cause;
+      });
+    }
+    return work;
+  }
+
+  #cancel(research: ResearchExecution, requestId: string): Promise<void> {
+    if (research.cancellation !== undefined) return research.cancellation;
+    if (research.finished) {
+      if (research.runId === undefined) return Promise.resolve();
+      research.cancellation = this.ports
+        .cancelRun(
+          { runId: research.runId, identity: research.owner.id },
+          requestId,
+        )
+        .then(() => {});
+      void research.cancellation.catch(() => {});
+      return research.cancellation;
+    }
+    research.cancelling = true;
+    let control: Promise<unknown>;
+    try {
+      control =
+        research.runId === undefined
+          ? Promise.resolve()
+          : this.ports.cancelRun(
+              { runId: research.runId, identity: research.owner.id },
+              requestId,
+            );
+    } catch (cause) {
+      control = Promise.reject(cause);
+    }
     for (const operation of research.operations.values())
       operation.controller.abort(
         new DOMException("Research cancelled.", "AbortError"),
       );
-    const results = await Promise.allSettled([
-      ...(research.runId === undefined
-        ? []
-        : [
-            this.ports.cancelRun(
-              { runId: research.runId, identity: research.owner.id },
-              requestId,
-            ),
-          ]),
-      ...[...research.operations.values()].map(({ work }) =>
-        work.then(
-          () => undefined,
-          () => undefined,
-        ),
-      ),
-    ]);
-    research.preparationStatus = "cancelled";
-    this.#publish(research);
-    this.#finish(research);
+    research.cancellation = (async () => {
+      const [controlled] = await Promise.allSettled([
+        control,
+        ...[...research.operations.values()].map(({ work }) => work),
+      ]);
+      if (controlled!.status === "rejected")
+        this.#error(research, research.job, controlled!.reason);
+      research.preparationStatus = "cancelled";
+      if (research.errors.length === 0)
+        try {
+          this.#publish(research);
+        } catch (cause) {
+          this.#error(research, research.job, cause);
+        }
+      research.terminal = true;
+      research.cancelling = false;
+      this.#finish(research);
+      if (research.errors.length > 1)
+        throw new AggregateError(
+          research.errors,
+          "Could not cancel research.",
+          { cause: research.errors[0] },
+        );
+      if (research.errors.length === 1) throw research.errors[0];
+    })();
+    void research.cancellation.catch(() => {});
+    return research.cancellation;
+  }
+
+  #release(research: ResearchExecution): void {
+    if (research.resourcesReleased) return;
+    research.resourcesReleased = true;
+    research.release();
+  }
+  idleOwner(owner: Agent): void {
+    for (const research of this.#executions) {
+      if (research.owner !== owner || !research.terminal) continue;
+      research.deliverySettled = true;
+      if (research.finished) this.#release(research);
+    }
+  }
+  async disposeOwner(owner: Agent): Promise<void> {
+    const owned = [...this.#executions].filter(
+      (research) => research.owner === owner,
+    );
+    const results = await Promise.allSettled(
+      owned
+        .filter((research) => !research.finished)
+        .map((research) => this.#requestCancel(research, "owner-disposed")),
+    );
     const failures = results.flatMap((result) =>
       result.status === "rejected" ? [result.reason] : [],
     );
-    if (failures.length > 0)
-      throw new AggregateError(failures, "Could not cancel research.", {
-        cause: failures[0],
-      });
-  }
-
-  async disposeOwner(owner: Agent): Promise<void> {
-    const stopped = await Promise.allSettled(
-      [...this.#executions]
-        .filter(
-          (research) =>
-            research.owner === owner && research.finishedAt === undefined,
-        )
-        .map((research) => this.#cancel(research, "owner-disposed")),
-    );
-    for (const research of this.#executions) {
-      if (research.owner !== owner) continue;
-      this.#release(research);
+    for (const research of owned) {
+      try {
+        this.#release(research);
+      } catch (cause) {
+        failures.push(cause);
+      }
       this.#executions.delete(research);
-      if (research.runId !== undefined) this.#runs.delete(research.runId);
+      if (
+        research.runId !== undefined &&
+        this.#runs.get(research.runId) === research
+      )
+        this.#runs.delete(research.runId);
+      for (const [id, execution] of this.#jobs)
+        if (execution === research) this.#jobs.delete(id);
     }
-    const failures = stopped.flatMap((result) =>
-      result.status === "rejected" ? [result.reason] : [],
-    );
     if (failures.length > 0)
       throw new AggregateError(failures, "Could not release research Jobs.", {
         cause: failures[0],
       });
   }
-
   async drain(): Promise<void> {
-    await Promise.allSettled([...this.#pending]);
+    while (this.#pending.size > 0) await Promise.allSettled([...this.#pending]);
   }
 }

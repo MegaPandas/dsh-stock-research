@@ -169,6 +169,7 @@ async function probe(directory, targetVersion) {
       "stock_start_research",
       "stock_resume_research",
       "stock_cancel_research",
+      "stock_read_research",
       "stock_recover_research",
       "stock_replay_research",
     ];
