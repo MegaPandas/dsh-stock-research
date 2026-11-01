@@ -1,7 +1,7 @@
 import type { ArtifactVersion } from "../contracts/artifacts.js";
+import type { ArtifactRef } from "../contracts/data.js";
 import type { RunReader } from "../contracts/run-access.js";
 import type { RunView } from "../contracts/runs.js";
-import { artifactRef, object, text } from "../tools/parameters.js";
 import {
   authorizeRun,
   type ResearchCaller,
@@ -9,8 +9,8 @@ import {
 } from "./bindings.js";
 
 export interface RunReadOperations {
-  readRun(value: unknown, caller: ResearchCaller): RunView;
-  readArtifact(value: unknown, caller: ResearchCaller): ArtifactVersion;
+  readRun(runId: string, caller: ResearchCaller): RunView;
+  readArtifact(ref: ArtifactRef, caller: ResearchCaller): ArtifactVersion;
 }
 
 export function createRunReadOperations(
@@ -18,19 +18,15 @@ export function createRunReadOperations(
   bindings: SessionBindings,
 ): RunReadOperations {
   return {
-    readRun(value, caller) {
+    readRun(runId, caller) {
       caller.signal.throwIfAborted();
       const bound = bindings.require(caller.agent);
-      const item = object(value, ["runId"]);
-      const runId = text(item.runId, "runId");
       authorizeRun(bound.binding, runId);
       return runs.view({ runId });
     },
-    readArtifact(value, caller) {
+    readArtifact(ref, caller) {
       caller.signal.throwIfAborted();
       const bound = bindings.require(caller.agent);
-      const item = object(value, ["ref"]);
-      const ref = artifactRef(item.ref);
       authorizeRun(bound.binding, ref.runId);
       return runs.readArtifact(ref);
     },

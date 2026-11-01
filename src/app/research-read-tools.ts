@@ -3,11 +3,14 @@ import type { AgentReport } from "../contracts/agent-reports.js";
 import type { RunReadOperations } from "../host/run-reading.js";
 import { researchTool } from "../tools/errors.js";
 import {
+  artifactRef,
   artifactRefSchema,
+  object,
   objectSchema,
   opaqueObjectSchema,
   resultOutput,
   stringSchema,
+  text,
 } from "../tools/parameters.js";
 
 export function createResearchReadTools(
@@ -20,13 +23,15 @@ export function createResearchReadTools(
       parameters: objectSchema({ runId: stringSchema }),
       output: resultOutput(opaqueObjectSchema),
       async execute(value, exec) {
-        const view = reads.readRun(value, exec);
+        exec.signal.throwIfAborted();
+        const item = object(value, ["runId"]);
+        const view = reads.readRun(text(item.runId, "runId"), exec);
         return {
           kind: "run_view",
           view,
           reportCatalog: view.tasks.flatMap(({ outputRefs }) =>
             outputRefs.map((ref) => {
-              const artifact = reads.readArtifact({ ref }, exec);
+              const artifact = reads.readArtifact(ref, exec);
               const report = artifact.content.payload.report as
                 AgentReport | undefined;
               return {
@@ -53,7 +58,9 @@ export function createResearchReadTools(
         }),
       ),
       async execute(value, exec) {
-        const artifact = reads.readArtifact(value, exec);
+        exec.signal.throwIfAborted();
+        const item = object(value, ["ref"]);
+        const artifact = reads.readArtifact(artifactRef(item.ref), exec);
         if (artifact.content.kind !== "report")
           return { kind: "artifact", artifact };
         const { kind, title, body } = artifact.content;

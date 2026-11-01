@@ -385,6 +385,20 @@ export default defineConfig(
     },
   },
   {
+    files: ["src/host/{bindings,run-reading,*-operations}.ts"],
+    rules: {
+      "no-restricted-syntax": [
+        "error",
+        {
+          selector:
+            ":matches(ImportDeclaration, ExportNamedDeclaration, ExportAllDeclaration, ImportExpression)[source.value=/(^|\\u002F)tools(\\u002F|$)/]",
+          message:
+            "Host identity and operations must not depend on tool adapters.",
+        },
+      ],
+    },
+  },
+  {
     files: [
       "src/app/collection-snapshot.ts",
       "src/app/research-control/open.ts",

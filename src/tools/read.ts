@@ -72,7 +72,12 @@ export function createReadTools(
         objectSchema({ kind: kind("run_view"), view: opaqueObject }),
       ),
       async execute(value, exec) {
-        return { kind: "run_view", view: reads.readRun(value, exec) };
+        exec.signal.throwIfAborted();
+        const item = object(value, ["runId"]);
+        return {
+          kind: "run_view",
+          view: reads.readRun(text(item.runId, "runId"), exec),
+        };
       },
     }),
     researchTool({
@@ -84,7 +89,12 @@ export function createReadTools(
         objectSchema({ kind: kind("artifact"), artifact: opaqueObject }),
       ),
       async execute(value, exec) {
-        return { kind: "artifact", artifact: reads.readArtifact(value, exec) };
+        exec.signal.throwIfAborted();
+        const item = object(value, ["ref"]);
+        return {
+          kind: "artifact",
+          artifact: reads.readArtifact(artifactRef(item.ref), exec),
+        };
       },
     }),
     researchTool({
