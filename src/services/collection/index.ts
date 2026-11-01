@@ -40,9 +40,9 @@ export class CollectionService implements CollectionAccess {
 
   constructor(
     private readonly createTasks: CollectionTaskFactory,
-    cache: SqliteCache,
+    cache: Pick<SqliteCache, "get" | "set">,
     options: CollectionOptions,
-    private readonly snapshots?: CollectionSnapshotStore,
+    private readonly snapshots?: Pick<CollectionSnapshotStore, "save">,
   ) {
     this.#options = structuredClone(options);
     this.#tables = new CollectionTableRunner(

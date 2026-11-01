@@ -76,7 +76,7 @@ function cacheWindow(
 
 export class CollectionCache {
   constructor(
-    private readonly cache: SqliteCache,
+    private readonly cache: Pick<SqliteCache, "get" | "set">,
     private readonly options: Pick<CollectionOptions, "freshness" | "ttl">,
   ) {}
 

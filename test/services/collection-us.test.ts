@@ -5,7 +5,6 @@ import type { ReadSource } from "../../src/contracts/query.js";
 import { ResearchError } from "../../src/contracts/errors.js";
 import { CollectionService } from "../../src/services/collection/index.js";
 import { HttpClient } from "../../src/data/http.js";
-import type { SqliteCache } from "../../src/cache/index.js";
 import { US_SECURITY } from "../fixtures/market.js";
 
 const scope = {
@@ -146,7 +145,7 @@ describe("configured US collection", () => {
     const cache = {
       get: vi.fn().mockReturnValue(undefined),
       set: vi.fn(),
-    } as unknown as SqliteCache;
+    };
     const service = new CollectionService(
       createCollectionTaskFactory(http, query, { secCiks }),
       cache,
