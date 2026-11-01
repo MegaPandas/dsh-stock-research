@@ -9,6 +9,7 @@ import type { DecisionResult } from "../../src/contracts/artifact-payloads.js";
 import type { RunReader } from "../../src/contracts/run-access.js";
 import { readCollection } from "../../src/app/collection-input.js";
 import { isApplicationBusy } from "../../src/app/activity.js";
+import { valuationCalculationCatalog } from "../../src/services/valuation/records.js";
 import { quickHost, initialInput } from "../../test/fixtures/quick-host.js";
 import {
   workflowModel,
@@ -150,8 +151,43 @@ function overlap(events: Event[]) {
 }
 function businessDecision(
   value: DecisionResult,
-  runs: Pick<RunReader, "readArtifact" | "readEvidence">,
+  runs: Pick<
+    RunReader,
+    | "readArtifact"
+    | "readEvidence"
+    | "numberContext"
+    | "inputCatalog"
+    | "readInputs"
+  >,
 ) {
+  const calculations = valuationCalculationCatalog(runs, value.runId).sort(
+    (a, b) => a.taskId.localeCompare(b.taskId),
+  );
+  assert.deepEqual(
+    calculations.map(({ taskId, methodId, purpose }) => ({
+      taskId,
+      methodId,
+      purpose,
+    })),
+    [
+      {
+        taskId: "analysis.fundamentals",
+        methodId: "comparable_multiples",
+        purpose: "valuation",
+      },
+      {
+        taskId: "manager.decision",
+        methodId: "comparable_multiples",
+        purpose: "target_price",
+      },
+    ],
+  );
+  let report = JSON.stringify(value.report);
+  for (const { calculationId, taskId, methodId, purpose } of calculations)
+    report = report.replaceAll(
+      calculationId,
+      `${taskId}/${methodId}/${purpose}`,
+    );
   const validation = {
     warnings: value.validation.warnings,
     checkedReports: value.validation.checkedRefs
@@ -193,11 +229,11 @@ function businessDecision(
     invalidationConditions: value.invalidationConditions,
     limitations: value.limitations,
     validation,
-    report: JSON.parse(
-      JSON.stringify(value.report, (key, item) =>
-        key === "calculationId" || key === "calculationIds" ? undefined : item,
-      ),
-    ),
+    calculations: calculations.map(({ calculationId, ...record }) => {
+      assert.ok(calculationId);
+      return record;
+    }),
+    report: JSON.parse(report),
   };
 }
 
