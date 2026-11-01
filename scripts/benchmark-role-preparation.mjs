@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { Buffer } from "node:buffer";
 import console from "node:console";
+import fs from "node:fs";
 import { mkdtempSync, rmSync } from "node:fs";
 import { cpus, tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -29,6 +30,9 @@ const { createResearchPlugin, Config } = await import(
 const { createQuickInput, prepareResearchRole } = await import(
   pathToFileURL(join(packageRoot, "dist/application.mjs")).href
 );
+const { ArtifactService, NumberService } = await import(
+  pathToFileURL(join(packageRoot, "dist/core.mjs")).href
+);
 const directory = mkdtempSync(join(tmpdir(), "dsh-role-preparation-bench-"));
 const ctx = new Context();
 const iterations = 100;
@@ -42,7 +46,23 @@ function measure(label, prepare) {
     for (let i = 0; i < iterations; i++) prepare();
     samples.push((performance.now() - started) / iterations);
   }
-  const provision = prepare();
+  const read = fs.readFileSync;
+  const reads = { manifest: 0, input: 0, evidence: 0, artifact: 0 };
+  let provision;
+  fs.readFileSync = function (path, ...args) {
+    const result = read.call(this, path, ...args);
+    const filename = String(path);
+    if (filename.endsWith("/manifest.json")) reads.manifest++;
+    else if (/\/inputs\/.*\.json$/.test(filename)) reads.input++;
+    else if (/\/evidence\/.*\.json$/.test(filename)) reads.evidence++;
+    else if (/\/artifacts\/.*\.json$/.test(filename)) reads.artifact++;
+    return result;
+  };
+  try {
+    provision = prepare();
+  } finally {
+    fs.readFileSync = read;
+  }
   const sorted = [...samples].sort((a, b) => a - b);
   measurements.push({
     label,
@@ -52,6 +72,7 @@ function measure(label, prepare) {
     minMs: sorted[0],
     maxMs: sorted.at(-1),
     batchMeansMs: samples,
+    reads,
     tools: provision.tools.map(({ name }) => name),
     promptBytes: Buffer.byteLength(JSON.stringify(provision.prompt)),
   });
@@ -99,12 +120,93 @@ try {
     cutoff: "2026-10-29T15:59:59.999Z",
   };
   const input = createQuickInput(scope, runtime.policy, []);
+  const fundamentals = input.definition.tasks.find(
+    ({ id }) => id === "analysis.fundamentals",
+  );
+  fundamentals.dependsOn = ["analysis.market"];
+  fundamentals.inputTasks = ["analysis.market"];
+  input.inputs.push({
+    name: "stock-research:collection",
+    content: {
+      schemaVersion: 1,
+      scope,
+      failures: [],
+      packets: [
+        {
+          id: "financial.indicators",
+          envelope: {
+            dataset: "fundamentals",
+            source: {
+              provider: "eastmoney",
+              url: "https://example.com/synthetic",
+              adapterVersion: "1",
+              normalizationVersion: "1",
+            },
+            asOf: scope.cutoff,
+            availableAt: scope.cutoff,
+            retrievedAt: scope.cutoff,
+            cutoff: scope.cutoff,
+            ageMs: 0,
+            stale: false,
+            historicalKnowledge: "verified",
+            gaps: [],
+            data: {
+              table: "financial.indicators",
+              title: "Synthetic financials",
+              columns: { revenue: { label: "Revenue", unit: "CNY" } },
+              rows: [
+                {
+                  date: scope.date,
+                  asOf: scope.cutoff,
+                  availableAt: scope.cutoff,
+                  complete: true,
+                  values: { revenue: 100 },
+                },
+              ],
+            },
+          },
+        },
+      ],
+    },
+  });
   const { runId } = runtime.runs.open("benchmark", input, "open");
   const operation = { runId, identity: "benchmark" };
   for (const taskId of ["analysis.market", "analysis.fundamentals"]) {
     const context = runtime.runs.dispatchForCall(operation, taskId, taskId);
     measure(taskId, () => prepareResearchRole(runtime, context));
-    if (taskId !== "analysis.fundamentals") continue;
+    if (taskId === "analysis.market") {
+      new ArtifactService(
+        runtime.runs,
+        new NumberService(runtime.runs),
+      ).submitArtifact(
+        { ...context.claim, identity: "benchmark", sessionId: null },
+        [
+          {
+            kind: "analysis",
+            title: "Synthetic upstream report",
+            body: "Artificial qualitative finding.",
+            inputRefs: [],
+            claims: [],
+            payload: {
+              findings: [
+                { text: "Artificial finding", evidence: [], numbers: [] },
+              ],
+              risks: [],
+              gaps: [],
+            },
+          },
+        ],
+        "save-market",
+      );
+      continue;
+    }
+    const prepared = prepareResearchRole(runtime, context);
+    assert.deepEqual(JSON.parse(prepared.prompt[0].text).context.materials, [
+      {
+        title: "Synthetic upstream report",
+        body: "Artificial qualitative finding.",
+      },
+    ]);
     const handle = await runtime.createAgent(
       { sessionId: SessionId("benchmark-calculations") },
       { kind: "task", runId, taskId, attempt: context.claim.attempt },
