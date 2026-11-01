@@ -63,3 +63,5 @@ export function researchLog(text: string) {
   }
   return { progress, collection, entries };
 }
+
+export type ResearchLog = ReturnType<typeof researchLog>;

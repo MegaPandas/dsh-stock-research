@@ -93,6 +93,19 @@ function elapsed(startedAt: number, finishedAt: number): string {
     : `${Math.floor(seconds / 60)} 分 ${seconds % 60} 秒`;
 }
 
+function OperationObservation({
+  jobs,
+  sessionId,
+  jobId,
+}: {
+  jobs: Pick<IJobs, "observe">;
+  sessionId: SessionId;
+  jobId: JobId;
+}) {
+  useEffect(() => jobs.observe(sessionId, jobId), [jobs, sessionId, jobId]);
+  return null;
+}
+
 export function ResearchJobCard({
   data,
   sessionId,
@@ -114,7 +127,6 @@ export function ResearchJobCard({
   const observedIds = operationIds.filter((id) =>
     rows.some((row) => row.id === id),
   );
-  const operationKey = observedIds.join("\n");
   const liveRows = rows.filter((job) => operationIds.includes(job.id));
   const observations = owned
     ? [data.jobId, ...operationIds].flatMap((id) => {
@@ -151,13 +163,6 @@ export function ResearchJobCard({
     return jobs.observe(sessionId, data.jobId);
   }, [jobs, sessionId, owned, parentPresent, data.jobId]);
   useEffect(() => {
-    if (!owned) return;
-    const releases = observedIds.map((id) => jobs.observe(sessionId, id));
-    return () => {
-      for (const release of releases) release();
-    };
-  }, [jobs, sessionId, owned, operationKey]);
-  useEffect(() => {
     if (!running) return;
     const timer = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(timer);
@@ -188,28 +193,39 @@ export function ResearchJobCard({
   }
 
   return (
-    <ResearchCardView
-      title={title}
-      status={status}
-      state={state}
-      progress={
-        terminal && state?.phase.kind !== "ended"
-          ? undefined
-          : (progress?.text ?? row?.progress)
-      }
-      elapsed={
-        startedAt === undefined
-          ? undefined
-          : elapsed(startedAt, finishedAt ?? now)
-      }
-      detail={detail}
-      canCancel={owned && running}
-      cancelling={cancelling}
-      cancelError={cancelError}
-      cancel={() => void cancel()}
-      operations={liveRows}
-      observations={observations}
-    />
+    <>
+      {observedIds.map((id) => (
+        <OperationObservation
+          key={id}
+          jobs={jobs}
+          sessionId={sessionId}
+          jobId={id}
+        />
+      ))}
+      <ResearchCardView
+        title={title}
+        status={status}
+        state={state}
+        progress={
+          terminal && state?.phase.kind !== "ended"
+            ? undefined
+            : (progress?.text ?? row?.progress)
+        }
+        elapsed={
+          startedAt === undefined
+            ? undefined
+            : elapsed(startedAt, finishedAt ?? now)
+        }
+        detail={detail}
+        canCancel={owned && running}
+        cancelling={cancelling}
+        cancelError={cancelError}
+        cancel={() => void cancel()}
+        operations={liveRows}
+        observations={observations}
+        parentLog={{ jobId: data.jobId, output }}
+      />
+    </>
   );
 }
 

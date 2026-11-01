@@ -1,7 +1,16 @@
 import { useId, useMemo, useState } from "react";
 import type { ObservedJob } from "@deepseek-ai/dsh-api-job-controller/client";
 import type { JobView } from "@deepseek-ai/dsh-jobs/view";
-import { researchLog, type ResearchLogEntry } from "./research-log.js";
+import {
+  researchLog,
+  type ResearchLog,
+  type ResearchLogEntry,
+} from "./research-log.js";
+
+export interface PreparedResearchLog {
+  jobId: ObservedJob["jobId"];
+  output: ResearchLog;
+}
 
 const LOG_PREVIEW_ENTRIES = 6;
 const operationLabels: Record<JobView["status"], string> = {
@@ -58,15 +67,14 @@ function LogStream({
   observation,
   label,
   raw,
+  output,
 }: {
   observation: ObservedJob;
   label: string | undefined;
   raw: boolean;
+  output: ResearchLog;
 }) {
-  const { collection, entries } = useMemo(
-    () => researchLog(observation.text),
-    [observation.text],
-  );
+  const { collection, entries } = output;
   const [expanded, setExpanded] = useState(false);
   const listId = useId();
   const earlierCount = Math.max(0, entries.length - LOG_PREVIEW_ENTRIES);
@@ -142,14 +150,26 @@ function LogStream({
   );
 }
 
+function OperationLogStream(
+  props: Omit<Parameters<typeof LogStream>[0], "output">,
+) {
+  const output = useMemo(
+    () => researchLog(props.observation.text),
+    [props.observation.text],
+  );
+  return <LogStream {...props} output={output} />;
+}
+
 export function ResearchDetails({
   progress,
   operations,
   observations,
+  parentLog,
 }: {
   progress: string | undefined;
   operations: readonly JobView[];
   observations: readonly ObservedJob[];
+  parentLog: PreparedResearchLog | undefined;
 }) {
   const [raw, setRaw] = useState(false);
   const streams = observations.filter((entry) => entry.text || entry.gapBefore);
@@ -213,19 +233,29 @@ export function ResearchDetails({
                 </button>
               </div>
             </div>
-            {streams.map((observation, index) => (
-              <LogStream
-                key={observation.jobId}
-                observation={observation}
-                raw={raw}
-                label={
-                  operations.find(
-                    (operation) => operation.id === observation.jobId,
-                  )?.label ??
-                  (streams.length > 1 ? `任务日志 ${index + 1}` : undefined)
-                }
-              />
-            ))}
+            {streams.map((observation, index) => {
+              const label =
+                operations.find(
+                  (operation) => operation.id === observation.jobId,
+                )?.label ??
+                (streams.length > 1 ? `任务日志 ${index + 1}` : undefined);
+              return observation.jobId === parentLog?.jobId ? (
+                <LogStream
+                  key={observation.jobId}
+                  observation={observation}
+                  raw={raw}
+                  label={label}
+                  output={parentLog.output}
+                />
+              ) : (
+                <OperationLogStream
+                  key={observation.jobId}
+                  observation={observation}
+                  raw={raw}
+                  label={label}
+                />
+              );
+            })}
           </section>
         )}
       </div>

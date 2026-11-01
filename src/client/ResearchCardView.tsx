@@ -2,7 +2,10 @@ import type { ObservedJob } from "@deepseek-ai/dsh-api-job-controller/client";
 import type { JobView } from "@deepseek-ai/dsh-jobs/view";
 import { researchCardStyles } from "./research-card-styles.js";
 import type { ResearchState } from "../contracts/research-progress.js";
-import { ResearchDetails } from "./ResearchDetails.js";
+import {
+  ResearchDetails,
+  type PreparedResearchLog,
+} from "./ResearchDetails.js";
 import { ResearchChives } from "./ResearchChives.js";
 
 export type ResearchCardStatus =
@@ -30,6 +33,7 @@ interface ResearchCardViewProps {
   cancel(): void;
   operations: readonly JobView[];
   observations: readonly ObservedJob[];
+  parentLog: PreparedResearchLog;
 }
 
 const labels: Record<ResearchCardStatus, string> = {
@@ -299,6 +303,7 @@ export function ResearchCardView(props: ResearchCardViewProps) {
                 progress={technicalProgress ? progress : undefined}
                 operations={operations}
                 observations={observations}
+                parentLog={props.parentLog}
               />
             </details>
           )}

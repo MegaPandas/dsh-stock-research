@@ -11,6 +11,7 @@ import { JobId } from "@deepseek-ai/dsh-jobs/brand";
 import type { ObservedJob } from "@deepseek-ai/dsh-api-job-controller/client";
 import type { JobView } from "@deepseek-ai/dsh-jobs/view";
 import { ResearchDetails } from "../../src/client/ResearchDetails.js";
+import { researchLog } from "../../src/client/research-log.js";
 
 afterEach(cleanup);
 
@@ -101,6 +102,7 @@ describe("research details", () => {
         progress={undefined}
         operations={[]}
         observations={[observation(text)]}
+        parentLog={{ jobId: JobId("collection"), output: researchLog(text) }}
       />,
     );
     expect(screen.getByText("已处理").parentElement?.textContent).toBe(
@@ -141,6 +143,7 @@ describe("research details", () => {
         progress={undefined}
         operations={[]}
         observations={[observation(text, { gapBefore: true })]}
+        parentLog={{ jobId: JobId("collection"), output: researchLog(text) }}
       />,
     );
     expect(screen.getByText("这里只显示最近的日志。")).toBeTruthy();
@@ -186,6 +189,7 @@ describe("research details", () => {
       <ResearchDetails
         progress={undefined}
         operations={tasks}
+        parentLog={undefined}
         observations={[
           observation("行情输出\n", {
             jobId: JobId("market"),
@@ -213,6 +217,7 @@ describe("research details", () => {
       <ResearchDetails
         progress={undefined}
         operations={tasks}
+        parentLog={undefined}
         observations={[
           observation("行情输出\n", {
             jobId: JobId("market"),

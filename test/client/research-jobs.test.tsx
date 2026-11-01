@@ -651,6 +651,7 @@ describe("research task card", () => {
   it("observes concurrent operations and releases only removed step observations", () => {
     const firstId = JobId("stock-research-step-market");
     const secondId = JobId("stock-research-step-finance");
+    const thirdId = JobId("stock-research-step-risk");
     const rows = [
       row(),
       row({
@@ -665,6 +666,7 @@ describe("research task card", () => {
         label: "财务分析",
         progress: "核对现金流",
       }),
+      row({ id: thirdId, kind: "stock-research-step", label: "风险分析" }),
     ];
     const h = jobsFixture(rows, {
       [jobId]: observation(progress({ operationIds: [firstId, secondId] })),
@@ -687,14 +689,47 @@ describe("research task card", () => {
     act(() =>
       h.update({
         rows: { [sessionId]: rows },
-        observed: { [jobId]: observation(progress({ operationIds: [] })) },
+        observed: {
+          [jobId]: observation(progress({ operationIds: [firstId] })),
+        },
       }),
     );
-    expect(h.unobserve).toHaveBeenCalledWith(firstId);
-    expect(h.unobserve).toHaveBeenCalledWith(secondId);
+    expect(h.unobserve.mock.calls).toEqual([[secondId]]);
+    act(() =>
+      h.update({
+        rows: { [sessionId]: rows },
+        observed: {
+          [jobId]: observation(progress({ operationIds: [firstId, thirdId] })),
+        },
+      }),
+    );
+    act(() =>
+      h.update({
+        rows: { [sessionId]: rows },
+        observed: {
+          [jobId]: observation(progress({ operationIds: [thirdId, firstId] })),
+        },
+      }),
+    );
+    expect(
+      vi.mocked(h.jobs.observe).mock.calls.filter(([, id]) => id === firstId),
+    ).toHaveLength(1);
+    expect(h.jobs.observe).toHaveBeenCalledWith(sessionId, thirdId);
+    expect(h.unobserve.mock.calls).toEqual([[secondId]]);
+    act(() =>
+      h.update({
+        rows: { [sessionId]: rows.filter(({ id }) => id !== firstId) },
+        observed: {
+          [jobId]: observation(progress({ operationIds: [firstId, thirdId] })),
+        },
+      }),
+    );
+    expect(h.unobserve.mock.calls).toEqual([[secondId], [firstId]]);
     expect(h.unobserve).not.toHaveBeenCalledWith(jobId);
     expect(h.unwatch).not.toHaveBeenCalled();
     mounted.unmount();
+    expect(h.unobserve).toHaveBeenCalledWith(thirdId);
+    expect(h.unobserve).toHaveBeenCalledTimes(4);
     expect(h.unobserve).toHaveBeenCalledWith(jobId);
     expect(h.unwatch).toHaveBeenCalledOnce();
   });
@@ -856,5 +891,34 @@ describe("research task card", () => {
     expect(h.jobs.watchRows).not.toHaveBeenCalled();
     expect(h.jobs.observe).not.toHaveBeenCalled();
     expect(screen.queryByRole("button")).toBeNull();
+  });
+
+  it("releases owned parent and operation observations when the card changes to another session", () => {
+    const operationId = JobId("stock-research-step-market");
+    const h = jobsFixture(
+      [row(), row({ id: operationId, kind: "stock-research-step" })],
+      {
+        [jobId]: observation(progress({ operationIds: [operationId] })),
+      },
+    );
+    const data = project([registered()]).data;
+    const mounted = render(
+      <ResearchJobCard data={data} sessionId={sessionId} jobs={h.jobs} />,
+    );
+    mounted.rerender(
+      <ResearchJobCard
+        data={data}
+        sessionId={SessionId("copied-session")}
+        jobs={h.jobs}
+      />,
+    );
+    expect(h.unwatch).toHaveBeenCalledOnce();
+    expect(h.unobserve.mock.calls.map(([id]) => id).sort()).toEqual(
+      [jobId, operationId].sort(),
+    );
+    expect(screen.queryByRole("button", { name: "取消调研" })).toBeNull();
+    expect(h.jobs.observe).toHaveBeenCalledTimes(2);
+    mounted.unmount();
+    expect(h.unobserve).toHaveBeenCalledTimes(2);
   });
 });

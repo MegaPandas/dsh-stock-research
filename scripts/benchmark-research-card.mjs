@@ -13,6 +13,7 @@ const { ResearchJobCard } = await import(
   pathToFileURL(resolve(process.argv[2])).href
 );
 const dom = new JSDOM("<!doctype html><html><body></body></html>");
+const { document } = dom.window;
 const previousGlobals = new Map();
 for (const [key, value] of Object.entries({
   window: dom.window,
