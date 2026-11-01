@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { SqliteCache } from "../../src/cache/index.js";
 import type { CollectionSnapshot } from "../../src/contracts/collection.js";
 import type { QueryPolicy } from "../../src/contracts/query.js";
@@ -18,9 +18,17 @@ import { COLLECTION_INPUT } from "../../src/app/collection-snapshot.js";
 import { CN_SECURITY } from "../fixtures/market.js";
 
 const cleanups: (() => Promise<void>)[] = [];
+beforeEach(() => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date("2024-01-03T08:00:00.000Z"));
+});
 afterEach(async () => {
-  for (const cleanup of cleanups.splice(0).reverse()) await cleanup();
-  vi.restoreAllMocks();
+  try {
+    for (const cleanup of cleanups.splice(0).reverse()) await cleanup();
+  } finally {
+    vi.restoreAllMocks();
+    vi.useRealTimers();
+  }
 });
 
 function setup(finishedAt = "2024-01-03T08:05:00.000Z") {
@@ -98,7 +106,14 @@ function setup(finishedAt = "2024-01-03T08:05:00.000Z") {
       },
     ],
   };
-  const collect = vi.spyOn(collection, "collect").mockResolvedValue(snapshot);
+  const collect = vi
+    .spyOn(collection, "collect")
+    .mockImplementation(async () => {
+      vi.setSystemTime(new Date(finishedAt));
+      for (const packet of snapshot.packets)
+        packet.envelope.retrievedAt = finishedAt;
+      return snapshot;
+    });
   const request: OpenResearchRequest = {
     scope,
     mode: "quick",
@@ -113,7 +128,6 @@ function setup(finishedAt = "2024-01-03T08:05:00.000Z") {
   };
   const ports = {
     collection,
-    now: () => new Date(finishedAt),
     openRun(input: Parameters<typeof runs.open>[1], requestId: string) {
       const { runId } = runs.open("opening-test", input, requestId);
       return runs.view({ runId });
@@ -127,19 +141,15 @@ it.each([
     mode: "quick" as const,
     version: "quick/10",
     finishedAt: "2024-01-03T08:05:00.000Z",
-    cutoff: "2024-01-03T08:05:00.000Z",
-    ageMs: 3_900_000,
   },
   {
     mode: "deep" as const,
     version: "deep/8",
     finishedAt: "2024-01-03T16:10:00.000Z",
-    cutoff: "2024-01-03T15:59:59.999Z",
-    ageMs: 32_399_999,
   },
 ])(
-  "opens $mode with completion cutoff, fixed inputs and stage gates",
-  async ({ mode, version, finishedAt, cutoff, ageMs }) => {
+  "opens $mode with the admission cutoff despite collection finishing at $finishedAt",
+  async ({ mode, version, finishedAt }) => {
     const f = setup(finishedAt);
     const view = await openResearch(
       f.ports,
@@ -150,7 +160,7 @@ it.each([
     expect(view).toMatchObject({
       mode,
       status: "active",
-      scope: { ...f.request.scope, cutoff },
+      scope: f.request.scope,
     });
     expect(f.runs.readDefinition(view.runId).stages?.[0]?.id).toBe("analysis");
     const catalog = f.runs.inputCatalog(view.runId);
@@ -160,10 +170,13 @@ it.each([
     );
     const input = catalog.inputs.find(({ name }) => name === COLLECTION_INPUT)!;
     const saved = f.runs.readInput<CollectionSnapshot>(view.runId, input.ref);
-    expect(saved.scope.cutoff).toBe(cutoff);
+    expect(new Date().toISOString()).toBe(finishedAt);
+    expect(saved).toEqual(f.snapshot);
+    expect(saved.scope.cutoff).toBe("2024-01-03T08:00:00.000Z");
     expect(saved.packets[0]!.envelope).toMatchObject({
-      cutoff,
-      ageMs,
+      cutoff: "2024-01-03T08:00:00.000Z",
+      retrievedAt: finishedAt,
+      ageMs: 3_600_000,
       stale: false,
     });
     const model = catalog.inputs.find(

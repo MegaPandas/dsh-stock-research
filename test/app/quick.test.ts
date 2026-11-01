@@ -333,16 +333,18 @@ describe("stock-quick real command boundary", () => {
     expect(evidence.gaps).toContainEqual(
       expect.objectContaining({ code: "unverified_time", field: "/data/rows" }),
     );
-    expect(evidence.retrievedAt <= evidence.cutoff).toBe(true);
+    expect(evidence.retrievedAt).toBe("2024-01-03T08:00:05.000Z");
+    expect(evidence.cutoff).toBe("2024-01-03T08:00:00.000Z");
     const collection = readCollection(h.runtime.runs, view.runId)!;
     expect(collection.packets).toHaveLength(1);
-    expect(
-      collection.packets[0]!.envelope.retrievedAt <= view.scope.cutoff,
-    ).toBe(true);
-    expect(collection.packets[0]!.envelope.cutoff).toBe(
+    expect(collection.scope).toEqual(view.scope);
+    expect(collection.packets[0]!.envelope.retrievedAt).toBe(
       "2024-01-03T08:00:05.000Z",
     );
-    expect(view.scope.cutoff).toBe("2024-01-03T08:00:05.000Z");
+    expect(collection.packets[0]!.envelope.cutoff).toBe(
+      "2024-01-03T08:00:00.000Z",
+    );
+    expect(view.scope.cutoff).toBe("2024-01-03T08:00:00.000Z");
     expect(collection.packets[0]).toMatchObject({
       id: "market.daily",
       envelope: {
