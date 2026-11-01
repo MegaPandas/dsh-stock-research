@@ -768,13 +768,6 @@ describe("write tools", () => {
     expect(g.generate).toHaveBeenCalledWith(
       expect.objectContaining({ taskId: "digest", scope: g.scope }),
       expect.any(AbortSignal),
-      expect.objectContaining({
-        runId: g.operation.runId,
-        taskId: "digest",
-        attempt: g.runs.readArtifact(saved.refs[0]!).attempt,
-        identity: g.coordinator.id,
-        sessionId: null,
-      }),
     );
     const content = g.runs.readArtifact(saved.refs[0]!).content;
     expect(content).toMatchObject({
