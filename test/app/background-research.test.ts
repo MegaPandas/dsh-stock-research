@@ -1,4 +1,7 @@
 import { setImmediate } from "node:timers/promises";
+import { join } from "node:path";
+import * as JsonlPersistence from "@deepseek-ai/dsh-session-persistence-jsonl";
+import SessionQuery from "@deepseek-ai/dsh-session-query-sqlite";
 import {
   createUserMessage,
   ToolCallId,
@@ -229,7 +232,9 @@ it("keeps the main Agent interactive, stops only a selected branch, and claims r
   const h = await quickHost(async function* (request) {
     if (isMainResearchRequest(request)) {
       const question = request.messages.findLast(
-        (message) => message.role === "user",
+        (message) =>
+          message.role === "user" &&
+          ["user", "stock-research"].includes(message.source?.kind ?? ""),
       )!;
       if (
         question.source?.kind === "user" &&
@@ -352,56 +357,70 @@ it("returns a background revision handle and reserves the original child session
   let runId: string | undefined;
   let originalRef: RunView["tasks"][number]["outputRefs"][number] | undefined;
   let revisionRequested = false;
-  const h = await quickHost(async function* (request) {
-    if (isMainResearchRequest(request)) {
-      if (phase === 0) {
-        const update = mainResearchRequest(request);
-        runId = update.runId!;
-        originalRef = h.runtime.runs
-          .view({ runId })
-          .tasks.find(({ taskId }) => taskId === "analysis.market")!
-          .outputRefs[0]!;
-        phase = 1;
-        yield* toolCall("stock_followup_task", {
-          runId,
-          taskId: "analysis.market",
-          message: feedback,
-          requestId: "revision",
-          resumeSearch: false,
-        });
-        return;
-      }
-      if (phase === 1) {
-        handle = lastToolResult<ResearchHandle>(request);
-        phase = 2;
-        yield* textResponse("修订已在后台进行。");
-        return;
-      }
-      phase = 3;
-    } else {
-      const input = initialInput<RoleInput>(request);
-      if (input.task.id === "analysis.market") {
-        const next = request.messages.findLast(({ role }) => role === "user")!;
-        if (
-          next.content.some(
-            (block) => block.type === "text" && block.text.includes(feedback),
-          ) &&
-          !revisionRequested
-        ) {
-          revisionRequested = true;
-          revised.started.resolve(request);
-          await revised.released.promise;
-          request.signal?.throwIfAborted();
-          const report = agentAnalysisReport();
-          report.summary = "Revised report in the retained child session.";
-          yield* reportSubmission(report, "revised-report", true);
+  const h = await quickHost(
+    async function* (request) {
+      if (isMainResearchRequest(request)) {
+        if (phase === 0) {
+          const update = mainResearchRequest(request);
+          runId = update.runId!;
+          originalRef = h.runtime.runs
+            .view({ runId })
+            .tasks.find(({ taskId }) => taskId === "analysis.market")!
+            .outputRefs[0]!;
+          phase = 1;
+          yield* toolCall("stock_followup_task", {
+            runId,
+            taskId: "analysis.market",
+            message: feedback,
+            requestId: "revision",
+            resumeSearch: false,
+          });
           return;
         }
-        originalSession ??= String(request.sessionId);
+        if (phase === 1) {
+          handle = lastToolResult<ResearchHandle>(request);
+          phase = 2;
+          yield* textResponse("修订已在后台进行。");
+          return;
+        }
+        phase = 3;
+      } else {
+        const input = initialInput<RoleInput>(request);
+        if (input.task.id === "analysis.market") {
+          const next = request.messages.findLast(
+            ({ role }) => role === "user",
+          )!;
+          if (
+            next.content.some(
+              (block) => block.type === "text" && block.text.includes(feedback),
+            ) &&
+            !revisionRequested
+          ) {
+            revisionRequested = true;
+            revised.started.resolve(request);
+            await revised.released.promise;
+            request.signal?.throwIfAborted();
+            const report = agentAnalysisReport();
+            report.summary = "Revised report in the retained child session.";
+            yield* reportSubmission(report, "revised-report", true);
+            return;
+          }
+          originalSession ??= String(request.sessionId);
+        }
       }
-    }
-    yield* model.respond(request);
-  });
+      yield* model.respond(request);
+    },
+    async ({ ctx, directory }) => {
+      await ctx.plugin(JsonlPersistence, {
+        root: join(directory, "sessions"),
+        compression: "none",
+      });
+      await ctx.plugin(SessionQuery, {
+        path: join(directory, "query.sqlite"),
+        openAt: "never",
+      });
+    },
+  );
   cleanups.push(h.close, () => revised.released.resolve());
   const root = await start(h);
   const request = await Promise.race([

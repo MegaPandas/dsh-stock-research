@@ -86,21 +86,24 @@ export function researchCommands(ctx: Context, agent: Agent) {
       ["stock-research", "stock-research-step"].includes(event.data.kind)
     )
       activities.push({ jobId: event.data.jobId });
-    if (
-      event.type === "user/message" &&
-      event.data.source?.kind === "stock-research"
-    ) {
+    if (event.type === "user/message") {
       const text = event.data.content
         .filter((block) => block.type === "text")
         .map((block) => block.text)
         .join("\n");
       const marker = "Research request: ";
-      const notice = JSON.parse(
-        text.slice(text.lastIndexOf(marker) + marker.length),
-      ) as { runId?: string; jobId: string; notice: string };
-      notice.notice = (event.data.source as { notice: string }).notice;
-      notices.push(notice);
-      activities.push(notice);
+      if (text.includes(marker)) {
+        const activity = JSON.parse(
+          text.slice(text.lastIndexOf(marker) + marker.length),
+        ) as { runId?: string; jobId?: string };
+        activities.push(activity);
+        if (event.data.source?.kind === "stock-research")
+          notices.push({
+            ...activity,
+            jobId: event.data.source.jobId,
+            notice: event.data.source.notice,
+          });
+      }
     }
     if (event.type === "tool/result" && event.data.message.isError)
       toolFailures.push(

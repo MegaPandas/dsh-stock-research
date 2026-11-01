@@ -122,7 +122,7 @@ describe("stock-deep command and resume", () => {
         instructions: [],
       })}`,
     );
-    expect(result?.result.kind).toBe("success");
+    expect(result?.result.kind, result?.result.text).toBe("success");
     const view = h.runtime.runs.view({ runId: before.runId });
     expect(view.scope).toEqual(before.scope);
     expect(view.mode).toBe("deep");
