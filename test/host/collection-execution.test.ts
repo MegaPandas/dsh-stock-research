@@ -24,7 +24,7 @@ function response() {
     JSON.stringify({
       code: 0,
       data: {
-        sz002594: { day: [["2024-01-03", "100", "102", "105", "95", "1000"]] },
+        sh600519: { day: [["2024-01-03", "100", "102", "105", "95", "1000"]] },
       },
     }),
   );
@@ -253,7 +253,7 @@ it("preserves cancellation record failures through scheduling and the independen
   const save = CollectionSnapshotStore.prototype.save;
   const failure = new Error("Cannot retain the cancelled data node");
   vi.spyOn(CollectionSnapshotStore.prototype, "save").mockImplementation(
-    function (record: CollectionRecord) {
+    function (this: CollectionSnapshotStore, record: CollectionRecord) {
       if (record.status === "cancelled") throw failure;
       return save.call(this, record);
     },

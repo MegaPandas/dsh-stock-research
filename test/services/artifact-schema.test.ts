@@ -60,7 +60,8 @@ function decision(): DecisionResult {
     finalizedAt: "2024-07-01T00:00:00.000Z",
   };
 }
-function payloads(): ArtifactPayloads {
+type BusinessArtifactKind = Exclude<ArtifactKind, "collection">;
+function payloads(): Pick<ArtifactPayloads, BusinessArtifactKind> {
   return {
     analysis: {
       findings: [statement],
@@ -98,7 +99,7 @@ function payloads(): ArtifactPayloads {
   };
 }
 function artifact(
-  kind: ArtifactKind = "analysis",
+  kind: BusinessArtifactKind = "analysis",
   payload: unknown = payloads()[kind],
 ) {
   return {
@@ -122,6 +123,39 @@ function invalid(value: unknown, path: string) {
 }
 
 describe("parseArtifactInput payload boundary", () => {
+  it("rejects an internal fixed data output at the model content boundary", () => {
+    invalid(
+      {
+        ...artifact(),
+        kind: "collection",
+        body: "固定数据节点",
+        inputRefs: [],
+        claims: [],
+        payload: {
+          snapshot: {
+            schemaVersion: 1,
+            node: "macro",
+            scope: {
+              security: {
+                id: "US:EXAMPLE",
+                market: "US",
+                symbol: "EXAMPLE",
+                exchange: "NASDAQ",
+                currency: "USD",
+                timeZone: "America/New_York",
+              },
+              date: "2024-06-30",
+              cutoff: "2024-06-30T20:00:00.000Z",
+            },
+            packets: [],
+            failures: [],
+          },
+          capturedFrom: null,
+        },
+      },
+      "unknown artifact kind",
+    );
+  });
   it.each([
     "analysis",
     "debate",

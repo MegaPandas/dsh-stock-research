@@ -1,5 +1,4 @@
 import type { JsonSchemaNode } from "@deepseek-ai/dsh-tools";
-import type { ArtifactKind } from "../contracts/artifacts.js";
 import {
   artifactRefSchema,
   objectSchema,
@@ -7,14 +6,8 @@ import {
   stringSchema,
 } from "../host/tool-protocol/parameters.js";
 
-type RoleArtifactKind = Exclude<ArtifactKind, "digest" | "decision" | "report">;
-const KINDS: readonly RoleArtifactKind[] = [
-  "analysis",
-  "debate",
-  "risk",
-  "plan",
-  "decision_draft",
-];
+const KINDS = ["analysis", "debate", "risk", "plan", "decision_draft"] as const;
+type RoleArtifactKind = (typeof KINDS)[number];
 const list = (items: JsonSchemaNode): JsonSchemaNode => ({
   type: "array",
   items,
