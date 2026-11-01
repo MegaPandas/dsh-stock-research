@@ -1,18 +1,47 @@
 import assert from "node:assert/strict";
 import { Buffer } from "node:buffer";
 import console from "node:console";
+import fs from "node:fs";
 import { mkdtempSync, rmSync } from "node:fs";
 import { cpus, tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { performance } from "node:perf_hooks";
 import process from "node:process";
-import {
-  ArtifactService,
-  DataRoot,
-  NumberService,
-  createRunService,
-  RunStore,
-} from "@megapandas/dsh-stock-research/core";
+import { pathToFileURL } from "node:url";
+
+const core =
+  process.argv[2] === undefined
+    ? "@megapandas/dsh-stock-research/core"
+    : pathToFileURL(resolve(process.argv[2])).href;
+const { ArtifactService, DataRoot, NumberService, createRunService, RunStore } =
+  await import(core);
+
+function measure(action) {
+  const read = fs.readFileSync;
+  let manifestReads = 0;
+  let evidenceReads = 0;
+  let artifactReads = 0;
+  fs.readFileSync = function (path, ...args) {
+    const result = read.call(this, path, ...args);
+    const filename = String(path);
+    if (filename.endsWith("/manifest.json")) manifestReads++;
+    else if (/\/evidence\/.*\.json$/.test(filename)) evidenceReads++;
+    else if (/\/artifacts\/.*\.json$/.test(filename)) artifactReads++;
+    return result;
+  };
+  const start = performance.now();
+  try {
+    return {
+      result: action(),
+      ms: performance.now() - start,
+      manifestReads,
+      evidenceReads,
+      artifactReads,
+    };
+  } finally {
+    fs.readFileSync = read;
+  }
+}
 
 const directory = mkdtempSync(join(tmpdir(), "dsh-numbers-bench-"));
 const cutoff = "2024-01-02T21:00:00.000Z";
@@ -45,6 +74,19 @@ try {
             dependsOn: [],
             inputTasks: [],
             outputKinds: ["analysis"],
+            dataRequirements: [],
+            instructionVersion: 1,
+          },
+          {
+            id: "review",
+            executor: {
+              kind: "role",
+              role: "discussion",
+              specialty: "benchmark",
+            },
+            dependsOn: ["analysis"],
+            inputTasks: ["analysis"],
+            outputKinds: ["debate", "risk"],
             dataRequirements: [],
             instructionVersion: 1,
           },
@@ -177,9 +219,11 @@ try {
       gaps: [],
     },
   };
-  const submitStart = performance.now();
-  const committed = submitter.submitArtifact(operation, [content], "submit");
-  const submitMs = performance.now() - submitStart;
+  const submitted = measure(() =>
+    submitter.submitArtifact(operation, [content], "submit"),
+  );
+  const committed = submitted.result;
+  const submitMs = submitted.ms;
   assert.equal(committed.refs.length, 1);
   const repeated = Array.from({ length: samples }, () => {
     const start = performance.now();
@@ -189,6 +233,74 @@ try {
     return elapsed;
   }).sort((a, b) => a - b);
   assert.equal(store.read(runId).artifacts.length, 1);
+  const review = {
+    ...runs.claim({ runId, identity: "benchmark" }, "review", "claim-review"),
+    identity: "benchmark-review",
+    sessionId: null,
+  };
+  const pair = [
+    {
+      ...content,
+      kind: "debate",
+      title: "Synthetic debate",
+      inputRefs: committed.refs,
+      payload: {
+        side: "bull",
+        arguments: [
+          {
+            text: "Synthetic argument",
+            evidence: [],
+            numbers: [{ kind: "local", claimId: "price-0" }],
+          },
+        ],
+        rebuttals: [],
+        unresolved: [],
+      },
+    },
+    {
+      ...content,
+      kind: "risk",
+      title: "Synthetic risk",
+      inputRefs: committed.refs,
+      claims: content.claims.map((claim) => ({
+        ...claim,
+        value: 101,
+        source: { ...claim.source, selector: "/data/bars/0/high" },
+      })),
+      payload: { issues: [] },
+    },
+  ];
+  const beforeValidation = store.read(runId);
+  const validation = Array.from({ length: samples }, () => {
+    const { result, ...metrics } = measure(() =>
+      submitter.validateArtifact(review, pair, "review-draft"),
+    );
+    assert.deepEqual(result.contents, pair);
+    return metrics;
+  });
+  assert.deepEqual(store.read(runId), beforeValidation);
+  const pairPublished = measure(() =>
+    submitter.submitArtifact(review, pair, "submit-review"),
+  );
+  assert.equal(pairPublished.result.refs.length, 2);
+  for (let index = 0; index < 2; index++)
+    assert.deepEqual(
+      runs.readArtifact(pairPublished.result.refs[index]).content,
+      pair[index],
+    );
+  const afterPair = store.read(runId);
+  const pairReplayed = measure(() =>
+    submitter.submitArtifact(review, pair, "submit-review"),
+  );
+  assert.deepEqual(pairReplayed.result, pairPublished.result);
+  assert.deepEqual(store.read(runId), afterPair);
+  const pairTimes = validation.map(({ ms }) => ms).sort((a, b) => a - b);
+  const metrics = ({ ms, manifestReads, evidenceReads, artifactReads }) => ({
+    ms,
+    manifestReads,
+    evidenceReads,
+    artifactReads,
+  });
   console.log(
     JSON.stringify(
       {
@@ -207,11 +319,32 @@ try {
           claims: 1000,
           contentBytes: Buffer.byteLength(JSON.stringify(content)),
           submitMs,
+          manifestReads: submitted.manifestReads,
+          evidenceReads: submitted.evidenceReads,
+          artifactReads: submitted.artifactReads,
           repeatedCalls: samples,
           repeatMedianMs: repeated[Math.floor(samples / 2)],
           repeatP95Ms: repeated[Math.ceil(samples * 0.95) - 1],
           includes:
             "schema, references, numeric gate, atomic commit and rendered projection; repeats replay receipt and repair projection",
+        },
+        multiArtifactSubmission: {
+          artifacts: 2,
+          claimsPerArtifact: 1000,
+          validation: {
+            medianMs: pairTimes[Math.floor(samples / 2)],
+            manifestReadCounts: [
+              ...new Set(validation.map(({ manifestReads }) => manifestReads)),
+            ],
+            evidenceReadCounts: [
+              ...new Set(validation.map(({ evidenceReads }) => evidenceReads)),
+            ],
+            artifactReadCounts: [
+              ...new Set(validation.map(({ artifactReads }) => artifactReads)),
+            ],
+          },
+          submit: metrics(pairPublished),
+          replay: metrics(pairReplayed),
         },
       },
       null,
