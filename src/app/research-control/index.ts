@@ -202,6 +202,7 @@ export class ResearchApplication implements ResearchActions {
         const view = await openResearch(
           {
             collection: this.ports.collection,
+            now: () => new Date(),
             openRun: (input, id) => {
               const opened = this.ports.openRun(owner, input, id);
               // Attach before awaiting so cancellation can reach the published run.

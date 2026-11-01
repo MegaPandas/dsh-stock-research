@@ -267,6 +267,7 @@ export { CollectionService } from "./services/collection/index.js";
 export { createCollectionTaskFactory } from "./data/collection-tasks.js";
 export type {
   CollectionAccess,
+  CollectionNode,
   CollectionOptions,
   CollectionSourceConfig,
   CollectionTaskFactory,

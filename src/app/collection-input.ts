@@ -13,6 +13,7 @@ import { extractCandidates } from "../services/candidates.js";
 import { collectionSummary } from "../services/collection/view.js";
 import { readQuickSnapshots } from "./quick-snapshots.js";
 import { COLLECTION_INPUT } from "./collection-snapshot.js";
+import { collectionNodeForTable } from "../contracts/collection-node.js";
 
 const text = z.string().pattern(/\S/).required();
 const schema = z
@@ -73,19 +74,16 @@ function belongsToTask(
   dataset: DataEnvelope<unknown>["dataset"],
   id: string,
 ): boolean {
-  const equityBenchmark =
-    /^benchmark\.(shanghai|shenzhen|csi300|chinext)\./.test(id);
+  if (dataset !== "market" && dataset !== "fundamentals" && dataset !== "macro")
+    return false;
+  const node = collectionNodeForTable(id, dataset);
   if (taskId === "analysis.market" || taskId === "analysis.sentiment") {
-    return (
-      dataset === "market" && (!id.startsWith("benchmark.") || equityBenchmark)
-    );
+    return node === "required" || node === "market";
   }
   if (taskId === "analysis.fundamentals" || taskId === "analysis.business")
-    return dataset === "fundamentals";
+    return node === "fundamentals";
   if (taskId === "analysis.macro" || taskId === "analysis.geopolitics")
-    return (
-      dataset === "macro" || (id.startsWith("benchmark.") && !equityBenchmark)
-    );
+    return node === "macro";
   return false;
 }
 

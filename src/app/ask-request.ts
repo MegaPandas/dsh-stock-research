@@ -11,7 +11,7 @@ import { collectionDirectory } from "./collection-input.js";
 import { requireCollectionData } from "./collection-snapshot.js";
 
 export interface AskRequestPorts {
-  collection: CollectionAccess;
+  collection: Pick<CollectionAccess, "collect" | "finalizeScope">;
   recallTool(): ToolDefinition;
 }
 export interface PreparedAsk {

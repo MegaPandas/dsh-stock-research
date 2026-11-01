@@ -7,6 +7,7 @@ import type { QueryPolicy } from "../../contracts/query.js";
 import type { OpenRunInput, RunInput, RunView } from "../../contracts/runs.js";
 import type { SourceDescription } from "../../contracts/sources.js";
 import type { RunDefinition } from "../../contracts/workflow.js";
+import { researchCutoff } from "../research-scope.js";
 import {
   attachCollection,
   requireCollectionData,
@@ -31,8 +32,10 @@ export interface OpenResearchPorts {
       signal: AbortSignal,
       onProgress: (progress: CollectionProgress) => void,
     ): Promise<CollectionSnapshot>;
+    finalizeScope(snapshot: CollectionSnapshot, scope: ResearchScope): void;
   };
   openRun(input: OpenRunInput, requestId: string): RunView;
+  now(): Date;
 }
 
 export async function openResearch(
@@ -48,7 +51,11 @@ export async function openResearch(
   );
   requireCollectionData(collection);
   signal.throwIfAborted();
-  const scope = request.scope;
+  const scope = {
+    ...request.scope,
+    cutoff: researchCutoff(request.scope, ports.now()),
+  };
+  ports.collection.finalizeScope(collection, scope);
   const input = attachResearchStages(
     attachCollection(
       (request.mode === "quick" ? createQuickInput : createDeepInput)(

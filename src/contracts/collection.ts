@@ -10,6 +10,12 @@ import type {
 import type { QueryCachePolicy } from "./cache.js";
 
 export interface CollectionAccess {
+  collectNode(
+    scope: ResearchScope,
+    node: CollectionNode,
+    signal?: AbortSignal,
+    onProgress?: (progress: CollectionProgress) => void,
+  ): Promise<CollectionSnapshot>;
   collect(
     scope: ResearchScope,
     signal?: AbortSignal,
@@ -17,6 +23,8 @@ export interface CollectionAccess {
   ): Promise<CollectionSnapshot>;
   finalizeScope(snapshot: CollectionSnapshot, scope: ResearchScope): void;
 }
+
+export type CollectionNode = "required" | "market" | "fundamentals" | "macro";
 
 export interface CollectionColumn {
   label: string;
@@ -166,6 +174,7 @@ export interface CollectionDiagnostics {
 
 export interface CollectionSnapshot {
   schemaVersion: 1;
+  node?: CollectionNode;
   scope: ResearchScope;
   packets: CollectionPacket[];
   failures: CollectionFailure[];

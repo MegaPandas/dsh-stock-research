@@ -10,8 +10,10 @@ import type {
   CollectionSnapshot,
   CollectionRecord,
   CollectionDataset,
+  CollectionNode,
   CollectionTaskFactory,
 } from "../../contracts/collection.js";
+import { collectionNodeForTable } from "../../contracts/collection-node.js";
 import type { ResearchScope } from "../../contracts/data.js";
 import type { CollectionSnapshotStore } from "../../storage/collection-snapshots.js";
 import { collectionError } from "./errors.js";
@@ -52,13 +54,31 @@ export class CollectionService implements CollectionAccess {
     );
   }
 
-  async collect(
+  collect(
     scope: ResearchScope,
     signal?: AbortSignal,
     onProgress?: (progress: CollectionProgress) => void,
   ): Promise<CollectionSnapshot> {
+    return this.collectSelection(scope, undefined, signal, onProgress);
+  }
+
+  collectNode(
+    scope: ResearchScope,
+    node: CollectionNode,
+    signal?: AbortSignal,
+    onProgress?: (progress: CollectionProgress) => void,
+  ): Promise<CollectionSnapshot> {
+    return this.collectSelection(scope, node, signal, onProgress);
+  }
+
+  private async collectSelection(
+    scope: ResearchScope,
+    node: CollectionNode | undefined,
+    signal: AbortSignal | undefined,
+    onProgress: ((progress: CollectionProgress) => void) | undefined,
+  ): Promise<CollectionSnapshot> {
     const captured = structuredClone(scope);
-    const identity = serializeJson(captured);
+    const identity = serializeJson({ scope: captured, node: node ?? null });
     let observers = this.#progress.get(identity);
     if (observers === undefined) {
       observers = { waiters: 0, listeners: new Set() };
@@ -74,7 +94,7 @@ export class CollectionService implements CollectionAccess {
         identity,
         identity,
         (active) =>
-          this.execute(captured, active, (progress) => {
+          this.execute(captured, node, active, (progress) => {
             capturedObservers.latest = progress;
             for (const notify of capturedObservers.listeners) notify(progress);
           }),
@@ -110,6 +130,7 @@ export class CollectionService implements CollectionAccess {
 
   private async execute(
     scope: ResearchScope,
+    node: CollectionNode | undefined,
     signal: AbortSignal,
     onProgress: (progress: CollectionProgress) => void,
   ): Promise<CollectionSnapshot> {
@@ -120,12 +141,22 @@ export class CollectionService implements CollectionAccess {
       cacheMisses: 0,
       attempts: [],
     };
+    const options =
+      node === "required"
+        ? { ...this.#options, requireDailyMarket: true }
+        : this.#options;
+    const tasks = this.createTasks(scope, options);
     const { plans, disabled } = createCollectionPlans(
-      this.createTasks(scope, this.#options),
-      this.#options,
+      node === undefined
+        ? tasks
+        : tasks.filter(
+            ({ id, dataset }) => collectionNodeForTable(id, dataset) === node,
+          ),
+      options,
     );
     const snapshot: CollectionSnapshot = {
       schemaVersion: 1,
+      ...(node === undefined ? {} : { node }),
       scope,
       packets: [],
       failures: disabled,
@@ -172,7 +203,8 @@ export class CollectionService implements CollectionAccess {
         await run(plan, signal);
       }
       missingRequired =
-        this.#options.requireDailyMarket === true &&
+        options.requireDailyMarket === true &&
+        (node === undefined || node === "required") &&
         !snapshot.packets.some((packet) => packet.id === "market.daily");
       if (!missingRequired) {
         const stop = new AbortController();
