@@ -66,9 +66,9 @@ afterEach(() => {
 describe("decision required-data coverage", () => {
   it("accepts the latest adopted close without rerunning numeric validation", () => {
     const fixture = setup();
-    const calls = fixture.numbers.calls;
+    const calls = fixture.numbers.checks;
     expect(() => check(fixture)).not.toThrow();
-    expect(fixture.numbers.calls).toBe(calls);
+    expect(fixture.numbers.checks).toBe(calls);
   });
 
   it("does not use a valid older cited price to cover the packet's missing latest close", () => {

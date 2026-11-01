@@ -41,7 +41,7 @@ export interface ReadToolServices {
   reads: RunReadOperations;
   queries: Pick<QueryAccess, "health">;
   memory: Pick<MemoryAccess, "recall" | "recallForTask">;
-  numbers: NumberChecker;
+  numbers: Pick<NumberChecker, "checkNumbers">;
 }
 const opaqueObject: JsonSchemaNode = {
   type: "object",

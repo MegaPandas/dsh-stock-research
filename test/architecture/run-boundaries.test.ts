@@ -16,7 +16,7 @@ describe("run capability boundaries", () => {
   it.each([
     ["src/app/research-control/index.ts", "../../services/run/service.js"],
     ["src/tools/read.ts", "../services/run/service.js"],
-    ["src/services/numbers.ts", "./run/service.js"],
+    ["src/services/numbers/session.ts", "../run/service.js"],
     ["src/host/runtime.ts", "../services/run/service.js"],
     ["src/host/dispatch/index.ts", "../../services/run/service.js"],
     ["src/client/index.ts", "../services/run/service.js"],
@@ -62,8 +62,8 @@ describe("run capability boundaries", () => {
       'import type { RunAccess } from "../../contracts/run-access.js";',
     ],
     [
-      "src/services/numbers.ts",
-      'import type { RunReader } from "../contracts/run-access.js";',
+      "src/services/numbers/session.ts",
+      'import type { RunReader } from "../../contracts/run-access.js";',
     ],
     [
       "src/core.ts",

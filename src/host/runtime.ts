@@ -26,7 +26,7 @@ import { ArtifactService } from "../services/artifact-submission/index.js";
 import { DecisionService } from "../services/decisions.js";
 import { DigestService } from "../services/digest/index.js";
 import { MemoryService } from "../services/memory/index.js";
-import { NumberService } from "../services/numbers.js";
+import { NumberService } from "../services/numbers/index.js";
 import { QueryService } from "../services/query/index.js";
 import { TaskQueryService } from "../services/task-query.js";
 import { CollectionService } from "../services/collection/index.js";

@@ -59,7 +59,7 @@ export class ArtifactService {
       | "readInput"
     > &
       Pick<RunCommands, "artifactForCall" | "commitArtifact">,
-    private readonly numbers: NumberChecker,
+    private readonly numbers: Pick<NumberChecker, "checkNumbersBatch">,
   ) {}
 
   submitArtifact(
@@ -132,16 +132,19 @@ export class ArtifactService {
       }
     }
     this.checkReferences(operation, captured);
-    const checks = captured.flatMap((content, index) =>
-      isStageReport(content) && content.claims.length === 0
-        ? []
-        : [
-            this.numbers.checkNumbers(operation, {
-              kind: "pending",
-              contentId: `${contentId}/${index}`,
-              content,
-            }),
-          ],
+    const checks = this.numbers.checkNumbersBatch(
+      operation,
+      captured.flatMap((content, index) =>
+        isStageReport(content) && content.claims.length === 0
+          ? []
+          : [
+              {
+                kind: "pending" as const,
+                contentId: `${contentId}/${index}`,
+                content,
+              },
+            ],
+      ),
     );
     if (checks.some((check) => !check.passed))
       throw new ArtifactNumberError(checks);

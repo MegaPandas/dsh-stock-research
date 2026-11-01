@@ -10,7 +10,7 @@ import type { MarketData } from "../../src/contracts/data.js";
 import type { EvidenceInput } from "../../src/contracts/task-data.js";
 import { parseArtifactInput } from "../../src/artifacts/schema.js";
 import { DecisionService } from "../../src/services/decisions.js";
-import { NumberService } from "../../src/services/numbers.js";
+import { NumberService } from "../../src/services/numbers/index.js";
 import { createRunService } from "../../src/services/run/index.js";
 import { assembleAgentArtifact } from "../../src/services/agent-artifacts.js";
 import { agentAnalysisReport } from "../fixtures/analysis-report.js";
@@ -289,7 +289,7 @@ describe("decision finalization", () => {
       expect(c.runs.readArtifact(c.draftRef).decisionValidation?.version).toBe(
         2,
       );
-      const checked = vi.spyOn(NumberService.prototype, "checkNumbers");
+      const checked = vi.spyOn(NumberService.prototype, "checkNumbersBatch");
       const before = c.store.read(c.operation.runId);
       const result = new DecisionService(c.runs, c.now).decide(
         c.operation,

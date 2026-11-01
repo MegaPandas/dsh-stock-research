@@ -45,7 +45,7 @@ import { ArtifactService } from "../../src/services/artifact-submission/index.js
 import { DecisionService } from "../../src/services/decisions.js";
 import { DigestService } from "../../src/services/digest/index.js";
 import { MemoryService } from "../../src/services/memory/index.js";
-import { NumberService } from "../../src/services/numbers.js";
+import { NumberService } from "../../src/services/numbers/index.js";
 import { createRunService } from "../../src/services/run/index.js";
 import { DataRoot } from "../../src/storage/data-root.js";
 import { createControlTools } from "../../src/tools/control.js";

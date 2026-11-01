@@ -3,31 +3,33 @@ import type {
   ArtifactVersion,
   NumberInput,
   NumericClaim,
-} from "../contracts/artifacts.js";
-import type { ArtifactRef, SourceRef } from "../contracts/data.js";
-import { ResearchError } from "../contracts/errors.js";
+} from "../../contracts/artifacts.js";
+import type { ArtifactRef, SourceRef } from "../../contracts/data.js";
+import { ResearchError } from "../../contracts/errors.js";
 import type {
   ClaimCheck,
   NumberCheck,
-  NumberChecker,
+  NumberContext,
   NumberIssueCode,
   NumberTarget,
   NumberWarning,
-} from "../contracts/numbers.js";
-import type { EvidenceData } from "../contracts/query.js";
-import type { RunOperation } from "../contracts/runs.js";
-import type { RegisteredEvidenceRecord } from "../contracts/task-data.js";
-import { artifactKey } from "../contracts/artifact-identity.js";
-import { SelectorError } from "../json/pointer.js";
-import { EvidenceTimeError, verifyEvidence } from "../evidence/checks.js";
-import { PriceBasisError, verifyPriceBasis } from "../evidence/price-basis.js";
+} from "../../contracts/numbers.js";
+import type { EvidenceData } from "../../contracts/query.js";
+import type { RegisteredEvidenceRecord } from "../../contracts/task-data.js";
+import { artifactKey } from "../../contracts/artifact-identity.js";
+import { SelectorError } from "../../json/pointer.js";
+import { EvidenceTimeError, verifyEvidence } from "../../evidence/checks.js";
+import {
+  PriceBasisError,
+  verifyPriceBasis,
+} from "../../evidence/price-basis.js";
 import {
   numberField,
   referenceField,
   type NumberField,
-} from "../evidence/fields.js";
-import type { RunReader } from "../contracts/run-access.js";
-import { createValuationReader } from "./valuation/records.js";
+} from "../../evidence/fields.js";
+import type { RunReader } from "../../contracts/run-access.js";
+import { createValuationReader } from "../valuation/records.js";
 
 export const NUMBER_CHECK_VERSION = "1";
 // Division and subtraction admit binary rounding; this is not a business/display tolerance.
@@ -50,24 +52,34 @@ interface ResolvedNumber {
   source?: SourceRef;
 }
 
-export class NumberService implements NumberChecker {
-  constructor(
-    private readonly runs: Pick<
-      RunReader,
-      | "numberContext"
-      | "readArtifact"
-      | "readEvidence"
-      | "inputCatalog"
-      | "readInput"
-    >,
-  ) {}
+export type NumberReads = Pick<
+  RunReader,
+  | "numberContext"
+  | "readArtifact"
+  | "readEvidence"
+  | "inputCatalog"
+  | "readInput"
+>;
 
-  checkNumbers(operation: RunOperation, target: NumberTarget): NumberCheck {
-    const captured = structuredClone(target);
-    const context = this.runs.numberContext(operation.runId);
-    const artifacts = new Map<string, ArtifactVersion>();
-    const evidence = new Map<string, RegisteredEvidenceRecord<EvidenceData>>();
-    let valuationReader: ReturnType<typeof createValuationReader> | undefined;
+/** Own fixed reads for one synchronous group; each target keeps its local calculation state. */
+export class NumberCheckSession {
+  private readonly context: NumberContext;
+  private readonly artifacts = new Map<string, ArtifactVersion>();
+  private readonly evidence = new Map<
+    string,
+    RegisteredEvidenceRecord<EvidenceData>
+  >();
+  private valuationReader: ReturnType<typeof createValuationReader> | undefined;
+
+  constructor(
+    private readonly runs: NumberReads,
+    runId: string,
+  ) {
+    this.context = runs.numberContext(runId);
+  }
+
+  check(captured: NumberTarget): NumberCheck {
+    const { context, artifacts, evidence } = this;
     const inputArtifact = (ref: ArtifactRef): ArtifactVersion => {
       if (ref.runId !== context.runId)
         fail(
@@ -87,7 +99,7 @@ export class NumberService implements NumberChecker {
     let content: ArtifactInput;
     if (captured.kind === "pending") content = captured.content;
     else {
-      if (captured.ref.runId !== operation.runId)
+      if (captured.ref.runId !== context.runId)
         throw new ResearchError(
           "ACCESS_DENIED",
           "The target artifact belongs to another run.",
@@ -226,9 +238,9 @@ export class NumberService implements NumberChecker {
           };
         } else if (claim.kind === "estimated") {
           if (claim.calculationId !== undefined) {
-            const calculation = (valuationReader ??= createValuationReader(
+            const calculation = (this.valuationReader ??= createValuationReader(
               this.runs,
-              operation.runId,
+              context.runId,
             )).read(claim.calculationId);
             if (
               calculation.result.perShareValues.length !== 1 ||

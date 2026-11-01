@@ -24,7 +24,7 @@ import { SessionBindings } from "../../src/host/bindings.js";
 import { RunStore } from "../../src/runs/store.js";
 import { createRunService } from "../../src/services/run/index.js";
 import { ArtifactService } from "../../src/services/artifact-submission/index.js";
-import { NumberService } from "../../src/services/numbers.js";
+import { NumberService } from "../../src/services/numbers/index.js";
 import { assembleAgentArtifact } from "../../src/services/agent-artifacts.js";
 import type { AgentReport } from "../../src/contracts/agent-reports.js";
 import type { NumberTarget } from "../../src/contracts/numbers.js";
@@ -242,8 +242,8 @@ it("shares calculation citation reads across one submission and observes later i
         String(path).endsWith(`/inputs/${id}.json`),
       ),
     );
-    // Two citation records, plus each artifact's independent numeric validation.
-    expect(calculationReads).toHaveLength(6);
+    // Citation checks and the numeric batch each read the two fixed calculations once.
+    expect(calculationReads).toHaveLength(4);
   } finally {
     read.mockRestore();
   }

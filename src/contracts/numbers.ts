@@ -4,6 +4,10 @@ import type { ResearchRun, RunOperation } from "./runs.js";
 
 export interface NumberChecker {
   checkNumbers(operation: RunOperation, target: NumberTarget): NumberCheck;
+  checkNumbersBatch(
+    operation: RunOperation,
+    targets: readonly NumberTarget[],
+  ): NumberCheck[];
 }
 
 export type NumberTarget =

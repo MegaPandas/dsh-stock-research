@@ -15,7 +15,7 @@ import { createQuickInput } from "../../src/app/plan/quick.js";
 import type { ResearchScope } from "../../src/contracts/data.js";
 import type { OpenRunInput } from "../../src/contracts/runs.js";
 import { ArtifactService } from "../../src/services/artifact-submission/index.js";
-import { NumberService } from "../../src/services/numbers.js";
+import { NumberService } from "../../src/services/numbers/index.js";
 import { analysis } from "../fixtures/dispatch-host.js";
 import {
   initialInput,

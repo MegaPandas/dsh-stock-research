@@ -65,10 +65,13 @@ describe("artifact rule boundaries", () => {
   );
 
   it.each([
-    'import { object } from "../artifacts/shape.js";',
-    'const parser = import("../artifacts/nested/new-parser.js");',
+    'import { object } from "../../artifacts/shape.js";',
+    'const parser = import("../../artifacts/nested/new-parser.js");',
   ])("keeps parsing implementation files private", async (source) => {
-    const errors = await boundaryErrors("src/services/numbers.ts", source);
+    const errors = await boundaryErrors(
+      "src/services/numbers/session.ts",
+      source,
+    );
     expect(errors).toHaveLength(1);
     expect(errors[0]!.messageId).toBe("privateEntry");
   });
@@ -122,6 +125,34 @@ describe("artifact rule boundaries", () => {
   ])("allows the submission boundary from %s", async (file, dependency) => {
     expect(
       await boundaryErrors(file, `import { Value } from "${dependency}";`),
+    ).toEqual([]);
+  });
+
+  it.each([
+    ["src/core.ts", "./services/numbers/session.js"],
+    ["src/services/artifact-submission/index.ts", "../numbers/session.js"],
+    ["src/tools/read.ts", "../services/numbers/nested/internal.js"],
+  ])(
+    "keeps numeric check sessions private from %s",
+    async (file, dependency) => {
+      const errors = await boundaryErrors(
+        file,
+        `export * from "${dependency}";`,
+      );
+      expect(errors).toHaveLength(1);
+      expect(errors[0]!.messageId).toBe("privateEntry");
+    },
+  );
+
+  it.each([
+    ["src/core.ts", "./services/numbers/index.js"],
+    ["src/services/artifact-submission/index.ts", "../numbers/index.js"],
+  ])("allows the numeric checker entry from %s", async (file, dependency) => {
+    expect(
+      await boundaryErrors(
+        file,
+        `import { NumberService } from "${dependency}";`,
+      ),
     ).toEqual([]);
   });
 });

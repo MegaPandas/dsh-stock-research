@@ -14,7 +14,7 @@ async function boundaryErrors(filePath: string, source: string) {
 
 describe("shared evidence boundaries", () => {
   it.each([
-    ["src/evidence/fields.ts", "../services/numbers.js"],
+    ["src/evidence/fields.ts", "../services/numbers/index.js"],
     ["src/evidence/checks.ts", "../services/run/index.js"],
     ["src/evidence/price-basis.ts", "../storage/data-root.js"],
     ["src/evidence/fields.ts", "../runs/store.js"],
@@ -25,7 +25,7 @@ describe("shared evidence boundaries", () => {
     ["src/evidence/price-basis.ts", "../tools/read.js"],
     ["src/evidence/fields.ts", "node:fs"],
     ["src/evidence/checks.ts", "@deepseek-ai/dsh-agent"],
-    ["src/evidence/nested/internal.ts", "../../services/numbers.js"],
+    ["src/evidence/nested/internal.ts", "../../services/numbers/index.js"],
   ])("keeps %s independent of %s", async (file, dependency) => {
     const errors = await boundaryErrors(file, `export * from "${dependency}";`);
     expect(errors).toHaveLength(1);
@@ -41,7 +41,7 @@ describe("shared evidence boundaries", () => {
     ["src/app/reference-price.ts", "../evidence/fields.js"],
     ["src/services/artifacts.ts", "../evidence/checks.js"],
     ["src/services/artifact-inputs.ts", "../evidence/fields.js"],
-    ["src/services/numbers.ts", "../evidence/price-basis.js"],
+    ["src/services/numbers/session.ts", "../../evidence/price-basis.js"],
     ["src/services/decision-basics.ts", "../evidence/price-basis.js"],
     ["src/services/decision-requirements.ts", "../evidence/fields.js"],
   ])("allows %s to use the declared entry %s", async (file, dependency) => {
@@ -51,10 +51,13 @@ describe("shared evidence boundaries", () => {
   });
 
   it.each([
-    'import type { Value } from "../evidence/new-internal.js";',
-    'const value = import("../evidence/nested/new-internal.js");',
+    'import type { Value } from "../../evidence/new-internal.js";',
+    'const value = import("../../evidence/nested/new-internal.js");',
   ])("keeps new evidence implementation files private", async (source) => {
-    const errors = await boundaryErrors("src/services/numbers.ts", source);
+    const errors = await boundaryErrors(
+      "src/services/numbers/session.ts",
+      source,
+    );
     expect(errors).toHaveLength(1);
     expect(errors[0]!.messageId).toBe("privateEntry");
   });

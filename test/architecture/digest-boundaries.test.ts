@@ -23,7 +23,7 @@ describe("digest boundaries", () => {
       "src/services/decisions.ts",
       'import { digestNumbers } from "./digest/inputs.js";',
     ],
-    ["src/services/numbers.ts", 'export * from "./digest/draft.js";'],
+    ["src/services/numbers/session.ts", 'export * from "../digest/draft.js";'],
     [
       "src/host/runtime.ts",
       'const value = import("../services/digest/nested/new-internal.js");',

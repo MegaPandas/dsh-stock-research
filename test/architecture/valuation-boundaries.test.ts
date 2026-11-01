@@ -16,8 +16,8 @@ async function boundaryErrors(filePath: string, source: string) {
 describe("valuation module boundaries", () => {
   it.each([
     [
-      "src/services/numbers.ts",
-      'import { calculateValuation } from "./valuation/calculate.js";',
+      "src/services/numbers/session.ts",
+      'import { calculateValuation } from "../valuation/calculate.js";',
     ],
     [
       "src/services/valuation/records.ts",
@@ -72,7 +72,7 @@ describe("valuation module boundaries", () => {
     ["src/valuation/requests.ts", "../json/schema.js"],
     ["src/valuation/report-policy.ts", "./rating-policy.js"],
     ["src/valuation/rating-policy.ts", "../contracts/rating-policy.js"],
-    ["src/services/numbers.ts", "./valuation/records.js"],
+    ["src/services/numbers/session.ts", "../valuation/records.js"],
     ["src/services/valuation/reports.ts", "../../valuation/report-policy.js"],
     ["src/services/valuation/calculate.ts", "./records.js"],
   ])(
@@ -90,8 +90,8 @@ describe("valuation module boundaries", () => {
       'import { value } from "../services/valuation/internal.js";',
     ],
     [
-      "src/services/numbers.ts",
-      'const value = import("./valuation/nested/internal.js");',
+      "src/services/numbers/session.ts",
+      'const value = import("../valuation/nested/internal.js");',
     ],
     ["src/core.ts", 'export * from "./services/valuation/internal.js";'],
   ])("keeps valuation internals private from %s", async (file, source) => {

@@ -20,7 +20,7 @@ describe("query module boundaries", () => {
       "../../services/query/source-queries.js",
     ],
     ["src/tools/read.ts", "../services/query/source-queries.js"],
-    ["src/services/numbers.ts", "./query/source-queries.js"],
+    ["src/services/numbers/session.ts", "../query/source-queries.js"],
     ["src/host/runtime.ts", "../services/query/source-queries.js"],
     ["src/client/index.ts", "../services/query/source-queries.js"],
     ["src/core.ts", "./services/query/source-queries.js"],

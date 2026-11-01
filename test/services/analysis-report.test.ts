@@ -68,7 +68,7 @@ function stageFixture(
   const report = agentAnalysisReport();
   report.content.currentState = ["最近收盘100美元/股。"];
   report.content.handoff.limitations = ["缺少交付数据，不能验证销量驱动假设。"];
-  const calls = fixture.numbers.calls;
+  const checks = fixture.numbers.checks;
   const content = assembleAgentArtifact("analysis", report, {
     taskId: task.id,
     specialty: "market",
@@ -93,7 +93,7 @@ function stageFixture(
     ref,
     inputs,
     versions,
-    priorNumberCalls: calls,
+    priorNumberChecks: checks,
   };
 }
 
@@ -167,7 +167,7 @@ describe("directional analysis reports", () => {
 
   it("publishes a business note without numeric-claim validation and checks provided data coverage", () => {
     const f = stageFixture();
-    expect(f.numbers.calls).toBe(f.priorNumberCalls);
+    expect(f.numbers.checks).toBe(f.priorNumberChecks);
     expect(f.runs.readArtifact(f.ref).content.payload).toEqual({
       schemaVersion: 3,
       report: f.report,

@@ -6,7 +6,7 @@ import type {
 } from "../../src/contracts/digests.js";
 import { DigestService } from "../../src/services/digest/index.js";
 import { ResearchError } from "../../src/contracts/errors.js";
-import { NumberService } from "../../src/services/numbers.js";
+import { NumberService } from "../../src/services/numbers/index.js";
 import { oneDigest } from "../fixtures/digest-conversation.js";
 import {
   decisionFixture,
@@ -199,17 +199,19 @@ describe("DigestService", () => {
   });
   it("uses the real number gate once for the new empty claim set", async () => {
     const c = setup();
-    const checked = vi.spyOn(NumberService.prototype, "checkNumbers");
+    const checked = vi.spyOn(NumberService.prototype, "checkNumbersBatch");
     await new DigestService(
       c.runs,
       c.artifacts,
       oneDigest(async (context) => draft(context)),
     ).makeDigest(c.operation, "digest", "make");
     expect(checked).toHaveBeenCalledTimes(1);
-    expect(checked.mock.calls[0]![1]).toMatchObject({
-      kind: "pending",
-      content: { kind: "digest", claims: [] },
-    });
+    expect(checked.mock.calls[0]![1]).toMatchObject([
+      {
+        kind: "pending",
+        content: { kind: "digest", claims: [] },
+      },
+    ]);
   });
   it("shares one model call for concurrent identical requests", async () => {
     const c = setup();

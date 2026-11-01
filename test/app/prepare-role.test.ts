@@ -24,7 +24,7 @@ import {
 import { calculationRequest, valuationRecord } from "../fixtures/valuation.js";
 import { createResearchPlugin } from "../../src/runtime.js";
 import { ArtifactService } from "../../src/services/artifact-submission/index.js";
-import { NumberService } from "../../src/services/numbers.js";
+import { NumberService } from "../../src/services/numbers/index.js";
 import { analysis } from "../fixtures/dispatch-host.js";
 import { MARKET_FIXTURE } from "../fixtures/market.js";
 import { runtimeHost, textResponse } from "../fixtures/runtime-host.js";

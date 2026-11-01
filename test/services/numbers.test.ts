@@ -1,18 +1,18 @@
 import fs from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type {
   ArtifactInput,
   NumericClaim,
 } from "../../src/contracts/artifacts.js";
 import type { MarketData, SourceRef } from "../../src/contracts/data.js";
-import type { NumberTarget } from "../../src/contracts/numbers.js";
+import type { NumberCheck, NumberTarget } from "../../src/contracts/numbers.js";
 import type { RunState } from "../../src/contracts/runs.js";
 import type { EvidenceInput } from "../../src/contracts/task-data.js";
 import { RunStore } from "../../src/runs/store.js";
 import { DataRoot } from "../../src/storage/data-root.js";
-import { NumberService } from "../../src/services/numbers.js";
+import { NumberService } from "../../src/services/numbers/index.js";
 import { createRunService } from "../../src/services/run/index.js";
 import {
   withIndicators,
@@ -207,6 +207,91 @@ afterEach(() => {
 });
 
 describe("numeric claim gate", () => {
+  it("shares fixed reads across targets while isolating local claim IDs and observing later invalidation", () => {
+    const c = setup();
+    const source = c.record();
+    const targets: NumberTarget[] = [
+      {
+        kind: "pending",
+        contentId: "first",
+        content: content([observed(source, 100)]),
+      },
+      {
+        kind: "pending",
+        contentId: "second",
+        content: content([
+          observed({ ...source, selector: "/data/bars/1/close" }, 120),
+        ]),
+      },
+    ];
+    const before = c.store.read(c.runId);
+    const reads = vi.spyOn(fs, "readFileSync");
+    let checks: NumberCheck[];
+    try {
+      checks = c.numbers.checkNumbersBatch(c.operation, targets);
+      expect(
+        reads.mock.calls.filter(([file]) =>
+          String(file).endsWith("/manifest.json"),
+        ),
+      ).toHaveLength(2);
+      expect(
+        reads.mock.calls.filter(([file]) =>
+          /\/evidence\/.*\.json$/.test(String(file)),
+        ),
+      ).toHaveLength(1);
+    } finally {
+      reads.mockRestore();
+    }
+    expect(
+      checks.map(({ passed, claims }) => ({
+        passed,
+        value: claims[0]!.claim.value,
+      })),
+    ).toEqual([
+      { passed: true, value: 100 },
+      { passed: true, value: 120 },
+    ]);
+    checks[0]!.claims[0]!.claim.value = 999;
+    expect(checks[1]!.claims[0]!.claim.value).toBe(120);
+    expect(
+      targets[0]!.kind === "pending" && targets[0]!.content.claims[0]!.value,
+    ).toBe(100);
+    expect(c.store.read(c.runId)).toEqual(before);
+    const foreign = c.numbers.checkNumbersBatch(c.operation, [
+      targets[0]!,
+      {
+        kind: "pending",
+        contentId: "foreign",
+        content: content([observed({ ...source, runId: "foreign" })]),
+      },
+    ]);
+    expect(foreign.map(({ passed }) => passed)).toEqual([true, false]);
+    expect(foreign[1]!.claims[0]!.issues[0]!.code).toBe("reference");
+    c.runs.redo({ runId: c.runId, identity: "owner" }, "a", "redo-batch");
+    expect(
+      c.numbers
+        .checkNumbersBatch(c.operation, targets)
+        .map(({ passed, claims }) => ({
+          passed,
+          code: claims[0]!.issues[0]!.code,
+        })),
+    ).toEqual([
+      { passed: false, code: "reference" },
+      { passed: false, code: "reference" },
+    ]);
+  });
+
+  it("returns an empty group without reading run state", () => {
+    const c = setup();
+    const reads = vi.spyOn(fs, "readFileSync");
+    try {
+      expect(c.numbers.checkNumbersBatch(c.operation, [])).toEqual([]);
+      expect(reads).not.toHaveBeenCalled();
+    } finally {
+      reads.mockRestore();
+    }
+  });
+
   it("checks manual historical selectors without candidate whitelist and leaves state unchanged", () => {
     const c = setup();
     const ref = c.record();
@@ -636,6 +721,26 @@ describe("numeric claim gate", () => {
     expect(
       c.numbers.checkNumbers(next, { kind: "artifact", ref: saved }).passed,
     ).toBe(true);
+    const historical: NumberTarget = { kind: "artifact", ref: saved };
+    const direct: NumberTarget = {
+      kind: "pending",
+      contentId: "old-direct",
+      content: content([observed(ref)]),
+    };
+    for (const targets of [
+      [historical, direct],
+      [direct, historical],
+    ])
+      expect(
+        c.numbers
+          .checkNumbersBatch(next, targets)
+          .map(({ target, passed }) => ({ kind: target.kind, passed })),
+      ).toEqual(
+        targets.map((target) => ({
+          kind: target.kind,
+          passed: target.kind === "artifact",
+        })),
+      );
     candidate.inputRefs = [];
     expect(
       c.numbers.checkNumbers(next, {

@@ -290,7 +290,10 @@ export type {
   NumberTargetRef,
   NumberWarning,
 } from "./contracts/numbers.js";
-export { NumberService, NUMBER_CHECK_VERSION } from "./services/numbers.js";
+export {
+  NumberService,
+  NUMBER_CHECK_VERSION,
+} from "./services/numbers/index.js";
 export type {
   AnalysisPayload,
   AnalysisReport,

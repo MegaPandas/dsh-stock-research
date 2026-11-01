@@ -17,17 +17,20 @@ import {
   ArtifactNumberError,
   ArtifactService,
 } from "../../src/services/artifact-submission/index.js";
-import { NumberService } from "../../src/services/numbers.js";
+import { NumberService } from "../../src/services/numbers/index.js";
 import { createRunService } from "../../src/services/run/index.js";
 import { RunStore } from "../../src/runs/store.js";
 import { DataRoot } from "../../src/storage/data-root.js";
 import { US_SECURITY } from "../fixtures/market.js";
 
 class CountedNumbers extends NumberService {
-  calls = 0;
-  override checkNumbers(operation: RunOperation, target: NumberTarget) {
-    this.calls++;
-    return super.checkNumbers(operation, target);
+  checks = 0;
+  override checkNumbersBatch(
+    operation: RunOperation,
+    targets: readonly NumberTarget[],
+  ) {
+    this.checks += targets.length;
+    return super.checkNumbersBatch(operation, targets);
   }
 }
 const cleanups: (() => void)[] = [];
@@ -205,7 +208,7 @@ describe("artifact submission boundary", () => {
     const c = setup();
     const content = c.analysis();
     const result = c.artifacts.submitArtifact(c.current, [content], "submit");
-    expect(c.numbers.calls).toBe(1);
+    expect(c.numbers.checks).toBe(1);
     expect(c.runs.view(c.operation).tasks[0]!.status).toBe("succeeded");
     expect(c.runs.readArtifact(result.refs[0]!).content).toEqual(content);
     content.claims[0]!.value = 999;
@@ -281,7 +284,7 @@ describe("artifact submission boundary", () => {
         "submit",
       ),
     ).toEqual(first);
-    expect(c.numbers.calls).toBe(1);
+    expect(c.numbers.checks).toBe(1);
     expect(() =>
       c.artifacts.submitArtifact(
         c.current,
@@ -289,7 +292,7 @@ describe("artifact submission boundary", () => {
         "submit",
       ),
     ).toThrowError(expect.objectContaining({ code: "REQUEST_CONFLICT" }));
-    expect(c.numbers.calls).toBe(1);
+    expect(c.numbers.checks).toBe(1);
   });
 
   it("replays after service reconstruction and repairs a missing projection without rechecking", () => {
@@ -318,7 +321,7 @@ describe("artifact submission boundary", () => {
         "submit",
       ),
     ).toEqual(committed);
-    expect(numbers.calls).toBe(0);
+    expect(numbers.checks).toBe(0);
     expect(fs.readFileSync(projection, "utf8")).toContain("Price 100 USD/股.");
   });
 
@@ -330,7 +333,7 @@ describe("artifact submission boundary", () => {
       expect(() =>
         c.artifacts.submitArtifact(c.current, [content], "submit"),
       ).toThrowError(expect.objectContaining({ code: "INVALID_ARTIFACT" }));
-      expect(c.numbers.calls).toBe(0);
+      expect(c.numbers.checks).toBe(0);
       expect(c.store.read(c.runId).artifacts).toEqual([]);
     },
   );
@@ -384,6 +387,91 @@ describe("artifact submission boundary", () => {
     ).toBe("succeeded");
   });
 
+  it("checks same-named claims independently and publishes none when the second output has a wrong value", () => {
+    const c = setup();
+    const parent = c.parent();
+    const operation = c.claim("review");
+    const debate: ResearchArtifactInput = {
+      kind: "debate",
+      title: "Discussion",
+      body: "Close {{number:base}}.",
+      inputRefs: [parent],
+      claims: [
+        {
+          id: "base",
+          kind: "observed",
+          value: 100,
+          unit: "USD/share",
+          source: c.source,
+        },
+      ],
+      payload: {
+        side: "bull",
+        arguments: [
+          {
+            text: "Synthetic close",
+            evidence: [],
+            numbers: [{ kind: "local", claimId: "base" }],
+          },
+        ],
+        rebuttals: [],
+        unresolved: [],
+      },
+    };
+    const risk: ResearchArtifactInput = {
+      kind: "risk",
+      title: "Risk",
+      body: "High {{number:base}}.",
+      inputRefs: [parent],
+      claims: [
+        {
+          id: "base",
+          kind: "observed",
+          value: 100,
+          unit: "USD/share",
+          source: { ...c.source, selector: "/data/bars/0/high" },
+        },
+      ],
+      payload: { issues: [] },
+    };
+    const before = c.store.read(c.runId);
+    expect(() =>
+      c.artifacts.submitArtifact(operation, [debate, risk], "pair"),
+    ).toThrowError(
+      expect.objectContaining({
+        code: "NUMBER_MISMATCH",
+        checks: [
+          expect.objectContaining({
+            passed: true,
+            target: { kind: "pending", contentId: "pair/0" },
+          }),
+          expect.objectContaining({
+            passed: false,
+            target: { kind: "pending", contentId: "pair/1" },
+            claims: [
+              expect.objectContaining({
+                issues: [expect.objectContaining({ code: "value" })],
+              }),
+            ],
+          }),
+        ],
+      }),
+    );
+    expect(c.store.read(c.runId)).toEqual(before);
+    risk.claims[0]!.value = 101;
+    const saved = c.artifacts.submitArtifact(operation, [debate, risk], "pair");
+    expect(
+      saved.refs.map(
+        (ref) => c.runs.readArtifact(ref).content.claims[0]!.value,
+      ),
+    ).toEqual([100, 101]);
+    const after = c.store.read(c.runId);
+    expect(after.revision).toBe(before.revision + 1);
+    expect(after.tasks.find((task) => task.taskId === "review")!.status).toBe(
+      "succeeded",
+    );
+  });
+
   it("requires the exact claimed default version while allowing declared historical inputs", () => {
     const c = setup();
     const ref = c.parent();
@@ -428,7 +516,7 @@ describe("artifact submission boundary", () => {
     expect(
       c.artifacts.submitArtifact(operation, [content], "submit").refs,
     ).toHaveLength(1);
-    expect(c.numbers.calls).toBe(3);
+    expect(c.numbers.checks).toBe(3);
     expect(c.runs.readArtifact(old).content.claims[0]!.value).toBe(100);
   });
   it("adopts qualitative evidence through a fixed historical artifact", () => {
@@ -445,7 +533,7 @@ describe("artifact submission boundary", () => {
     expect(
       c.artifacts.submitArtifact(next, [content], "submit").refs,
     ).toHaveLength(1);
-    expect(c.numbers.calls).toBe(2);
+    expect(c.numbers.checks).toBe(2);
     expect(c.runs.readArtifact(old).content.claims[0]!.value).toBe(100);
   });
 

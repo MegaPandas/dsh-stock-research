@@ -12,17 +12,20 @@ import type { NumberTarget } from "../../src/contracts/numbers.js";
 import type { EvidenceInput } from "../../src/contracts/task-data.js";
 import type { TaskDefinition } from "../../src/contracts/workflow.js";
 import { ArtifactService } from "../../src/services/artifact-submission/index.js";
-import { NumberService } from "../../src/services/numbers.js";
+import { NumberService } from "../../src/services/numbers/index.js";
 import { createRunService } from "../../src/services/run/index.js";
 import { RunStore } from "../../src/runs/store.js";
 import { DataRoot } from "../../src/storage/data-root.js";
 import { US_SECURITY } from "./market.js";
 
 class CountedNumbers extends NumberService {
-  calls = 0;
-  override checkNumbers(operation: RunOperation, target: NumberTarget) {
-    this.calls++;
-    return super.checkNumbers(operation, target);
+  checks = 0;
+  override checkNumbersBatch(
+    operation: RunOperation,
+    targets: readonly NumberTarget[],
+  ) {
+    this.checks += targets.length;
+    return super.checkNumbersBatch(operation, targets);
   }
 }
 export interface DecisionFixtureOptions {

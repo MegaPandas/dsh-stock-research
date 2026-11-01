@@ -63,6 +63,10 @@ export default defineConfig(
             publicEntries: ["records.js", "calculate.js", "reports.js"],
           },
           {
+            directory: "src/services/numbers",
+            publicEntries: ["index.js"],
+          },
+          {
             directory: "src/services/artifact-submission",
             publicEntries: ["index.js"],
           },
@@ -310,7 +314,7 @@ export default defineConfig(
   },
   {
     files: [
-      "src/services/numbers.ts",
+      "src/services/numbers/**/*.ts",
       "src/services/valuation/{records,reports}.ts",
     ],
     rules: {

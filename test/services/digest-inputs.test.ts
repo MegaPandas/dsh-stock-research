@@ -95,7 +95,7 @@ describe("fixed digest number inputs", () => {
     const inputs = new ArtifactInputs(fixture.runs);
     const versions = inputs.closure([fixture.draftRef]);
     const before = structuredClone(versions);
-    const calls = fixture.numbers.calls;
+    const calls = fixture.numbers.checks;
     const candidates = digestNumbers(versions, inputs);
     expect(candidates).toHaveLength(2);
     const base = candidates.find(({ input }) => input.claimId === "base")!;
@@ -124,7 +124,7 @@ describe("fixed digest number inputs", () => {
       2,
     );
     expect(versions).toEqual(before);
-    expect(fixture.numbers.calls).toBe(calls);
+    expect(fixture.numbers.checks).toBe(calls);
   });
 
   it("binds calculated local inputs to their owning version and retains the stored result", () => {
@@ -144,7 +144,7 @@ describe("fixed digest number inputs", () => {
       },
     });
     const inputs = new ArtifactInputs(fixture.runs);
-    const calls = fixture.numbers.calls;
+    const calls = fixture.numbers.checks;
     const candidates = digestNumbers(
       inputs.closure([fixture.draftRef]),
       inputs,
@@ -177,7 +177,7 @@ describe("fixed digest number inputs", () => {
       candidates.find(({ input }) => input.claimId === "base")!.input.artifact,
     ).toEqual(fixture.analysisRef);
     expect(candidates).toHaveLength(3);
-    expect(fixture.numbers.calls).toBe(calls);
+    expect(fixture.numbers.checks).toBe(calls);
   });
 
   it("deduplicates fixed inputs and reads their old facts after a later redo", () => {
@@ -185,7 +185,7 @@ describe("fixed digest number inputs", () => {
     const inputs = new ArtifactInputs(fixture.runs);
     const versions = inputs.closure([fixture.draftRef]);
     fixture.runs.redo(fixture.operation, "analysis", "later-redo");
-    const calls = fixture.numbers.calls;
+    const calls = fixture.numbers.checks;
     const candidates = digestNumbers([...versions, ...versions], inputs);
     expect(candidates).toHaveLength(2);
     expect(candidates.map(({ input }) => input)).toEqual(
@@ -197,7 +197,7 @@ describe("fixed digest number inputs", () => {
     expect(candidates.map(({ claim }) => claim.value)).toEqual(
       expect.arrayContaining([120, 100]),
     );
-    expect(fixture.numbers.calls).toBe(calls);
+    expect(fixture.numbers.checks).toBe(calls);
   });
 });
 
@@ -206,7 +206,7 @@ describe("fixed digest risk inputs", () => {
     const fixture = setup({ additionalTasks: [riskTask("risk-extra")] });
     const version = commitRisk(fixture, "risk-extra");
     const before = structuredClone(version);
-    const calls = fixture.numbers.calls;
+    const calls = fixture.numbers.checks;
     expect(inheritRisks([version])).toEqual([
       {
         issueId: "liquidity",
@@ -222,7 +222,7 @@ describe("fixed digest risk inputs", () => {
       },
     ]);
     expect(version).toEqual(before);
-    expect(fixture.numbers.calls).toBe(calls);
+    expect(fixture.numbers.checks).toBe(calls);
   });
 
   it("merges identical risk cores without losing or duplicating their fixed references", () => {

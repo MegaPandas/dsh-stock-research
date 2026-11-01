@@ -447,7 +447,7 @@ describe("write tools", () => {
   });
   it("persists complete role output and replays without another number check", async () => {
     const f = setup();
-    const checked = vi.spyOn(f.numbers, "checkNumbers");
+    const checked = vi.spyOn(f.numbers, "checkNumbersBatch");
     const args = { requestId: "save", contents: [analysis()] };
     const saved = (await f.call("stock_save_report", args)) as {
       refs: Parameters<typeof f.runs.readArtifact>[0][];
