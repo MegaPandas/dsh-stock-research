@@ -2,26 +2,23 @@ import { isDeepStrictEqual } from "node:util";
 import type {
   AgentReport,
   ValuationRecord,
-} from "../contracts/agent-reports.js";
-import type { DecisionProposal } from "../contracts/artifact-payloads.js";
-import type { NumericClaim } from "../contracts/artifacts.js";
-import type { ResearchScope } from "../contracts/data.js";
-import { ResearchError } from "../contracts/errors.js";
-import { decisionPolicy } from "../valuation/rating-policy.js";
-import type { RunReader } from "../contracts/run-access.js";
-import type { ValuationCalculation } from "../contracts/valuation.js";
-import type { TaskDefinition } from "../contracts/workflow.js";
-import { formatNumber, valueText } from "../report/render.js";
+} from "../../contracts/agent-reports.js";
+import type { DecisionProposal } from "../../contracts/artifact-payloads.js";
+import type { NumericClaim } from "../../contracts/artifacts.js";
+import type { ResearchScope } from "../../contracts/data.js";
+import { ResearchError } from "../../contracts/errors.js";
+import { decisionPolicy } from "../../valuation/rating-policy.js";
+import type { RunReader } from "../../contracts/run-access.js";
+import type { ValuationCalculation } from "../../contracts/valuation.js";
+import type { TaskDefinition } from "../../contracts/workflow.js";
+import { formatNumber, valueText } from "../../report/render.js";
 import {
   formatValuationDiagnostic,
   formatValuationStep,
-} from "../report/valuation-labels.js";
-import { valuationInputAt } from "../valuation/requests.js";
-import {
-  createValuationReader,
-  savedValuationMethods,
-} from "./valuation-records.js";
-import { validateRoleValuation } from "../valuation/report-policy.js";
+} from "../../report/valuation-labels.js";
+import { valuationInputAt } from "../../valuation/requests.js";
+import { createValuationReader, savedValuationMethods } from "./records.js";
+import { validateRoleValuation } from "../../valuation/report-policy.js";
 
 type CalculationReader = Pick<
   RunReader,

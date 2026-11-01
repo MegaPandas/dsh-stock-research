@@ -25,6 +25,12 @@ const pureImports = [
   "**/runs/**",
   "**/storage/**",
 ];
+const valuationRegistrationRestriction = {
+  selector:
+    ":matches(ImportDeclaration, ExportNamedDeclaration, ExportAllDeclaration, ImportExpression)[source.value=/(^|\\u002F)calculate\\.js$/]",
+  message:
+    "Valuation readers and reports must not depend on calculation registration.",
+};
 export default defineConfig(
   globalIgnores(["dist/", "coverage/"]),
   {
@@ -51,6 +57,10 @@ export default defineConfig(
           {
             directory: "src/services/run",
             publicEntries: ["index.js"],
+          },
+          {
+            directory: "src/services/valuation",
+            publicEntries: ["records.js", "calculate.js", "reports.js"],
           },
           {
             directory: "src/services/artifact-submission",
@@ -299,22 +309,27 @@ export default defineConfig(
     },
   },
   {
-    files: ["src/services/{numbers,valuation-records,valuation-reports}.ts"],
+    files: [
+      "src/services/numbers.ts",
+      "src/services/valuation/{records,reports}.ts",
+    ],
     rules: {
-      "no-restricted-syntax": [
-        "error",
-        {
-          selector:
-            ":matches(ImportDeclaration, ExportNamedDeclaration, ExportAllDeclaration)[source.value=/(^|\\u002F)valuation-calculations\\.js$/]",
-          message:
-            "Valuation readers and reports must not depend on calculation registration.",
-        },
-      ],
+      "no-restricted-syntax": ["error", valuationRegistrationRestriction],
     },
   },
   {
-    files: ["src/services/valuation-records.ts"],
+    files: ["src/services/valuation/records.ts"],
     rules: {
+      "no-restricted-syntax": [
+        "error",
+        valuationRegistrationRestriction,
+        {
+          selector:
+            "ImportExpression[source.value=/(^|\\u002F)(reports\\.js$|report\\u002F)/]",
+          message:
+            "Fixed valuation records must not depend on report rendering or integration layers.",
+        },
+      ],
       "no-restricted-imports": [
         "error",
         {
@@ -323,7 +338,7 @@ export default defineConfig(
               group: [
                 ...integrationImports,
                 "@deepseek-ai/*",
-                "**/valuation-reports.js",
+                "**/reports.js",
                 "**/report/**",
               ],
               message:

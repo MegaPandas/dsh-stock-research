@@ -1,7 +1,7 @@
 import type { ToolDefinition } from "@deepseek-ai/dsh-tools";
 import { authorizeRun, type SessionBindings } from "../host/bindings.js";
 import type { RunCommands, RunReader } from "../contracts/run-access.js";
-import { savedValuationMethods } from "../services/valuation-records.js";
+import { savedValuationMethods } from "../services/valuation/records.js";
 import {
   VALUATION_INPUT_SCHEMAS,
   valuationCalculationParameters,

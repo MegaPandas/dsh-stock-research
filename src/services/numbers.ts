@@ -27,7 +27,7 @@ import {
   type NumberField,
 } from "../evidence/fields.js";
 import type { RunReader } from "../contracts/run-access.js";
-import { createValuationReader } from "./valuation-records.js";
+import { createValuationReader } from "./valuation/records.js";
 
 export const NUMBER_CHECK_VERSION = "1";
 // Division and subtraction admit binary rounding; this is not a business/display tolerance.

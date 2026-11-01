@@ -29,16 +29,16 @@ import { assembleAgentArtifact } from "../../src/services/agent-artifacts.js";
 import type { AgentReport } from "../../src/contracts/agent-reports.js";
 import type { NumberTarget } from "../../src/contracts/numbers.js";
 import type { ResearchArtifactInput } from "../../src/contracts/artifact-payloads.js";
-import { calculateValuation } from "../../src/services/valuation-calculations.js";
+import { calculateValuation } from "../../src/services/valuation/calculate.js";
 import {
   materializeTargetPrice,
   materializeValuation,
   validateCalculatedReport,
-} from "../../src/services/valuation-reports.js";
+} from "../../src/services/valuation/reports.js";
 import {
   readValuationCalculation,
   valuationCalculationCatalog,
-} from "../../src/services/valuation-records.js";
+} from "../../src/services/valuation/records.js";
 import { DataRoot } from "../../src/storage/data-root.js";
 import {
   createValuationTools,
@@ -291,7 +291,7 @@ it("checks each value when distinct claims share immutable calculations", () => 
   ]);
 });
 
-it.each(["redo", "cancel"] as const)(
+it.each(["redo", "cancel", "fail"] as const)(
   "rejects previously checked calculations after %s on the next call",
   (action) => {
     const f = setup();
@@ -305,13 +305,54 @@ it.each(["redo", "cancel"] as const)(
     expect(numbers.checkNumbers(f.operation, target).passed).toBe(true);
     const owner = { runId: f.operation.runId, identity: "coordinator" };
     if (action === "redo") f.runs.redo(owner, f.operation.taskId, "invalidate");
-    else f.runs.cancel(owner, "invalidate");
+    else if (action === "cancel") f.runs.cancel(owner, "invalidate");
+    else
+      f.runs.failAttempt(
+        f.operation,
+        { code: "RESEARCH_FAILED", message: "Synthetic failed attempt." },
+        "invalidate",
+      );
     expect(valuationCalculationCatalog(f.runs, f.operation.runId)).toEqual([]);
+    expect(() =>
+      readValuationCalculation(
+        f.runs,
+        f.operation.runId,
+        calculation.calculationId,
+      ),
+    ).toThrow(/superseded|unsuccessful/);
+    expect(calculateValuation(f.runs, f.operation, supplied, "ps")).toEqual(
+      calculation,
+    );
     expect(() => numbers.checkNumbers(f.operation, target)).toThrow(
       /superseded|unsuccessful/,
     );
   },
 );
+
+it("reads the just-registered immutable result without rebuilding its validity index", () => {
+  const f = setup();
+  const reads = vi.spyOn(fs, "readFileSync");
+  let saved: ValuationCalculation;
+  try {
+    saved = calculateValuation(f.runs, f.operation, request(), "ps");
+    expect(
+      reads.mock.calls.filter(([path]) =>
+        String(path).endsWith("/manifest.json"),
+      ),
+    ).toHaveLength(7);
+  } finally {
+    reads.mockRestore();
+  }
+  expect(saved).toMatchObject({
+    taskId: f.operation.taskId,
+    attempt: f.operation.attempt,
+    createdAt: "2024-07-01T12:00:00.000Z",
+    result: { perShareValues: [13.5, 22.5] },
+  });
+  expect(
+    readValuationCalculation(f.runs, f.operation.runId, saved.calculationId),
+  ).toEqual(saved);
+});
 
 it("calculates independent amount/share scales and sensitivity, and persists immutable receipts", () => {
   const f = setup();

@@ -1,8 +1,8 @@
-import catalogue from "../valuation/methods.json" with { type: "json" };
-import { ResearchError } from "../contracts/errors.js";
-import type { RunReader } from "../contracts/run-access.js";
-import { VALUATION_METHODS_INPUT } from "../contracts/valuation.js";
-import type { ValuationCalculation } from "../contracts/valuation.js";
+import catalogue from "../../valuation/methods.json" with { type: "json" };
+import { ResearchError } from "../../contracts/errors.js";
+import type { RunReader } from "../../contracts/run-access.js";
+import { VALUATION_METHODS_INPUT } from "../../contracts/valuation.js";
+import type { ValuationCalculation } from "../../contracts/valuation.js";
 
 type CalculationReader = Pick<
   RunReader,

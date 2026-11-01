@@ -29,11 +29,11 @@ import {
   selectDecisionInputs,
 } from "../decision-basics.js";
 import { checkDecisionRequirements } from "./requirements.js";
-import { createValuationReader } from "../valuation-records.js";
+import { createValuationReader } from "../valuation/records.js";
 import {
   validateCalculatedReport,
   validateCalculatedTarget,
-} from "../valuation-reports.js";
+} from "../valuation/reports.js";
 
 function invalid(detail: string): never {
   throw new ResearchError("INVALID_ARTIFACT", detail);

@@ -1,24 +1,20 @@
-import { ResearchError } from "../contracts/errors.js";
-import { decisionPolicy } from "../valuation/rating-policy.js";
-import type { RunCommands, RunReader } from "../contracts/run-access.js";
-import type { TaskOperation } from "../contracts/runs.js";
+import { ResearchError } from "../../contracts/errors.js";
+import { decisionPolicy } from "../../valuation/rating-policy.js";
+import type { RunCommands, RunReader } from "../../contracts/run-access.js";
+import type { TaskOperation } from "../../contracts/runs.js";
 import {
   VALUATION_ENGINE_VERSION,
   type ValuationCalculation,
   type ValuationOutput,
   type ValuationRequest,
-} from "../contracts/valuation.js";
-import { evaluateValuation } from "../valuation/index.js";
-import { valuationDependencyIds } from "../valuation/dependencies.js";
+} from "../../contracts/valuation.js";
+import { evaluateValuation } from "../../valuation/index.js";
+import { valuationDependencyIds } from "../../valuation/dependencies.js";
 import {
   parseValuationRequest,
   sensitivityRequest,
-} from "../valuation/requests.js";
-import {
-  createValuationReader,
-  readValuationCalculation,
-  savedValuationMethods,
-} from "./valuation-records.js";
+} from "../../valuation/requests.js";
+import { createValuationReader, savedValuationMethods } from "./records.js";
 
 type CalculationReader = Pick<
   RunReader,
@@ -107,9 +103,9 @@ export function calculateValuation(
     },
     callId,
   );
-  return readValuationCalculation(
-    runs,
-    operation.runId,
-    registration.calculationId,
-  );
+  // Registration has committed this calculation for the current attempt.
+  return runs.readInput<ValuationCalculation>(operation.runId, {
+    kind: "input",
+    id: registration.calculationId,
+  });
 }

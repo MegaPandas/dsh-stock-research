@@ -1,7 +1,7 @@
 import type { ValuationCalculation } from "../contracts/valuation.js";
 import type { RunCommands, RunReader } from "../contracts/run-access.js";
-import { calculateValuation } from "../services/valuation-calculations.js";
-import { readValuationCalculation } from "../services/valuation-records.js";
+import { calculateValuation } from "../services/valuation/calculate.js";
+import { readValuationCalculation } from "../services/valuation/records.js";
 import {
   authorizeRun,
   taskOperation,
