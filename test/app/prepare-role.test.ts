@@ -10,7 +10,7 @@ import { createDeepInput } from "../../src/app/plan/deep.js";
 import { createReplayInput } from "../../src/app/replay-input.js";
 import { attachCollection } from "../../src/app/collection-snapshot.js";
 import type { CollectionSnapshot } from "../../src/contracts/collection.js";
-import type { ResearchScope } from "../../src/contracts/data.js";
+import type { ArtifactRef, ResearchScope } from "../../src/contracts/data.js";
 import { prepareResearchRole } from "../../src/app/role-preparation/index.js";
 import { RESEARCH_MODELS_INPUT } from "../../src/app/research-models.js";
 import {
@@ -21,7 +21,11 @@ import {
   VALUATION_METHODS_INPUT,
   type ValuationMethods,
 } from "../../src/app/valuation-methods.js";
-import { calculationRequest, valuationRecord } from "../fixtures/valuation.js";
+import {
+  calculationRequest,
+  valuationRecord,
+  valuationSelection,
+} from "../fixtures/valuation.js";
 import { createResearchPlugin } from "../../src/runtime.js";
 import { ArtifactService } from "../../src/services/artifact-submission/index.js";
 import { NumberService } from "../../src/services/numbers/index.js";
@@ -292,6 +296,79 @@ describe("persisted research role preparation", () => {
       },
     });
     await parent.dispose();
+  });
+
+  it("resolves calculations registered after preparation when writing the original draft", async () => {
+    const h = await host();
+    const { runId } = h.runtime.runs.open(
+      "owner",
+      h.input,
+      "open-late-calculation",
+    );
+    const context = h.runtime.runs.dispatchForCall(
+      { runId, identity: "owner" },
+      "analysis.fundamentals",
+      "prepare-fundamentals",
+    );
+    const provision = prepareResearchRole(h.runtime, context);
+    expect(prompt(provision).context.valuationCalculations).toEqual([]);
+    const handle = await h.runtime.createAgent(
+      h.agentOptions("late-calculation"),
+      {
+        kind: "task",
+        runId,
+        taskId: context.claim.taskId,
+        attempt: context.claim.attempt,
+      },
+      [],
+    );
+    try {
+      const exec = {
+        agent: handle.agent,
+        callId: "late-calculation",
+        signal: new AbortController().signal,
+      };
+      const execute = (name: string, value: unknown) =>
+        provision.tools
+          .find((tool) => tool.name === name)!
+          .execute(value, exec);
+      const calculation = (await execute(
+        "stock_calculate_valuation",
+        calculationRequest(),
+      )) as { calculationId: string };
+      const report = agentAnalysisReport();
+      const selection = valuationSelection(
+        valuationRecord(h.scope.date, h.scope.security.currency),
+      );
+      selection.methods[0]!.calculationIds = [calculation.calculationId];
+      await execute("stock_write_report", {
+        summary: report.summary,
+        ...report.content,
+        valuation: selection,
+      });
+      await execute("stock_write_handoff", reportHandoff(report));
+      const result = (await execute("stock_submit", {})) as {
+        refs: ArtifactRef[];
+      };
+      expect(
+        h.runtime.runs.readArtifact(result.refs[0]!).content.payload,
+      ).toMatchObject({
+        report: {
+          content: {
+            valuation: {
+              methods: [
+                {
+                  calculationIds: [calculation.calculationId],
+                  valueRange: { low: 192, high: 240, unit: "USD/share" },
+                },
+              ],
+            },
+          },
+        },
+      });
+    } finally {
+      await handle.dispose();
+    }
   });
 
   it("rejects a missing recorded valuation catalogue", async () => {

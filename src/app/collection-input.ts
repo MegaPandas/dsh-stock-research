@@ -102,8 +102,8 @@ export function registerCollectionSources(
   > &
     Pick<RunCommands, "evidenceForCall" | "recordEvidence" | "replayEvidence">,
   operation: TaskOperation,
+  snapshot: CollectionSnapshot | null,
 ) {
-  const snapshot = readCollection(runs, operation.runId);
   const scope = runs.view(operation).scope;
   const replay =
     snapshot === null ? null : runs.replaySnapshot(operation.runId);

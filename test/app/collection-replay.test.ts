@@ -2,7 +2,10 @@ import fs from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { registerCollectionSources } from "../../src/app/collection-input.js";
+import {
+  readCollection,
+  registerCollectionSources,
+} from "../../src/app/collection-input.js";
 import { attachCollection } from "../../src/app/collection-snapshot.js";
 import type { ResearchArtifactInput } from "../../src/contracts/artifact-payloads.js";
 import type { CollectionSnapshot } from "../../src/contracts/collection.js";
@@ -199,6 +202,7 @@ describe("deterministic collection replay identity", () => {
     const originalFundamental = registerCollectionSources(
       h.runs,
       fundamentals,
+      readCollection(h.runs, fundamentals.runId),
     )[0]!;
     const fundamentalRef = h.artifacts.submitArtifact(
       fundamentals,
@@ -206,7 +210,11 @@ describe("deterministic collection replay identity", () => {
       "save-fundamentals",
     ).refs[0]!;
     const business = h.claim("analysis.business");
-    const originalBusiness = registerCollectionSources(h.runs, business)[0]!;
+    const originalBusiness = registerCollectionSources(
+      h.runs,
+      business,
+      readCollection(h.runs, business.runId),
+    )[0]!;
     h.artifacts.submitArtifact(
       business,
       [
@@ -226,6 +234,7 @@ describe("deterministic collection replay identity", () => {
     const replayedFundamental = registerCollectionSources(
       h.runs,
       replayFundamental,
+      readCollection(h.runs, replayFundamental.runId),
     )[0]!;
     h.artifacts.submitArtifact(
       replayFundamental,
@@ -252,13 +261,18 @@ describe("deterministic collection replay identity", () => {
     const replayedBusiness = registerCollectionSources(
       h.runs,
       replayBusiness,
+      readCollection(h.runs, replayBusiness.runId),
     )[0]!;
     expect(
       h.runs.readEvidence(replayedBusiness.sourceRef).replayedFrom,
     ).toEqual(originalBusiness.sourceRef);
 
     const count = h.runs.numberContext(replayRun).evidence.length;
-    const repeated = registerCollectionSources(h.runs, replayBusiness)[0]!;
+    const repeated = registerCollectionSources(
+      h.runs,
+      replayBusiness,
+      readCollection(h.runs, replayBusiness.runId),
+    )[0]!;
     expect(repeated.sourceRef).toEqual(replayedBusiness.sourceRef);
     expect(h.runs.numberContext(replayRun).evidence).toHaveLength(count);
   });
@@ -269,7 +283,11 @@ describe("deterministic collection replay identity", () => {
     const replayRun = h.replay();
     const replayFundamental = h.claim("analysis.fundamentals", replayRun);
     expect(() =>
-      registerCollectionSources(h.runs, replayFundamental),
+      registerCollectionSources(
+        h.runs,
+        replayFundamental,
+        readCollection(h.runs, replayFundamental.runId),
+      ),
     ).toThrowError(
       expect.objectContaining({
         code: "DATA_INSUFFICIENT",
