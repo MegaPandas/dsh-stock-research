@@ -149,7 +149,7 @@ try {
   );
   assert.equal(input.versions.plugin, manifest.version);
   assert.equal(input.versions.prompts.roles, "31");
-  assert.equal(input.versions.prompts.digest, "12");
+  assert.equal(input.versions.prompts.digest, "13");
   assert.equal(input.definition.tasks.length, 12);
   assert.equal(input.instructions.length, 12);
   const { runId } = runtime.runs.open("package-owner", input, "open");
