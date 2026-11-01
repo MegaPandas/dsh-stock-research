@@ -140,7 +140,7 @@ async function setup(options: { financials?: boolean; late?: boolean } = {}) {
       enabledSources: [
         "tencent",
         "china-macro",
-        ...(options.financials ? ["eastmoney-income"] : []),
+        ...(options.financials ? ["eastmoney-income" as const] : []),
       ],
       http: { timeoutMs: 60_000, maxConcurrency: 1, minIntervalMs: 0 },
       policy: {

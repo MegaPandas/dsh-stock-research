@@ -631,9 +631,10 @@ describe("explicit run control commands", () => {
       ),
     ).rejects.toMatchObject({ code: "ACCESS_DENIED" });
     expect(h.runtime.runs.view({ runId: seeded.runId })).toEqual(before);
-    expect(h.runtime.runs.readArtifact(seeded.marketRef).content).toEqual(
-      analysis(),
-    );
+    expect(h.runtime.runs.readArtifact(seeded.marketRef).content).toEqual({
+      ...analysis(),
+      inputRefs: [seeded.dataRefs["data.market"]!],
+    });
     expect(h.adapter.requests).toEqual([]);
   });
 });

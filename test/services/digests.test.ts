@@ -190,7 +190,7 @@ describe("DigestService", () => {
       outputRefs: saved.refs,
     });
     expect(content(c, saved.refs).body).toBe(
-      "Summary of the business analysis.",
+      "Summary of the business analysis.\n\n## 事实\n- Retain the qualitative finding.\n\n## 未决分歧\n\n## 风险摘要",
     );
     expect(
       new ArtifactInputs(c.runs).closure(saved.refs).map(({ ref }) => ref),

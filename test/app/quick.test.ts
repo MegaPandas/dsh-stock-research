@@ -886,7 +886,12 @@ describe("stock-quick real command boundary", () => {
           (request) => initialInput<{ task: { id: string } }>(request).task.id,
         );
       expect(new Set(started)).toEqual(
-        new Set(["analysis.market", "analysis.fundamentals"]),
+        new Set([
+          "analysis.market",
+          "analysis.fundamentals",
+          "analysis.macro",
+          "analysis.public",
+        ]),
       );
       expect(h.runtime.runs.readArtifact(marketRef).content.kind).toBe(
         "analysis",
