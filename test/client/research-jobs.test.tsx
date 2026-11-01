@@ -648,6 +648,89 @@ describe("research task card", () => {
     },
   );
 
+  it.each([
+    { canonical: "completed", native: "completed", label: "已完成" },
+    { canonical: "completed", native: "failed", label: "执行失败" },
+    { canonical: "cancelled", native: "killed", label: "已取消" },
+  ] as const)(
+    "keeps canonical $canonical in resource drain until native $native settlement",
+    ({ canonical, native, label }) => {
+      vi.useFakeTimers();
+      vi.setSystemTime(10000);
+      const text =
+        canonical === "completed"
+          ? "研究报告已定档，主 Agent 将在聊天中交付结论"
+          : "研究已取消，已提交产物保留";
+      const output = observation(
+        progress({ status: canonical, phase: { kind: "ended" } }, text),
+      );
+      const h = jobsFixture([row()], { [jobId]: output });
+      const mounted = render(
+        <ResearchJobCard
+          data={project([registered()]).data}
+          sessionId={sessionId}
+          jobs={h.jobs}
+        />,
+      );
+      expect(screen.getByRole("status").textContent).toBe(
+        canonical === "completed" ? "正在收尾" : "正在取消",
+      );
+      expect(
+        screen
+          .getAllByText(text)
+          .some((element) => !element.closest("details")),
+      ).toBe(true);
+      expect(screen.queryByRole("button", { name: "取消调研" })).toBeNull();
+      if (canonical === "cancelled") {
+        expect(
+          (
+            screen.getByRole("button", {
+              name: "正在取消…",
+            }) as HTMLButtonElement
+          ).disabled,
+        ).toBe(true);
+        act(() =>
+          h.update({
+            rows: { [sessionId]: [row({ status: "stopping" })] },
+            observed: { [jobId]: output },
+          }),
+        );
+        expect(screen.getByRole("status").textContent).toBe("正在取消");
+      }
+      act(() => vi.advanceTimersByTime(1000));
+      expect(screen.getByText("用时 10 秒")).toBeTruthy();
+      expect(h.jobs.kill).not.toHaveBeenCalled();
+      expect(h.jobs.observe).toHaveBeenCalledExactlyOnceWith(sessionId, jobId);
+      expect(h.unobserve).not.toHaveBeenCalled();
+      const detail = native === "failed" ? "角色释放失败" : undefined;
+      act(() =>
+        h.update({
+          rows: {
+            [sessionId]: [
+              row({
+                status: native,
+                finishedAt: 11000,
+                ...(detail === undefined ? {} : { detail }),
+              }),
+            ],
+          },
+          observed: { [jobId]: output },
+        }),
+      );
+      expect(screen.getByRole("status").textContent).toBe(label);
+      expect(screen.getByText("用时 10 秒")).toBeTruthy();
+      if (detail !== undefined) expect(screen.getByText(detail)).toBeTruthy();
+      expect(screen.queryByRole("button", { name: /取消/ })).toBeNull();
+      expect(vi.getTimerCount()).toBe(0);
+      expect(h.jobs.observe).toHaveBeenCalledOnce();
+      expect(h.unobserve).not.toHaveBeenCalled();
+      mounted.unmount();
+      expect(h.unobserve).toHaveBeenCalledExactlyOnceWith(jobId);
+      expect(h.unwatch).toHaveBeenCalledOnce();
+      expect(h.listeners.size).toBe(0);
+    },
+  );
+
   it("observes concurrent operations and releases only removed step observations", () => {
     const firstId = JobId("stock-research-step-market");
     const secondId = JobId("stock-research-step-finance");

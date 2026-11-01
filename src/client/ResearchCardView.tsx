@@ -10,6 +10,7 @@ import { ResearchChives } from "./ResearchChives.js";
 
 export type ResearchCardStatus =
   | "running"
+  | "finishing"
   | "stopping"
   | "completed"
   | "killed"
@@ -38,6 +39,7 @@ interface ResearchCardViewProps {
 
 const labels: Record<ResearchCardStatus, string> = {
   running: "进行中",
+  finishing: "正在收尾",
   stopping: "正在取消",
   completed: "已完成",
   killed: "已取消",
@@ -151,7 +153,7 @@ export function ResearchCardView(props: ResearchCardViewProps) {
           ? "warning"
           : waiting
             ? "pause"
-            : status === "reconnecting"
+            : status === "reconnecting" || status === "finishing"
               ? "clock"
               : "research";
   const ended =

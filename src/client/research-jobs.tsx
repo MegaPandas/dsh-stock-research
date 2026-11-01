@@ -142,9 +142,14 @@ export function ResearchJobCard({
   const status =
     terminal || nativeStatus === "stopping"
       ? nativeStatus
-      : (state?.status ?? nativeStatus ?? "reconnecting");
+      : nativeStatus === "running" && state?.status === "completed"
+        ? "finishing"
+        : nativeStatus === "running" && state?.status === "cancelled"
+          ? "stopping"
+          : (state?.status ?? nativeStatus ?? "reconnecting");
   const running =
     status === "running" ||
+    status === "finishing" ||
     status === "stopping" ||
     status === "preparing" ||
     status === "active" ||
@@ -217,7 +222,7 @@ export function ResearchJobCard({
             : elapsed(startedAt, finishedAt ?? now)
         }
         detail={detail}
-        canCancel={owned && running}
+        canCancel={owned && running && status !== "finishing"}
         cancelling={cancelling}
         cancelError={cancelError}
         cancel={() => void cancel()}
