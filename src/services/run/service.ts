@@ -219,12 +219,28 @@ function initialInstructions(input: OpenRunInput) {
 
 export class RunService implements RunAccess {
   readonly #restored = new Set<string>();
+  readonly #listeners = new Map<string, Set<() => void>>();
 
   constructor(
     private readonly store: RunStore<RunState>,
     private readonly now: () => ISOTime,
     private readonly syncProjections: SyncRunProjections,
   ) {}
+
+  subscribe(runId: string, notify: () => void): () => void {
+    let listeners = this.#listeners.get(runId);
+    if (listeners === undefined) {
+      listeners = new Set();
+      this.#listeners.set(runId, listeners);
+    }
+    const entry = () => notify();
+    listeners.add(entry);
+    return () => {
+      listeners.delete(entry);
+      if (listeners.size === 0 && this.#listeners.get(runId) === listeners)
+        this.#listeners.delete(runId);
+    };
+  }
 
   open(
     identity: string,
@@ -1428,24 +1444,33 @@ export class RunService implements RunAccess {
     let result!: Result;
     let contents!: ContentReader;
     let replayed = false;
-    const committed = this.store.commit(operation.runId, (run, writer) => {
-      this.restore(run);
-      validate?.(run);
-      contents = writer;
-      const receipt = findReceipt(run, scope, action, requestId);
-      if (receipt !== undefined) {
-        result = this.replay(receipt, request, writer) as Result;
-        replayed = true;
-        return null;
-      }
-      run.updatedAt = this.now();
-      result = apply(run, writer);
-      const input = writer.input(() => request);
-      run.receipts.push({ scope, action, requestId, request: input, result });
-      return run;
-    });
-    if (repairsViews) this.project(committed, contents);
-    return { result, run: committed, replayed };
+    let publishing = false;
+    try {
+      const committed = this.store.commit(operation.runId, (run, writer) => {
+        this.restore(run);
+        validate?.(run);
+        contents = writer;
+        const receipt = findReceipt(run, scope, action, requestId);
+        if (receipt !== undefined) {
+          result = this.replay(receipt, request, writer) as Result;
+          replayed = true;
+          return null;
+        }
+        run.updatedAt = this.now();
+        result = apply(run, writer);
+        const input = writer.input(() => request);
+        run.receipts.push({ scope, action, requestId, request: input, result });
+        publishing = true;
+        return run;
+      });
+      if (repairsViews) this.project(committed, contents);
+      return { result, run: committed, replayed };
+    } finally {
+      // Publication may precede a sync/projection error; observers reread canonical state.
+      if (publishing)
+        for (const notify of this.#listeners.get(operation.runId) ?? [])
+          notify();
+    }
   }
 
   private replay(

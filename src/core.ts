@@ -198,6 +198,7 @@ export type {
 export { createRunService } from "./services/run/index.js";
 export type {
   RunAccess,
+  RunChanges,
   RunCommands,
   RunLifecycle,
   RunReader,

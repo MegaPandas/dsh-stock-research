@@ -67,6 +67,11 @@ export interface RunReader {
   numberContext(runId: string): NumberContext;
 }
 
+export interface RunChanges {
+  /** Receipt-bearing transaction invalidation; callbacks must not mutate runs or throw. */
+  subscribe(runId: string, notify: () => void): () => void;
+}
+
 export interface RunLifecycle {
   open(
     identity: string,
@@ -230,6 +235,7 @@ export interface RunCommands {
 }
 
 /** Complete capability set held by composition; consumers select the methods they use. */
-export interface RunAccess extends RunReader, RunCommands, RunLifecycle {
+export interface RunAccess
+  extends RunReader, RunChanges, RunCommands, RunLifecycle {
   repairProjections(runId: string): void;
 }

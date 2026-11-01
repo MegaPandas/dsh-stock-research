@@ -7,6 +7,7 @@ import type { ArtifactRef } from "../../src/contracts/data.js";
 import type {
   OpenRunInput,
   RunState,
+  RunView,
   TaskInstructionSnapshot,
   TaskOperation,
 } from "../../src/contracts/runs.js";
@@ -139,6 +140,93 @@ afterEach(() => {
 });
 
 describe("run control transactions", () => {
+  it("notifies only the subscribed run after a new transaction and not on reads, rejected claims or receipt replay", () => {
+    const { service, op, runId } = setup();
+    const snapshots: RunView[] = [];
+    const release = service.subscribe(runId, () =>
+      snapshots.push(service.view(op)),
+    );
+    const other = service.open("owner", definition(), "other-run");
+    claim(service, other.runId, "a");
+    expect(snapshots).toEqual([]);
+    expect(() => claim(service, runId, "d")).toThrowError(
+      expect.objectContaining({ code: "TASK_NOT_READY" }),
+    );
+    service.view(op);
+    expect(snapshots).toEqual([]);
+    const a = claim(service, runId, "a");
+    expect(snapshots.map(({ readyTasks }) => readyTasks)).toEqual([["b"]]);
+    expect(claim(service, runId, "a")).toEqual(a);
+    expect(snapshots).toHaveLength(1);
+    service.commitArtifact(a, [content("a")], "submit-a");
+    expect(snapshots.map(({ readyTasks }) => readyTasks)).toEqual([
+      ["b"],
+      ["b", "d"],
+    ]);
+    release();
+    service.redo(op, "a", "redo-a");
+    expect(snapshots).toHaveLength(2);
+  });
+
+  it("owns each subscription independently and old releases cannot remove a new subscriber", () => {
+    const { service, op, runId } = setup();
+    const events: string[] = [];
+    const notify = () => {
+      events.push("changed");
+    };
+    const first = service.subscribe(runId, notify);
+    const second = service.subscribe(runId, notify);
+    claim(service, runId, "a");
+    expect(events).toHaveLength(2);
+    first();
+    claim(service, runId, "b");
+    expect(events).toHaveLength(3);
+    second();
+    const latest = service.subscribe(runId, notify);
+    first();
+    second();
+    service.redo(op, "a", "redo-a");
+    expect(events).toHaveLength(4);
+    latest();
+  });
+
+  it.each(["rename", "sync"] as const)(
+    "invalidates observers after a %s failure during publication without treating notification as success",
+    (failureAt) => {
+      const { service, op, runId } = setup();
+      claim(service, runId, "a");
+      const snapshots: RunView[] = [];
+      const release = service.subscribe(runId, () =>
+        snapshots.push(service.view(op)),
+      );
+      const failure = new Error(`Fixture ${failureAt} failure`);
+      const rename = fs.renameSync;
+      const sync = fs.fsyncSync;
+      let published = false;
+      vi.spyOn(fs, "renameSync").mockImplementation((...args) => {
+        if (failureAt === "rename") throw failure;
+        rename(...args);
+        if (String(args[1]).endsWith("/manifest.json")) published = true;
+      });
+      vi.spyOn(fs, "fsyncSync").mockImplementation((fd) => {
+        if (published && fs.fstatSync(fd).isDirectory()) throw failure;
+        sync(fd);
+      });
+      const input = { taskId: "a", expectedAttempt: 1, reason: "Stop" };
+      expect(
+        caught(() => service.cancelTask(op, input, "cancel-a")),
+      ).toMatchObject({ code: "STORAGE_FAILED", cause: failure });
+      vi.restoreAllMocks();
+      expect(snapshots).toHaveLength(1);
+      expect(snapshots[0]!.tasks[0]!.status).toBe(
+        failureAt === "sync" ? "cancelled" : "running",
+      );
+      service.cancelTask(op, input, "cancel-a");
+      expect(snapshots).toHaveLength(failureAt === "sync" ? 1 : 2);
+      release();
+    },
+  );
+
   it("cancels only unfinished work and preserves successful content and historical receipts", () => {
     const { service, store, op, runId, setTime, root, path } = setup();
     const successful = complete(service, runId, "a");
@@ -866,6 +954,10 @@ describe("run control transactions", () => {
     (action) => {
       const { service, store, op, runId, path } = setup();
       complete(service, runId, "a");
+      const observed: string[] = [];
+      const release = service.subscribe(runId, () => {
+        observed.push(service.view(op).tasks[0]!.status);
+      });
       const control = () =>
         action === "redo"
           ? service.redo(op, "a", "redo")
@@ -890,10 +982,13 @@ describe("run control transactions", () => {
       expect(saved.tasks[0]!.status).toBe(
         action === "redo" ? "pending" : "cancelled",
       );
+      expect(observed).toEqual([action === "redo" ? "pending" : "cancelled"]);
       expect(fs.existsSync(view)).toBe(true);
       control();
       expect(store.read(runId)).toEqual(saved);
       expect(fs.existsSync(view)).toBe(false);
+      expect(observed).toHaveLength(1);
+      release();
     },
   );
 });
