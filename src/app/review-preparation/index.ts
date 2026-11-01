@@ -16,7 +16,7 @@ import { createReviewTools } from "./tools.js";
 export interface ReviewRequestPorts {
   runs: Pick<
     RunReader,
-    "view" | "readArtifact" | "readEvidence" | "numberContext"
+    "view" | "readArtifact" | "readEvidence" | "readInputs" | "numberContext"
   >;
   memory: ReviewSessionPorts["memory"];
   queryReturns: QueryMemoryReturns;

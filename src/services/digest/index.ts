@@ -36,6 +36,7 @@ export class DigestService {
       RunReader,
       | "readAttempt"
       | "readInput"
+      | "readInputs"
       | "readArtifact"
       | "readEvidence"
       | "numberContext"

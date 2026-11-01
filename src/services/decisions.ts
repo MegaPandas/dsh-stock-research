@@ -19,7 +19,7 @@ export class DecisionService {
   constructor(
     private readonly runs: Pick<
       RunReader,
-      "readArtifact" | "readEvidence" | "numberContext"
+      "readArtifact" | "readEvidence" | "readInputs" | "numberContext"
     > &
       Pick<
         RunCommands,

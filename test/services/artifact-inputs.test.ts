@@ -37,6 +37,7 @@ function reader(versions: ResearchArtifactVersion[]) {
       )!,
     ),
     readEvidence: vi.fn(),
+    readInputs: vi.fn(),
     numberContext: vi.fn(),
   };
 }

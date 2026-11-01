@@ -57,6 +57,7 @@ export class ArtifactService {
       | "readArtifact"
       | "inputCatalog"
       | "readInput"
+      | "readInputs"
     > &
       Pick<RunCommands, "artifactForCall" | "commitArtifact">,
     private readonly numbers: Pick<NumberChecker, "checkNumbersBatch">,

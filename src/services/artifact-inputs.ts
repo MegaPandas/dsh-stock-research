@@ -47,7 +47,7 @@ export class ArtifactInputs {
   constructor(
     private readonly runs: Pick<
       RunReader,
-      "readArtifact" | "readEvidence" | "numberContext"
+      "readArtifact" | "readEvidence" | "readInputs" | "numberContext"
     >,
     pending: readonly ResearchArtifactVersion[] = [],
   ) {
@@ -125,6 +125,23 @@ export class ArtifactInputs {
     for (const version of versions)
       for (const source of this.artifactSources(version.ref))
         sources.set(JSON.stringify([source.runId, source.evidenceId]), source);
+    const missing = new Map<string, SourceRef[]>();
+    for (const [key, source] of sources) {
+      if (this.evidence.has(key)) continue;
+      const group = missing.get(source.runId) ?? [];
+      group.push(source);
+      missing.set(source.runId, group);
+    }
+    for (const [runId, refs] of missing) {
+      const records = this.runs.readInputs<
+        RegisteredEvidenceRecord<EvidenceData>
+      >(
+        runId,
+        refs.map(({ evidenceId }) => ({ kind: "evidence", id: evidenceId })),
+      );
+      for (const record of records)
+        this.evidence.set(JSON.stringify([runId, record.evidenceId]), record);
+    }
     return aggregateArtifactGaps(
       versions,
       [...sources.values()].map((source) => ({
