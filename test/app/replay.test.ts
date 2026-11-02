@@ -99,19 +99,22 @@ function savedInputs(h: Awaited<ReturnType<typeof quickHost>>, runId: string) {
 }
 
 describe("stock-replay command", () => {
-  it("rejects replay with an unavailable recorded valuation engine while retaining the source run", async () => {
-    const h = await quickHost(workflowModel().respond);
-    cleanups.push(h.close);
-    const input = createQuickInput(scope, h.runtime.policy, []);
-    input.versions.prompts.roles = "25";
-    input.versions.prompts.valuationEngine = "1";
-    const { runId } = h.runtime.runs.open("owner", input, "legacy-engine");
-    const before = h.runtime.runs.view({ runId });
-    expect(() => createReplayInput(h.runtime.runs, runId)).toThrowError(
-      expect.objectContaining({ code: "VERSION_UNAVAILABLE" }),
-    );
-    expect(h.runtime.runs.view({ runId })).toEqual(before);
-  });
+  it.each(["1", undefined])(
+    "rejects replay with valuation engine %s while retaining the source run",
+    async (version) => {
+      const h = await quickHost(workflowModel().respond);
+      cleanups.push(h.close);
+      const input = createQuickInput(scope, h.runtime.policy, []);
+      if (version === undefined) delete input.versions.prompts.valuationEngine;
+      else input.versions.prompts.valuationEngine = version;
+      const { runId } = h.runtime.runs.open("owner", input, "legacy-engine");
+      const before = h.runtime.runs.view({ runId });
+      expect(() => createReplayInput(h.runtime.runs, runId)).toThrowError(
+        expect.objectContaining({ code: "VERSION_UNAVAILABLE" }),
+      );
+      expect(h.runtime.runs.view({ runId })).toEqual(before);
+    },
+  );
 
   it.each([
     { mode: "quick", nodes: 15 },
@@ -296,24 +299,37 @@ describe("stock-replay command", () => {
     REPLAY_TEST_TIMEOUT_MS,
   );
 
-  it("rejects an unavailable version before opening a replay or calling a model", async () => {
-    const model = workflowModel();
-    const h = await quickHost(model.respond);
-    cleanups.push(h.close);
-    const input = createQuickInput(scope, h.runtime.policy, []);
-    input.versions.prompts.digest = "unavailable";
-    const { runId } = h.runtime.runs.open(h.outside.agent.id, input, "source");
-    const before = manifest(h, runId);
-    const files = h.runFiles();
-    await expect(h.execute(`/stock-replay ${runId}`)).rejects.toMatchObject({
-      code: "VERSION_UNAVAILABLE",
-    });
-    expect(h.runFiles()).toEqual(files);
-    expect(manifest(h, runId).text).toBe(before.text);
-    expect(h.adapter.requests).toEqual([]);
-    expect(h.created).toEqual([]);
-    expect(fetch).not.toHaveBeenCalled();
-  });
+  it.each([
+    ["digest", "unavailable"],
+    ["digest", "11"],
+    ["coordinator", "10"],
+    ["mode", "quick/7"],
+  ] as const)(
+    "rejects %s version %s before opening a replay or calling a model",
+    async (kind, version) => {
+      const model = workflowModel();
+      const h = await quickHost(model.respond);
+      cleanups.push(h.close);
+      const input = createQuickInput(scope, h.runtime.policy, []);
+      if (kind === "mode") input.versions.mode = version;
+      else input.versions.prompts[kind] = version;
+      const { runId } = h.runtime.runs.open(
+        h.outside.agent.id,
+        input,
+        "source",
+      );
+      const before = manifest(h, runId);
+      const files = h.runFiles();
+      await expect(h.execute(`/stock-replay ${runId}`)).rejects.toMatchObject({
+        code: "VERSION_UNAVAILABLE",
+      });
+      expect(h.runFiles()).toEqual(files);
+      expect(manifest(h, runId).text).toBe(before.text);
+      expect(h.adapter.requests).toEqual([]);
+      expect(h.created).toEqual([]);
+      expect(fetch).not.toHaveBeenCalled();
+    },
+  );
 
   it("rejects a previous role protocol before creating a replay", async () => {
     const h = await quickHost(workflowModel().respond);

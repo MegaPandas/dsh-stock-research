@@ -15,15 +15,7 @@ export function savedCoordinator(
   const version = catalog.versions.prompts.coordinator;
   if (
     catalog.versions.prompts.roles !== ROLE_PROMPT_VERSION ||
-    (version !== "4" &&
-      version !== "5" &&
-      version !== "6" &&
-      version !== "7" &&
-      version !== "8" &&
-      version !== "9" &&
-      version !== "10" &&
-      version !== "11" &&
-      version !== COORDINATOR_PROMPT_VERSION) ||
+    version !== COORDINATOR_PROMPT_VERSION ||
     inputs.length !== 1
   )
     throw new ResearchError(

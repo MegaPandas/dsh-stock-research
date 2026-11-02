@@ -116,6 +116,7 @@
     "bench:decisions": "node scripts/benchmark-decisions.mjs",
     "bench:digests": "node scripts/benchmark-digests.mjs",
     "bench:roles": "node scripts/benchmark-role-preparation.mjs",
+    "bench:context": "node scripts/benchmark-research-context.mjs",
     "check:market": "node scripts/check-market.mjs",
     "check:query": "node --use-env-proxy scripts/check-query.mjs",
     "collect:data": "node --use-env-proxy scripts/collect-data.mjs",

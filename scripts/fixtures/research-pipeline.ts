@@ -242,6 +242,7 @@ export async function sample(
   mode: Mode,
   profile: Profile,
   onRunBoundary?: (active: boolean) => void,
+  onRequest?: (request: GenerateOptions) => void,
 ) {
   assert.ok(["quick", "deep"].includes(mode));
   assert.ok(["slow-macro", "slow-fundamentals"].includes(profile));
@@ -300,6 +301,7 @@ export async function sample(
     async function* respond(
       request: GenerateOptions,
     ): AsyncIterable<StreamChunk> {
+      onRequest?.(request);
       activeStreams++;
       peakStreams = Math.max(peakStreams, activeStreams);
       const first = !seen.has(String(request.sessionId));

@@ -1,6 +1,8 @@
 import type { ToolDefinition } from "@deepseek-ai/dsh-tools";
 import type { AgentReport } from "../contracts/agent-reports.js";
+import { ResearchError } from "../contracts/errors.js";
 import type { RunReadOperations } from "../host/run-reading.js";
+import { reportMaterial } from "../report/material.js";
 import { researchTool } from "../host/tool-protocol/errors.js";
 import {
   artifactRef,
@@ -49,8 +51,14 @@ export function createResearchReadTools(
     researchTool({
       name: "stock_read_artifact",
       description:
-        "Read a fixed artifact for review. Final reports return the rendered body; source details remain in the saved artifact.",
-      parameters: objectSchema({ ref: artifactRefSchema }),
+        "Read a fixed report and handoff for review. Set view=full only to inspect the complete stored artifact, including evidence references and numeric claims.",
+      parameters: objectSchema(
+        {
+          ref: artifactRefSchema,
+          view: { type: "string", enum: ["business", "full"] },
+        },
+        ["ref"],
+      ),
       output: resultOutput(
         objectSchema({
           kind: { type: "string", const: "artifact" },
@@ -59,14 +67,28 @@ export function createResearchReadTools(
       ),
       async execute(value, exec) {
         exec.signal.throwIfAborted();
-        const item = object(value, ["ref"]);
+        const item = object(value, ["ref", "view"]);
+        if (
+          item.view !== undefined &&
+          item.view !== "business" &&
+          item.view !== "full"
+        )
+          throw new ResearchError("INVALID_INPUT", "Unknown artifact view.");
         const artifact = reads.readArtifact(artifactRef(item.ref), exec);
-        if (artifact.content.kind !== "report")
-          return { kind: "artifact", artifact };
-        const { kind, title, body } = artifact.content;
+        if (item.view === "full") return { kind: "artifact", artifact };
+        const { kind, payload } = artifact.content;
         return {
           kind: "artifact",
-          artifact: { ...artifact, content: { kind, title, body } },
+          artifact: {
+            ...artifact,
+            content: {
+              kind,
+              ...reportMaterial(artifact.content),
+              ...(payload.stageHandoff === undefined
+                ? {}
+                : { stageHandoff: payload.stageHandoff }),
+            },
+          },
         };
       },
     }),

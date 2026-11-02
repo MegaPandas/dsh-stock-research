@@ -228,6 +228,8 @@ describe("persisted research role preparation", () => {
         expect.objectContaining({ name: "Saved FCFF method" }),
       ]),
     });
+    for (const field of ["selectionBasis", "stageGuidance", "typeOverlays"])
+      expect(prompt(first).context.valuationMethods).not.toHaveProperty(field);
     const exec = { signal: new AbortController().signal } as ToolRunContext;
     const read = (provision: typeof first) =>
       provision.tools
@@ -238,6 +240,16 @@ describe("persisted research role preparation", () => {
       version: "saved-methods",
       method: { name: "Saved FCFF method", requiredInputs: expect.any(Array) },
       sources: expect.arrayContaining([expect.objectContaining({ id: "D06" })]),
+    });
+    const guide = (provision: typeof first) =>
+      provision.tools
+        .find(({ name }) => name === "stock_read_valuation_method")!
+        .execute({ methodId: null }, exec);
+    const savedGuide = await guide(first);
+    expect(savedGuide).toMatchObject({
+      version: "saved-methods",
+      selectionBasis: captured.selectionBasis,
+      stageGuidance: captured.stageGuidance,
     });
     expect(
       prepare(runId, "analysis.market").tools.some(
@@ -250,9 +262,9 @@ describe("persisted research role preparation", () => {
       createReplayInput(h.runtime.runs, runId),
       "replay-methods",
     );
-    expect(await read(prepare(replay.runId, "analysis.fundamentals"))).toEqual(
-      result,
-    );
+    const replayed = prepare(replay.runId, "analysis.fundamentals");
+    expect(await read(replayed)).toEqual(result);
+    expect(await guide(replayed)).toEqual(savedGuide);
   });
 
   it("returns a missing valuation section to the original fundamental role for correction", async () => {

@@ -12,7 +12,6 @@ import {
   objectSchema,
   opaqueObjectSchema,
   resultOutput,
-  stringSchema,
   text,
 } from "../host/tool-protocol/parameters.js";
 
@@ -90,16 +89,7 @@ export function valuationMethodContext(
     reviewedAt: methods.reviewedAt,
     valuationDate: scope.date,
     targetDate: decisionPolicy(scope.date).horizonEndDate,
-    selectionBasis: methods.selectionBasis,
     methods: methods.methods.map(({ id, name }) => ({ id, name })),
-    stageGuidance: methods.stageGuidance,
-    typeOverlays: methods.typeOverlays.map(
-      ({ feature, methodIds, constraint }) => ({
-        feature,
-        methodIds,
-        constraint,
-      }),
-    ),
   };
 }
 
@@ -107,23 +97,32 @@ export function createValuationMethodTool(methods: ValuationMethods) {
   return researchTool({
     name: "stock_read_valuation_method",
     description:
-      "Read one selected valuation method's formulas, required input schema, applicability and references. Supply company data and forecast assumptions through the research.",
+      "Read a method's formulas, input schema, applicability and references. Use methodId=null for the method-selection guide by business type and development stage.",
     parameters: objectSchema({
-      methodId: { type: "string", enum: methods.methods.map(({ id }) => id) },
+      methodId: {
+        oneOf: [
+          { type: "string", enum: methods.methods.map(({ id }) => id) },
+          { type: "null" },
+        ],
+      },
     }),
-    output: resultOutput(
-      objectSchema({
-        version: stringSchema,
-        calculationEngineVersion: stringSchema,
-        conventions: opaqueObjectSchema,
-        method: opaqueObjectSchema,
-        sources: { type: "array", items: opaqueObjectSchema },
-        calculationInputSchema: opaqueObjectSchema,
-      }),
-    ),
+    output: resultOutput(opaqueObjectSchema),
     async execute(value, exec) {
       exec.signal.throwIfAborted();
       const input = object(value, ["methodId"]);
+      if (input.methodId === null)
+        return structuredClone({
+          version: methods.version,
+          selectionBasis: methods.selectionBasis,
+          stageGuidance: methods.stageGuidance,
+          typeOverlays: methods.typeOverlays.map(
+            ({ feature, methodIds, constraint }) => ({
+              feature,
+              methodIds,
+              constraint,
+            }),
+          ),
+        });
       const methodId = text(input.methodId, "methodId");
       return valuationMethodDetail(methods, methodId);
     },

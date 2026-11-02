@@ -77,3 +77,31 @@ it("returns the selected method's full input contract on demand", async () => {
     },
   });
 });
+
+it("loads business and stage selection guidance only when requested", async () => {
+  const tool = createValuationMethodTool(VALUATION_METHODS);
+  const guide = await tool.execute({ methodId: null }, {
+    signal: new AbortController().signal,
+  } as ToolRunContext);
+  expect(guide).toMatchObject({
+    version: VALUATION_METHODS.version,
+    selectionBasis: VALUATION_METHODS.selectionBasis,
+    stageGuidance: expect.arrayContaining([
+      expect.objectContaining({
+        stage: "idea_research",
+        candidateMethodIds: ["scenario_dcf_rnpv", "real_options"],
+      }),
+    ]),
+    typeOverlays: expect.arrayContaining([
+      expect.objectContaining({
+        feature: "financial_intermediation",
+        methodIds: [
+          "dividend_discount",
+          "regulatory_capital_fcfe",
+          "residual_income",
+        ],
+      }),
+    ]),
+  });
+  expect(guide).not.toHaveProperty("calculationInputSchema");
+});

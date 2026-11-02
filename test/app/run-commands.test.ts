@@ -235,142 +235,134 @@ describe("explicit run control commands", () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
-  it.each(["4", "5", "6", "7", "8", "9"])(
-    "resumes coordinator version %s after plugin restart and reuses successful fixed inputs",
-    async (version) => {
-      const roles: RoleInput[] = [];
-      const fundamentalsDisposed = deferred<void>();
-      let calculationId: string | undefined;
-      const h = await host(async function* (request) {
-        if (isMainResearchRequest(request)) {
-          yield* textResponse(
-            "Fundamentals submitted; remaining mandatory research is incomplete.",
-          );
-        } else {
-          const input = initialInput<RoleInput>(request);
-          if (input.task.id !== "analysis.fundamentals") {
-            yield* textResponse("Independent research remains incomplete.");
-            return;
-          }
-          if (!request.messages.some((message) => message.role === "tool")) {
-            roles.push(input);
-            h.ctx.on("agent/disposed", ({ agent }) => {
-              if (agent.id === request.sessionId)
-                fundamentalsDisposed.resolve();
-            });
-            yield* toolCall("stock_calculate_valuation", calculationRequest());
-            return;
-          }
-          if (calculationId !== undefined) {
-            yield* textResponse("Submitted canonical analysis.");
-            return;
-          }
-          calculationId = lastToolResult<{ calculationId: string }>(
-            request,
-          ).calculationId;
-          const report = agentAnalysisReport();
-          report.content.valuation = valuationRecord(
-            input.scope.date,
-            input.scope.security.currency,
-          );
-          report.content.valuation.methods[0]!.calculationIds = [calculationId];
-          yield* reportSubmission(report, "save-fundamentals");
+  it("resumes the current coordinator protocol after plugin restart and reuses successful fixed inputs", async () => {
+    const roles: RoleInput[] = [];
+    const fundamentalsDisposed = deferred<void>();
+    let calculationId: string | undefined;
+    const h = await host(async function* (request) {
+      if (isMainResearchRequest(request)) {
+        yield* textResponse(
+          "Fundamentals submitted; remaining mandatory research is incomplete.",
+        );
+      } else {
+        const input = initialInput<RoleInput>(request);
+        if (input.task.id !== "analysis.fundamentals") {
+          yield* textResponse("Independent research remains incomplete.");
+          return;
         }
-      });
-      const seeded = seed(h, (input) => {
-        input.versions.prompts.coordinator = version;
-      });
-      await h.quickFiber.dispose();
-      const restarted = h.ctx.plugin(Quick, {
-        provider: "runtime-fixture",
-        model: "quick",
-      });
-      await restarted;
-      cleanups.push(() => restarted.dispose());
-      const result = await h.executeAndWait(
-        `/stock-resume ${seeded.runId} ${JSON.stringify({ resolvedReasonIds: seeded.reasons.map((reason) => reason.id), instructions: [{ taskId: "analysis.fundamentals", instruction: "Read only the fixed successful market analysis." }] })}`,
-      );
-      await waitForRun(
-        h,
-        seeded.runId,
-        (view) =>
-          view.tasks.find(({ taskId }) => taskId === "analysis.fundamentals")!
-            .status === "succeeded",
-      );
-      await fundamentalsDisposed.promise;
-      expect(result?.result.kind).toBe("error");
-      expect(roles).toHaveLength(1);
-      expect(roles[0]).toMatchObject({
-        task: {
-          id: "analysis.fundamentals",
-          objective: "Read only the fixed successful market analysis.",
-        },
-        context: {
-          materials: [{ title: analysis().title, body: analysis().body }],
-        },
-      });
-      expect(roles[0]).not.toHaveProperty("inputRefs");
-      const view = h.runtime.runs.view({ runId: seeded.runId });
-      expect(view.scope).toEqual(scope);
-      expect(
-        view.tasks.find((task) => task.taskId === "analysis.market"),
-      ).toMatchObject({
-        status: "succeeded",
-        attempt: 1,
-        outputRefs: [seeded.marketRef],
-      });
-      expect(
-        view.tasks.find((task) => task.taskId === "analysis.fundamentals")!
-          .status,
-      ).toBe("succeeded");
-      const fundamentalsRef = view.tasks.find(
-        (task) => task.taskId === "analysis.fundamentals",
-      )!.outputRefs[0]!;
-      const fixedRefs =
-        h.runtime.runs.readArtifact(fundamentalsRef).content.inputRefs;
-      expect(fixedRefs).toHaveLength(2);
-      expect(fixedRefs).toEqual(
-        expect.arrayContaining([
-          seeded.marketRef,
-          seeded.dataRefs["data.market"],
-        ]),
-      );
-      const coordinator = h.adapter.requests.find(
-        (request) =>
-          request.sessionId === h.outside.agent.id &&
-          mainResearchRequest(request).kind === "resume",
-      )!;
-      const saved = h.runtime.runs
-        .inputCatalog(seeded.runId)
-        .inputs.find(({ name }) => name === "prompt:coordinator")!;
-      expect(h.runtime.runs.readInput(seeded.runId, saved.ref)).toBe(
-        savedPrompt,
-      );
-      expect(coordinator.sessionId).toBe(h.outside.agent.id);
-      expect(coordinator.tools!.map((tool) => tool.name).sort()).toEqual([
-        "host_marker",
-        "stock_cancel_research",
-        "stock_cancel_task",
-        "stock_followup_task",
-        "stock_read_artifact",
-        "stock_read_research",
-        "stock_read_run",
-        "stock_recover_research",
-        "stock_redo_task",
-        "stock_replay_research",
-        "stock_resume_research",
-        "stock_review_stage",
-        "stock_start_research",
-      ]);
-      expect(mainResearchRequest(coordinator)).toMatchObject({
-        runId: seeded.runId,
-        view: expect.objectContaining({ scope }),
-        kind: "resume",
-      });
-      expect(h.ctx.agents.list()).toEqual([h.outside.agent]);
-      expect(fetch).not.toHaveBeenCalled();
-    },
-  );
+        if (!request.messages.some((message) => message.role === "tool")) {
+          roles.push(input);
+          h.ctx.on("agent/disposed", ({ agent }) => {
+            if (agent.id === request.sessionId) fundamentalsDisposed.resolve();
+          });
+          yield* toolCall("stock_calculate_valuation", calculationRequest());
+          return;
+        }
+        if (calculationId !== undefined) {
+          yield* textResponse("Submitted canonical analysis.");
+          return;
+        }
+        calculationId = lastToolResult<{ calculationId: string }>(
+          request,
+        ).calculationId;
+        const report = agentAnalysisReport();
+        report.content.valuation = valuationRecord(
+          input.scope.date,
+          input.scope.security.currency,
+        );
+        report.content.valuation.methods[0]!.calculationIds = [calculationId];
+        yield* reportSubmission(report, "save-fundamentals");
+      }
+    });
+    const seeded = seed(h);
+    await h.quickFiber.dispose();
+    const restarted = h.ctx.plugin(Quick, {
+      provider: "runtime-fixture",
+      model: "quick",
+    });
+    await restarted;
+    cleanups.push(() => restarted.dispose());
+    const result = await h.executeAndWait(
+      `/stock-resume ${seeded.runId} ${JSON.stringify({ resolvedReasonIds: seeded.reasons.map((reason) => reason.id), instructions: [{ taskId: "analysis.fundamentals", instruction: "Read only the fixed successful market analysis." }] })}`,
+    );
+    await waitForRun(
+      h,
+      seeded.runId,
+      (view) =>
+        view.tasks.find(({ taskId }) => taskId === "analysis.fundamentals")!
+          .status === "succeeded",
+    );
+    await fundamentalsDisposed.promise;
+    expect(result?.result.kind).toBe("error");
+    expect(roles).toHaveLength(1);
+    expect(roles[0]).toMatchObject({
+      task: {
+        id: "analysis.fundamentals",
+        objective: "Read only the fixed successful market analysis.",
+      },
+      context: {
+        materials: [{ title: analysis().title, body: analysis().body }],
+      },
+    });
+    expect(roles[0]).not.toHaveProperty("inputRefs");
+    const view = h.runtime.runs.view({ runId: seeded.runId });
+    expect(view.scope).toEqual(scope);
+    expect(
+      view.tasks.find((task) => task.taskId === "analysis.market"),
+    ).toMatchObject({
+      status: "succeeded",
+      attempt: 1,
+      outputRefs: [seeded.marketRef],
+    });
+    expect(
+      view.tasks.find((task) => task.taskId === "analysis.fundamentals")!
+        .status,
+    ).toBe("succeeded");
+    const fundamentalsRef = view.tasks.find(
+      (task) => task.taskId === "analysis.fundamentals",
+    )!.outputRefs[0]!;
+    const fixedRefs =
+      h.runtime.runs.readArtifact(fundamentalsRef).content.inputRefs;
+    expect(fixedRefs).toHaveLength(2);
+    expect(fixedRefs).toEqual(
+      expect.arrayContaining([
+        seeded.marketRef,
+        seeded.dataRefs["data.market"],
+      ]),
+    );
+    const coordinator = h.adapter.requests.find(
+      (request) =>
+        request.sessionId === h.outside.agent.id &&
+        mainResearchRequest(request).kind === "resume",
+    )!;
+    const saved = h.runtime.runs
+      .inputCatalog(seeded.runId)
+      .inputs.find(({ name }) => name === "prompt:coordinator")!;
+    expect(h.runtime.runs.readInput(seeded.runId, saved.ref)).toBe(savedPrompt);
+    expect(coordinator.sessionId).toBe(h.outside.agent.id);
+    expect(coordinator.tools!.map((tool) => tool.name).sort()).toEqual([
+      "host_marker",
+      "stock_cancel_research",
+      "stock_cancel_task",
+      "stock_followup_task",
+      "stock_read_artifact",
+      "stock_read_research",
+      "stock_read_run",
+      "stock_recover_research",
+      "stock_redo_task",
+      "stock_replay_research",
+      "stock_resume_research",
+      "stock_review_stage",
+      "stock_start_research",
+    ]);
+    expect(mainResearchRequest(coordinator)).toMatchObject({
+      runId: seeded.runId,
+      view: expect.objectContaining({ scope }),
+      kind: "resume",
+    });
+    expect(h.ctx.agents.list()).toEqual([h.outside.agent]);
+    expect(fetch).not.toHaveBeenCalled();
+  });
 
   it("cancels an existing run while subagent publication is still awaiting the host", async () => {
     const h = await host(async function* (request) {

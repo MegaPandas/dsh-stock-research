@@ -10,6 +10,7 @@ import { QUICK_MODE_VERSION } from "./plan/quick.js";
 import { researchVersions } from "./plan/versions.js";
 import { VALUATION_ENGINE_VERSION } from "../contracts/valuation.js";
 import { ResearchError } from "../contracts/errors.js";
+import { savedValuationMethods } from "../services/valuation/records.js";
 
 export function createReplayInput(
   runs: Pick<RunReader, "readDefinition" | "inputCatalog" | "readInput">,
@@ -18,10 +19,7 @@ export function createReplayInput(
   const { definition } = savedCoordinator(runs, runId);
   const recorded = runs.inputCatalog(runId).versions;
   const saved = recorded.prompts;
-  if (
-    saved.valuationEngine !== undefined &&
-    saved.valuationEngine !== VALUATION_ENGINE_VERSION
-  )
+  if (saved.valuationEngine !== VALUATION_ENGINE_VERSION)
     throw new ResearchError(
       "VERSION_UNAVAILABLE",
       "The recorded valuation engine is unavailable for replay; start a new research run. Saved reports and calculations remain readable.",
@@ -30,29 +28,11 @@ export function createReplayInput(
     definition.mode === "quick" ? QUICK_MODE_VERSION : DEEP_MODE_VERSION,
     { ...SOURCE_VERSIONS, ...COLLECTION_SOURCE_VERSIONS },
   );
-  const supported = {
-    digest: ["10", "11", "12"],
-    coordinator: ["4", "5", "6", "7", "8", "9", "10", "11", "12", "13"],
-  };
-  if (
-    [
-      QUICK_MODE_VERSION,
-      DEEP_MODE_VERSION,
-      "quick/7",
-      "quick/8",
-      "deep/5",
-      "deep/6",
-    ].includes(recorded.mode)
-  )
-    versions.mode = recorded.mode;
   // Method knowledge is replayed from the saved input, independent of the installed catalogue.
-  if (saved.valuationMethods !== undefined)
-    versions.prompts.valuationMethods = saved.valuationMethods;
-  for (const key of ["digest", "coordinator"] as const) {
-    const version = saved[key];
-    if (version !== undefined && supported[key].includes(version))
-      versions.prompts[key] = version;
-  }
+  versions.prompts.valuationMethods = savedValuationMethods(
+    runs,
+    runId,
+  ).version;
   return {
     replay: { runId },
     versions,

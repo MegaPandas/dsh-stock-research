@@ -496,21 +496,10 @@ describe("stock-quick real command boundary", () => {
     ).toEqual([]);
   });
 
-  it.each(["4", "5", "6"])(
-    "continues legacy coordinator protocol %s in the current main chat",
+  it.each(["4", "11", "14"])(
+    "rejects previous coordinator protocol %s before resuming",
     async (version) => {
-      let received: unknown;
-      let names: string[] = [];
-      const h = await host(async function* (request) {
-        if (
-          isMainResearchRequest(request) &&
-          mainResearchRequest(request).kind === "resume"
-        ) {
-          received = mainResearchRequest(request);
-          names = request.tools!.map(({ name }) => name);
-        }
-        yield* textResponse("本次调度已停止。");
-      });
+      const h = await host(workflowModel().respond);
       const scope = {
         security: {
           id: "CN:002594.SZ",
@@ -525,28 +514,24 @@ describe("stock-quick real command boundary", () => {
       };
       const input = createQuickInput(scope, h.runtime.policy, []);
       input.versions.prompts.coordinator = version;
-      input.inputs.find(({ name }) => name === "prompt:coordinator")!.content =
-        "按固定runId和tasks推进运行，结束时返回执行状态。";
       const { runId } = h.runtime.runs.open(
         h.outside.agent.id,
         input,
         `legacy-${version}`,
       );
       completeCollectionTasks(h.runtime.runs, runId, h.outside.agent.id);
-      const result = await h.executeAndWait(
-        `/stock-resume ${runId} {"resolvedReasonIds":[],"instructions":[]}`,
-      );
-      expect(result?.result.kind).toBe("error");
-      expect(received).toMatchObject({
-        kind: "resume",
-        runId,
-        view: expect.objectContaining({ scope }),
-        tasks: expect.any(Array),
+      const before = h.runtime.runs.view({ runId });
+      await expect(
+        h.execute(
+          `/stock-resume ${runId} {"resolvedReasonIds":[],"instructions":[]}`,
+        ),
+      ).rejects.toMatchObject({
+        code: "VERSION_UNAVAILABLE",
       });
-      expect(received).not.toHaveProperty("context");
-      expect(received).not.toHaveProperty("task");
-      expect(names).not.toContain("stock_submit");
-      expect(h.runtime.runs.view({ runId }).status).toBe("active");
+      expect(h.runtime.runs.view({ runId })).toEqual(before);
+      expect(h.adapter.requests).toEqual([]);
+      expect(h.created).toEqual([]);
+      expect(fetch).not.toHaveBeenCalled();
     },
   );
 

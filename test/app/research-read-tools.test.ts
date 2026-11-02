@@ -5,6 +5,11 @@ import { createResearchReadTools } from "../../src/app/research-read-tools.js";
 import { SessionBindings } from "../../src/host/bindings.js";
 import { createRunReadOperations } from "../../src/host/run-reading.js";
 import { DecisionService } from "../../src/services/decisions.js";
+import { assembleAgentArtifact } from "../../src/services/agent-artifacts.js";
+import {
+  agentAnalysisReport,
+  reportHandoff,
+} from "../fixtures/analysis-report.js";
 import { decisionFixture } from "../fixtures/decision.js";
 
 const fixtures: ReturnType<typeof decisionFixture>[] = [];
@@ -79,6 +84,52 @@ it("presents final report text while preserving its complete stored artifact", a
   expect(f.runs.readArtifact(ref)).toEqual(saved);
 });
 
+it("loads one business report and handoff by default and the complete artifact on demand", async () => {
+  const f = setup();
+  f.runs.redo(f.operation, "analysis", "redo-analysis");
+  const claim = f.runs.claim(f.operation, "analysis", "new-analysis");
+  const report = agentAnalysisReport();
+  const handoff = reportHandoff(report);
+  const content = assembleAgentArtifact(
+    "analysis",
+    report,
+    {
+      taskId: "analysis",
+      specialty: "market",
+      title: "Market research",
+      inputRefs: [],
+      currency: f.scope.security.currency,
+      scope: f.scope,
+      referencePrice: null,
+    },
+    [],
+    handoff,
+  );
+  const ref = f.artifacts.submitArtifact(
+    { ...claim, identity: "worker", sessionId: null },
+    [content],
+    "new-report",
+  ).refs[0]!;
+  const saved = f.runs.readArtifact(ref);
+  expect(await f.call("stock_read_artifact", { ref })).toEqual({
+    kind: "artifact",
+    artifact: {
+      ...saved,
+      content: {
+        kind: "analysis",
+        title: "Market research",
+        ...report,
+        stageHandoff: handoff,
+      },
+    },
+  });
+  expect(await f.call("stock_read_artifact", { ref, view: "full" })).toEqual({
+    kind: "artifact",
+    artifact: saved,
+  });
+  expect(f.runs.readArtifact(ref)).toEqual(saved);
+});
+
 it("rejects run and artifact reads outside the coordinator binding", async () => {
   const f = setup();
   await expect(
@@ -100,6 +151,7 @@ it("validates closed arguments and references before reading storage", async () 
     ["stock_read_run", { runId: "" }],
     ["stock_read_artifact", { ref: { ...f.analysisRef, sessionId: "forged" } }],
     ["stock_read_artifact", { ref: { ...f.analysisRef, revision: 0 } }],
+    ["stock_read_artifact", { ref: f.analysisRef, view: "unknown" }],
   ] as const)
     await expect(f.call(name, value)).rejects.toMatchObject({
       code: "INVALID_INPUT",
