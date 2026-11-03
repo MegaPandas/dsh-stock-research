@@ -42,7 +42,7 @@
 dsh plugin --profile web add @megapandas/dsh-stock-research@next
 ```
 
-安装后启动对应的 DSH profile；已运行的实例未自动加载插件时，重启后再使用。自定义 profile 需提供 Agent、工具、模型、命令及本地子 Agent 等基础服务。
+安装后启动对应的 DSH profile；已运行的实例未自动加载插件时，重启后再使用。自定义 profile 需提供 Agent、工具、模型、命令、会话查询及本地子 Agent 等基础服务。
 
 ### 发起研究
 
@@ -171,7 +171,7 @@ npm run test:package
 
 `test:package` 检查构建产物与包入口。需要验证真实宿主装配时，构建后运行 `npm run test:runtime-package` 和 `npm run test:application-package`；角色准备性能可用 `npm run bench:roles` 测量，该基准不调用模型或数据源。
 
-`npm run test:install` 将构建产物打包，在临时目录安装开发依赖锁定的 DSH 版本并启动独立宿主，验证安装、插件装配、工具和设置；该检查不读取用户 profile、凭证或研究数据，也不调用模型。可用 `npm run test:install -- --dsh-version 0.2.1-rc.5` 指定另一个受支持的精确版本。
+`npm run test:install` 将构建产物打包，在临时目录安装开发依赖锁定的 DSH 版本并启动独立宿主，验证安装、插件装配、工具和设置。可用 `npm run test:install -- --dsh-version 0.2.1-rc.5` 指定另一个受支持的精确版本。
 
 从源码安装时，运行 `npm pack` 生成包含构建产物的归档，再安装到目标 profile：
 
