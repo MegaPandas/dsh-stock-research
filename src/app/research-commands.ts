@@ -14,6 +14,7 @@ import type {
 import { parseResearchInput } from "./ask-input.js";
 import { parseRunCommand } from "./run-command-input.js";
 import { runStatus } from "./run-view.js";
+import { researchContextView } from "./research-view.js";
 import { runApplicationCommand } from "./settings.js";
 
 function requestResearch(
@@ -57,7 +58,7 @@ async function controlResearch(
       content: [
         {
           type: "text",
-          text: `Background scheduling is active. Review the current results and handle stage notifications.\nResearch request: ${JSON.stringify({ kind, operationId, ...context, ...result.handle })}`,
+          text: `Background scheduling is active. Review the current results and handle stage notifications.\nResearch request: ${JSON.stringify({ kind, operationId, ...researchContextView(context), ...result.handle })}`,
         },
       ],
       source: { kind: "user" },

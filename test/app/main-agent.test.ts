@@ -1,7 +1,11 @@
 import type {} from "@deepseek-ai/dsh-session-projection";
 import { createUserMessage } from "@deepseek-ai/dsh-llm";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { quickHost, initialInput } from "../fixtures/quick-host.js";
+import {
+  quickHost,
+  initialInput,
+  lastToolResult,
+} from "../fixtures/quick-host.js";
 import {
   workflowModel,
   isMainResearchRequest,
@@ -98,6 +102,17 @@ describe("research from an ordinary DSH chat", () => {
     const mainRequests = h.adapter.requests.filter(
       ({ sessionId }) => sessionId === h.outside.agent.id,
     );
+    const reviewReceipts = mainRequests.flatMap((request) => {
+      if (request.messages.at(-1)?.role !== "tool") return [];
+      const result = lastToolResult<Record<string, unknown>>(request);
+      return result.stageId === undefined ? [] : [result];
+    });
+    expect(reviewReceipts).toHaveLength(4);
+    for (const receipt of reviewReceipts) {
+      expect(Object.keys(receipt)).toEqual(["runId", "stageId", "verdict"]);
+      expect(receipt.verdict).toBe("accepted");
+      expect(receipt.runId).toBe(view.runId);
+    }
     for (const request of h.adapter.requests.filter(
       (request) => !isMainResearchRequest(request),
     ))

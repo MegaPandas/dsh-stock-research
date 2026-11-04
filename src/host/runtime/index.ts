@@ -37,7 +37,7 @@ export function createResearchPlugin(prepareRole: PrepareRole) {
   return {
     name: "stock-research",
     Config,
-    inject: ["tools", "agents", "subagents"],
+    inject: ["tools", "agents", "subagents", "sessionQuery"],
     async apply(ctx: Context, config: ResearchConfig): Promise<void> {
       config = structuredClone(config);
       const spawn = ctx.subagents.getProvider("spawn");

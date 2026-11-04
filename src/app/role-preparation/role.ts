@@ -1,4 +1,5 @@
 import type { Agent } from "@deepseek-ai/dsh-agent";
+import type { ContentBlock } from "@deepseek-ai/dsh-llm";
 import type {
   RoleDispatchContext,
   TaskInstructionSnapshot,
@@ -34,13 +35,34 @@ import {
 } from "./report.js";
 import { prepareRoleValuation } from "./valuation.js";
 
+function followupInput(
+  instruction: string,
+  resumeSearch: boolean | undefined,
+): ContentBlock[] {
+  const lines = [
+    instruction,
+    "Use the existing conversation to complete the requested additions or revisions, check the draft and submit it.",
+  ];
+  if (resumeSearch !== undefined)
+    lines.push(
+      resumeSearch
+        ? "The primary agent has resumed search. Previous usage and limits remain; each over-budget search requires user approval."
+        : "Search pause and usage remain unchanged.",
+    );
+  return [{ type: "text", text: lines.join("\n") }];
+}
+
 export function prepareUnifiedRole(
   services: RoleServices,
   context: RoleDispatchContext,
   profile: ReturnType<typeof readApplicationInput>,
   instruction: string,
   parent?: Agent,
-  previous?: { search?: PublicSearchSession; submission?: RoleReportSeed },
+  continuation?: {
+    search?: PublicSearchSession;
+    submission: RoleReportSeed;
+    resumeSearch: boolean;
+  },
 ): RoleProvision {
   const { claim, definition, scope } = context;
   const kind = definition.outputKinds[0];
@@ -115,7 +137,7 @@ export function prepareUnifiedRole(
     systemPrompt += `\n${profile.prompts.valuation}`;
     tools.push(...valuation.tools);
   }
-  let search = previous?.search;
+  let search = continuation?.search;
   const revisionFeedback = researchStageFeedback(
     services.runs,
     claim.runId,
@@ -160,7 +182,7 @@ export function prepareUnifiedRole(
         : { valuationMethods: valuation.methods }),
       publicRole,
     },
-    previous?.submission,
+    continuation?.submission,
   );
   const agentOptions = readResearchModels(services.runs, claim.runId)?.research;
   return {
@@ -181,38 +203,45 @@ export function prepareUnifiedRole(
         {
           ...(search === undefined ? {} : { search }),
           submission: submission.continuation(),
+          resumeSearch,
         },
       );
     },
-    prompt: agentInput({
-      scope,
-      task: {
-        id: claim.taskId,
-        role: definition.executor.specialty,
-        objective: instruction,
-      },
-      context: {
-        materials: roots
-          .filter(({ content }) => content.kind !== "collection")
-          .map(({ content }) => reportMaterial(content)),
-        dataCatalog: collected.map((source) =>
-          Object.fromEntries(
-            Object.entries(source).filter(([key]) => key !== "sourceRef"),
+    prompt:
+      continuation === undefined
+        ? agentInput({
+            scope,
+            task: {
+              id: claim.taskId,
+              role: definition.executor.specialty,
+              objective: instruction,
+            },
+            context: {
+              materials: roots
+                .filter(({ content }) => content.kind !== "collection")
+                .map(({ content }) => reportMaterial(content)),
+              dataCatalog: collected.map((source) =>
+                Object.fromEntries(
+                  Object.entries(source).filter(([key]) => key !== "sourceRef"),
+                ),
+              ),
+              reportCatalog: reader.catalog,
+              requiredRisks: inheritRisks(reports).map(({ issueId }) => ({
+                issueId,
+              })),
+              referencePrice:
+                price === null
+                  ? null
+                  : { value: price.claim.value, unit: price.claim.unit },
+              ...(reportKind === "decision_draft"
+                ? { decisionPolicy: decisionPolicy(scope.date) }
+                : {}),
+              ...details,
+            },
+          })
+        : followupInput(
+            instruction,
+            publicRole ? continuation.resumeSearch : undefined,
           ),
-        ),
-        reportCatalog: reader.catalog,
-        requiredRisks: inheritRisks(reports).map(({ issueId }) => ({
-          issueId,
-        })),
-        referencePrice:
-          price === null
-            ? null
-            : { value: price.claim.value, unit: price.claim.unit },
-        ...(reportKind === "decision_draft"
-          ? { decisionPolicy: decisionPolicy(scope.date) }
-          : {}),
-        ...details,
-      },
-    }),
   };
 }

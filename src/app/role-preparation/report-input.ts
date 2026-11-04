@@ -11,17 +11,20 @@ import {
   type ValuationSelection,
 } from "../../services/valuation/reports.js";
 
-export function valuationDraftInput(
+export function roleReportInput(
   kind: AgentReportKind,
   runs: Pick<RunReader, "numberContext" | "inputCatalog" | "readInput">,
   runId: string,
+  valuationEnabled: boolean,
 ): ReportDraftInput {
   const schema = agentReportSchemas[kind];
+  const sections = calculatedReportSections({
+    summary: schema.properties.summary,
+    ...schema.properties.content.properties,
+  });
+  if (!valuationEnabled) delete sections.valuation;
   return {
-    sections: calculatedReportSections({
-      summary: schema.properties.summary,
-      ...schema.properties.content.properties,
-    }),
+    sections,
     resolve(input) {
       const resolved = { ...input };
       if (input.valuation !== undefined && input.valuation !== null)

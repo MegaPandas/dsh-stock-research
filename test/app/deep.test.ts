@@ -10,7 +10,7 @@ import type {
 } from "../../src/contracts/artifact-payloads.js";
 import { readCollection } from "../../src/app/collection-input.js";
 import { quickHost } from "../fixtures/quick-host.js";
-import type { ResearchObservation } from "../../src/app/research-actions.js";
+import type { ResearchObservationView } from "../../src/app/research-view.js";
 import {
   workflowModel,
   isMainResearchRequest,
@@ -86,11 +86,24 @@ describe("stock-deep command and resume", () => {
       signal: new AbortController().signal,
     });
     expect(observed.isError).toBe(false);
-    const observation = observed.value as unknown as ResearchObservation;
+    const observation = observed.value as unknown as ResearchObservationView;
     expect(observation.job.id).toBe(job.id);
     expect(observation.runId).toBeDefined();
     const before = h.runtime.runs.view({ runId: observation.runId! });
-    expect(observation.view).toEqual(before);
+    expect(observation.view).toMatchObject({
+      runId: before.runId,
+      scope: before.scope,
+      mode: "deep",
+      status: "active",
+    });
+    expect(observation.view!.tasks).toEqual(
+      before.tasks.map(({ taskId, status, attempt }) => ({
+        taskId,
+        status,
+        attempt,
+      })),
+    );
+    expect(observation.view).not.toHaveProperty("stageReviews");
     expect(before.mode).toBe("deep");
     expect(before.status).toBe("active");
     const analyses = before.tasks.filter(({ taskId }) =>

@@ -6,6 +6,13 @@ import type {
 } from "../contracts/artifact-payloads.js";
 import { renderArtifactBody } from "./render.js";
 
+export function reportSectionNames(artifact: ArtifactInput): string[] {
+  const report = (artifact.payload as { report?: AgentReport }).report;
+  return report === undefined
+    ? ["body"]
+    : ["summary", ...Object.keys(report.content)];
+}
+
 /** Present business content; storage identity and provenance stay outside context. */
 export function reportMaterial(artifact: ArtifactInput) {
   const payload = artifact.payload as {

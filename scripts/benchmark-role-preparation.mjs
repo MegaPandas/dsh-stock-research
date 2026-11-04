@@ -18,6 +18,7 @@ import AgentPresetRegistry from "@deepseek-ai/dsh-agent-preset-registry";
 import { SubagentRuntime } from "@deepseek-ai/dsh-subagent";
 import * as SpawnInProcess from "@deepseek-ai/dsh-subagent-spawn-in-process";
 import { SessionId } from "@deepseek-ai/dsh-session";
+import SessionQuery from "@deepseek-ai/dsh-session-query-sqlite";
 
 // An optional built checkout allows the same workload to compare frozen versions.
 const packageRoot =
@@ -86,6 +87,7 @@ try {
   await ctx.plugin(AgentPresetRegistry, { default: "benchmark-research" });
   await ctx.agentPresets.register({ id: "benchmark-research", plugins: [] });
   await mountAgentLoopTestHarness(ctx);
+  await ctx.plugin(SessionQuery, { path: ":memory:", openAt: "never" });
   await ctx.plugin(SubagentRuntime, {});
   await ctx.plugin(SpawnInProcess, { providerName: "spawn" });
   await ctx.plugin(
@@ -120,6 +122,11 @@ try {
     cutoff: "2026-10-29T15:59:59.999Z",
   };
   const input = createQuickInput(scope, runtime.policy, []);
+  const market = input.definition.tasks.find(
+    ({ id }) => id === "analysis.market",
+  );
+  market.dependsOn = [];
+  market.inputTasks = [];
   const fundamentals = input.definition.tasks.find(
     ({ id }) => id === "analysis.fundamentals",
   );
@@ -174,6 +181,10 @@ try {
   for (const taskId of ["analysis.market", "analysis.fundamentals"]) {
     const context = runtime.runs.dispatchForCall(operation, taskId, taskId);
     measure(taskId, () => prepareResearchRole(runtime, context));
+    const initial = prepareResearchRole(runtime, context);
+    measure(`${taskId}/followup`, () =>
+      initial.followup(context, { resumeSearch: false }),
+    );
     if (taskId === "analysis.market") {
       new ArtifactService(
         runtime.runs,
@@ -239,6 +250,9 @@ try {
       }
       measure("analysis.fundamentals/10-calculations", () =>
         prepareResearchRole(runtime, context),
+      );
+      measure("analysis.fundamentals/10-calculations/followup", () =>
+        initial.followup(context, { resumeSearch: false }),
       );
     } finally {
       await handle.dispose();

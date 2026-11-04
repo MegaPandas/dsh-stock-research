@@ -18,6 +18,7 @@ import {
   type TokenUsage,
 } from "@deepseek-ai/dsh-llm";
 import { SessionId } from "@deepseek-ai/dsh-session";
+import SessionQuery from "@deepseek-ai/dsh-session-query-sqlite";
 import { SubagentRuntime } from "@deepseek-ai/dsh-subagent";
 import * as SpawnInProcess from "@deepseek-ai/dsh-subagent-spawn-in-process";
 import type { ToolDefinition } from "@deepseek-ai/dsh-tools";
@@ -367,6 +368,7 @@ export async function dispatchHost(
     const adapter = new DispatchAdapter([...scripts]);
     ctx.llm.registerAdapter(["fixture"], adapter);
     await mountAgentLoopTestHarness(ctx);
+    await ctx.plugin(SessionQuery, { path: ":memory:", openAt: "never" });
     await ctx.plugin(SubagentRuntime, subagentOptions);
     await ctx.plugin(SpawnInProcess, { providerName: "spawn" });
     const bindings = new SessionBindings();

@@ -19,7 +19,7 @@ import type {
   ValuationInputs,
   ValuationRequest,
 } from "../../src/contracts/valuation.js";
-import { DETERMINISTIC_VALUATION_PROTOCOL } from "../../src/contracts/valuation.js";
+import { ROLE_PROMPT_VERSION } from "../../src/app/research-prompts.js";
 import { SessionBindings } from "../../src/host/bindings.js";
 import { RunStore } from "../../src/runs/store.js";
 import { createRunService } from "../../src/services/run/index.js";
@@ -46,7 +46,7 @@ import {
 } from "../../src/tools/valuation.js";
 import { createValuationOperations } from "../../src/host/valuation-operations.js";
 import { createReportDraft } from "../../src/host/report-draft.js";
-import { valuationDraftInput } from "../../src/app/role-preparation/valuation-draft.js";
+import { roleReportInput } from "../../src/app/role-preparation/report-input.js";
 import { agentAnalysisReport } from "../fixtures/analysis-report.js";
 import { US_SECURITY } from "../fixtures/market.js";
 import { renderValuation } from "../../src/report/valuation.js";
@@ -91,7 +91,7 @@ function request(): Extract<
 }
 function setup(
   tasks?: OpenRunInput["definition"]["tasks"],
-  roleVersion = DETERMINISTIC_VALUATION_PROTOCOL,
+  roleVersion = ROLE_PROMPT_VERSION,
 ) {
   const path = fs.mkdtempSync(join(tmpdir(), "valuation-calculation-"));
   let root = new DataRoot(path);
@@ -1081,7 +1081,7 @@ it("resolves calculation references before atomically updating a confirmed draft
   };
   const session = createReportDraft("decision_draft", () => "saved", {
     handoff: {},
-    input: valuationDraftInput("decision_draft", f.runs, f.operation.runId),
+    input: roleReportInput("decision_draft", f.runs, f.operation.runId, true),
   });
   const [write, read, , handoff] = session.tools;
   const exec = { signal: new AbortController().signal } as ToolRunContext;
@@ -1102,7 +1102,7 @@ it("resolves calculation references before atomically updating a confirmed draft
     },
     exec,
   );
-  const before = await read!.execute({}, exec);
+  const before = await read!.execute({ sections: null }, exec);
   expect(session.draft().content.targetPrice).toMatchObject({
     value: 18,
     calculationId: target.calculationId,
@@ -1130,10 +1130,10 @@ it("resolves calculation references before atomically updating a confirmed draft
     await expect(write!.execute(patch, exec)).rejects.toMatchObject({
       code: "INVALID_INPUT",
     });
-    expect(await read!.execute({}, exec)).toEqual(before);
+    expect(await read!.execute({ sections: null }, exec)).toEqual(before);
   }
   await write!.execute({ summary: "Updated", valuation: selection }, exec);
-  expect(await read!.execute({}, exec)).toMatchObject({
+  expect(await read!.execute({ sections: ["summary"] }, exec)).toMatchObject({
     draft: { summary: "Updated" },
     handoffConfirmed: false,
   });

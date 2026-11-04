@@ -111,6 +111,59 @@ async function setup(
 }
 
 describe("public research analyst", () => {
+  it("uses native owner approvals when a scheduled public analyst runs in the background", async () => {
+    const h = await setup(0);
+    if (h.ctx.get("approval") === undefined)
+      await h.ctx.plugin(ApprovalService, {});
+    const { runId } = h.runtime.runs.open(
+      "owner",
+      h.input,
+      "background-public",
+    );
+    const parent = await h.runtime.createAgent(
+      h.agentOptions("background-public-parent"),
+      { kind: "coordinator", runIds: [runId] },
+      [],
+    );
+    expect(parent.agent.status).toBe("idle");
+    h.ctx.on("approval/request", async (request) => {
+      expect(request.agent).toBe(parent.agent);
+      return "allowed-once";
+    });
+    await h.runtime.executeScheduled(
+      parent.agent,
+      runId,
+      {
+        kind: "task",
+        taskId: "analysis.public",
+        attempt: 1,
+        executor: { kind: "role", role: "analyst", specialty: "public" },
+        requestId: "background-public-dispatch",
+      },
+      new AbortController().signal,
+    );
+    await parent.agent.whenIdle();
+    const result = h.runtime.runs.readAttempt({
+      runId,
+      taskId: "analysis.public",
+      attempt: 1,
+    });
+    expect(result.status).toBe("succeeded");
+    expect(result.outputRefs).toHaveLength(1);
+    expect(h.nativeSearch).toHaveBeenCalledTimes(1);
+    expect(
+      parent.agent.session
+        .snapshotEvents()
+        .filter(({ type }) =>
+          ["approval/asked", "approval/decided", "assistant/message"].includes(
+            type,
+          ),
+        ),
+    ).toMatchObject([
+      { type: "approval/asked", data: { toolName: "stock_search_public" } },
+      { type: "approval/decided", data: { outcome: "allowed-once" } },
+    ]);
+  });
   it("uses its recorded prompt and allowance with host-configured results and business-only submission", async () => {
     const limit = 2;
     const h = await setup(limit);

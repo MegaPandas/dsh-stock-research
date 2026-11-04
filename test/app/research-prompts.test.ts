@@ -30,13 +30,9 @@ describe("research role instructions", () => {
   });
 
   it("assigns the manager a target-price estimate under the supplied decision policy", () => {
-    for (const prompt of [
-      ROLE_PROMPTS.manager,
-      SHARED_BRIEFS["manager.decision"],
-    ]) {
-      expect(prompt).toContain("context.decisionPolicy");
-      expect(prompt).toMatch(/The code determines .*horizon and rating/);
-    }
+    const decision = SHARED_BRIEFS["manager.decision"];
+    expect(decision).toContain("context.decisionPolicy");
+    expect(decision).toMatch(/The code determines .*horizon and rating/);
   });
 
   it("separates investor risk actions from company operating decisions", () => {

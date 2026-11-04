@@ -12,7 +12,7 @@ import { createQuickInput } from "../../src/app/plan/quick.js";
 import { completeCollectionTasks } from "../fixtures/collection-tasks.js";
 import type { CollectionRecord } from "../../src/contracts/collection.js";
 import { readCollection } from "../../src/app/collection-input.js";
-import type { ResearchObservation } from "../../src/app/research-actions.js";
+import type { ResearchObservationView } from "../../src/app/research-view.js";
 import { researchLog } from "../../src/client/research-log.js";
 import {
   quickHost,
@@ -74,7 +74,7 @@ async function readResearch(h: Awaited<ReturnType<typeof host>>) {
     signal: new AbortController().signal,
   });
   if (result.isError) throw new Error(result.error.message);
-  return result.value as unknown as ResearchObservation;
+  return result.value as unknown as ResearchObservationView;
 }
 async function committedMarket(h: Awaited<ReturnType<typeof host>>) {
   const { runId } = await readResearch(h);
@@ -185,7 +185,12 @@ describe("stock-quick real command boundary", () => {
     expect(view!.status).not.toBe("completed");
     expect(
       view!.tasks.find((task) => task.taskId === "analysis.market"),
-    ).toMatchObject({ status: "failed", outputRefs: [] });
+    ).toMatchObject({ status: "failed", failure: { code: "NO_ARTIFACT" } });
+    expect(
+      h.runtime.runs
+        .view({ runId: runId! })
+        .tasks.find((task) => task.taskId === "analysis.market")!.outputRefs,
+    ).toEqual([]);
     expect(
       view!.tasks.find((task) => task.taskId === "digest.analysis")!.status,
     ).toBe("pending");

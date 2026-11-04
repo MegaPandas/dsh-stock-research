@@ -12,6 +12,7 @@ import {
 } from "../../src/host/dispatch/index.js";
 import { SessionBindings, taskOperation } from "../../src/host/bindings.js";
 import { ResearchSessions } from "../../src/host/sessions/index.js";
+import type { TaskInstructionSnapshot } from "../../src/contracts/runs.js";
 import { DigestService } from "../../src/services/digest/index.js";
 import {
   analysis,
@@ -92,7 +93,19 @@ async function host(
   const provision = (): RoleProvision => ({
     prompt: [{ type: "text", text: "first-turn-marker: prepare the report." }],
     tools: [save],
-    ...(followup ? { followup: () => provision() } : {}),
+    ...(followup
+      ? {
+          followup: (next) => ({
+            ...provision(),
+            prompt: [
+              {
+                type: "text",
+                text: `application-followup-marker: ${storage.runs.readInput<TaskInstructionSnapshot>(next.claim.runId, next.claim.instructionRef!).instruction}`,
+              },
+            ],
+          }),
+        }
+      : {}),
   });
   const digests = new DigestService(
     storage.runs,
@@ -203,6 +216,9 @@ describe("role follow-up in a persistent native child", () => {
     );
     expect(JSON.stringify(requests[2]!.messages)).toContain(
       "second-turn-marker",
+    );
+    expect(JSON.stringify(requests[2]!.messages)).toContain(
+      "application-followup-marker",
     );
     expect(requests[2]!.tools?.map(({ name }) => name)).toEqual([
       "save_report",

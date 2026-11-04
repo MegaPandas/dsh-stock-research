@@ -43,6 +43,15 @@ function execution(controller = new AbortController()) {
 }
 
 describe("section report drafts", () => {
+  const availableSections = [
+    "summary",
+    "currentState",
+    "analysisModel",
+    "outlook",
+    "risks",
+    "handoff",
+    "valuation",
+  ];
   const handoff: StageHandoff = {
     keyPoints: ["回款改善。"],
     disagreements: [],
@@ -64,7 +73,7 @@ describe("section report drafts", () => {
       /stock_write_handoff/,
     );
     await writeHandoff!.execute(handoff, exec);
-    expect(await read!.execute({}, exec)).toMatchObject({
+    expect(await read!.execute({ sections: null }, exec)).toMatchObject({
       stageHandoff: handoff,
       handoffConfirmed: true,
     });
@@ -100,7 +109,9 @@ describe("section report drafts", () => {
     await expect(write.execute(oversized, exec)).rejects.toThrow(
       /901\/900.*target 450.*over by 1.*keyPoints=.*disagreements=.*risks=.*openQuestions=/,
     );
-    expect(await session.tools[1]!.execute({}, exec)).toMatchObject({
+    expect(
+      await session.tools[1]!.execute({ sections: [] }, exec),
+    ).toMatchObject({
       stageHandoff: exact,
     });
     await expect(
@@ -120,7 +131,9 @@ describe("section report drafts", () => {
       handoff: { seed: handoff },
     });
     const exec = execution();
-    expect(await session.tools[1]!.execute({}, exec)).toMatchObject({
+    expect(
+      await session.tools[1]!.execute({ sections: [] }, exec),
+    ).toMatchObject({
       stageHandoff: handoff,
       handoffConfirmed: false,
     });
@@ -172,12 +185,13 @@ describe("section report drafts", () => {
       assertSupportedJsonSchema(tool.parameters);
     await write!.execute({ summary: report.summary }, exec);
     await write!.execute({ currentState: report.content.currentState }, exec);
-    expect(await read!.execute({}, exec)).toEqual({
+    expect(await read!.execute({ sections: null }, exec)).toEqual({
       draft: {
         summary: report.summary,
         content: { currentState: ["回款上升。"] },
       },
       missingSections: ["analysisModel", "outlook", "risks", "handoff"],
+      availableSections,
     });
     await expect(submit!.execute({}, exec)).rejects.toMatchObject({
       code: "INVALID_INPUT",
@@ -215,12 +229,13 @@ describe("section report drafts", () => {
       sections: ["summary", "currentState", "risks"],
     });
     update.currentState.push("调用后外部修改。");
-    expect(await read!.execute({}, exec)).toEqual({
+    expect(await read!.execute({ sections: null }, exec)).toEqual({
       draft: {
         summary: "更新判断。",
         content: { ...report.content, currentState: ["新增观察。"] },
       },
       missingSections: [],
+      availableSections,
       stageHandoff: handoff,
       handoffConfirmed: false,
     });
@@ -243,7 +258,7 @@ describe("section report drafts", () => {
       await expect(write!.execute(update, exec)).rejects.toMatchObject({
         code: "INVALID_INPUT",
       });
-      expect(await read!.execute({}, exec)).toMatchObject({
+      expect(await read!.execute({ sections: null }, exec)).toMatchObject({
         draft: report,
         stageHandoff: handoff,
         handoffConfirmed: true,
@@ -262,7 +277,7 @@ describe("section report drafts", () => {
     const exec = execution();
     await writeHandoff!.execute(handoff, exec);
     await expect(write!.execute({}, exec)).resolves.toEqual({ sections: [] });
-    expect(await read!.execute({}, exec)).toMatchObject({
+    expect(await read!.execute({ sections: null }, exec)).toMatchObject({
       draft: report,
       stageHandoff: handoff,
       handoffConfirmed: true,
@@ -299,6 +314,42 @@ describe("section report drafts", () => {
     await expect(read!.execute({ extra: true }, exec)).rejects.toMatchObject({
       code: "INVALID_INPUT",
     });
+  });
+
+  it("checks status without the body and reads only requested seeded sections", async () => {
+    const session = createReportDraft("analysis", () => "saved", {
+      seed: report,
+      handoff: { seed: handoff },
+    });
+    const read = session.tools[1]!;
+    const exec = execution();
+    expect(await read.execute({ sections: [] }, exec)).toEqual({
+      draft: { content: {} },
+      availableSections,
+      missingSections: [],
+      stageHandoff: handoff,
+      handoffConfirmed: false,
+    });
+    const selected = (await read.execute(
+      { sections: ["currentState"] },
+      exec,
+    )) as {
+      draft: { content: { currentState: string[] } };
+    };
+    expect(selected.draft).toEqual({
+      content: { currentState: ["回款上升。"] },
+    });
+    selected.draft.content.currentState.push("外部修改");
+    expect(session.draft()).toEqual(report);
+    for (const sections of [
+      ["unknown"],
+      ["summary", "summary"],
+      "summary",
+      undefined,
+    ])
+      await expect(read.execute({ sections }, exec)).rejects.toMatchObject({
+        code: "INVALID_INPUT",
+      });
   });
 
   it("explains valid sections and the selected section's format when a write fails", async () => {

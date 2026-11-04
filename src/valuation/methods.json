@@ -1,5 +1,5 @@
 {
-  "version": "4",
+  "version": "5",
   "reviewedAt": "2026-10-29",
   "language": "en",
   "purpose": "Valuation method reference for research roles. Use research data for current parameters and tool schemas for execution and report submission.",
@@ -9,7 +9,7 @@
     "timing": "Provide forecastStartDate and each period's endDate. Flows are full-period totals, assumed uniform within each period. Code removes elapsed portions and discounts at period-end; Gordon terminal value annualizes the final period's flow.",
     "rates": "Use decimals for rates and probabilities. Match cash-flow currency and nominal or real basis to the discount rate.",
     "discounting": "Execution uses ACT/365F: t=actual days from value date to cash-flow period-end/365; DF_t(r)=(1+r)^t. Supply a justified discount rate or CAPM/WACC components for code to combine.",
-    "commonEquityBridge": "E_common=V_op+separately stated excess cash+other nonoperating assets-financing debt-preferred equity-applicable minority interests-other claims. Exclude excess cash from other assets; equity multiples require no further bridge.",
+    "commonEquityBridge": "E_common=V_op+separately stated excess cash+other nonoperating assets-financing debt-preferred equity-applicable minority interests-other claims. Exclude excess cash from other assets; equity multiples require no further bridge. State cash, interest-bearing debt and minority interests separately; total liabilities cannot replace interest-bearing debt.",
     "perShare": "P_common=E_common/N_common. Keep share count, share classes, employee options and financing treatment consistent; accounting diluted weighted-average shares may require adjustment.",
     "missingInputs": "Read the available statement details before declaring an input missing. Keep missing observations distinct from forecast assumptions. Estimate uncertain parameters with an explicit basis and sensitivities; select another applicable model when essential inputs are unavailable.",
     "terminalConstraint": "Use perpetual terminal value only for a stable business with discount rate above growth. Code derives reinvestment, payout and residual income from growth and capital returns. For finite recovery, supply actual net recovery at the final date; RI subtracts ending book equity.",
@@ -243,6 +243,7 @@
       ],
       "notes": [
         "Support multiples with company and peer economics rather than sector labels alone",
+        "PE uses net income attributable to the parent, P/CF uses operating cash flow, and EV/Revenue uses revenue. Only EV multiples require the cash/debt bridge.",
         "Empirical fit to share prices does not validate intrinsic value",
         "Explain margins, risk and reinvestment when using revenue multiples",
         "Exit-multiple terminal values embed relative-pricing assumptions"

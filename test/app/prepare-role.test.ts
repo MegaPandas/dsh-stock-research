@@ -209,6 +209,7 @@ describe("persisted research role preparation", () => {
     )!.content as ValuationMethods;
     captured.version = "saved-methods";
     captured.methods[0]!.name = "Saved FCFF method";
+    captured.conventions.commonEquityBridge = "Saved equity-bridge conventions";
     h.input.versions.prompts.valuationMethods = captured.version;
     const { runId } = openPrepared(h, "owner", h.input, "open-methods");
     captured.methods[0]!.name = "Caller mutation";
@@ -238,6 +239,9 @@ describe("persisted research role preparation", () => {
     const result = await read(first);
     expect(result).toMatchObject({
       version: "saved-methods",
+      conventions: {
+        commonEquityBridge: "Saved equity-bridge conventions",
+      },
       method: { name: "Saved FCFF method", requiredInputs: expect.any(Array) },
       sources: expect.arrayContaining([expect.objectContaining({ id: "D06" })]),
     });
@@ -321,6 +325,38 @@ describe("persisted research role preparation", () => {
     });
     await parent.dispose();
   });
+
+  it.each(["analysis.market", "analysis.macro", "analysis.public"])(
+    "excludes valuation writes from %s without altering the draft on rejection",
+    async (taskId) => {
+      const h = await host();
+      const { runId } = openPrepared(h, "owner", h.input, "open-role-input");
+      const provision = prepareResearchRole(
+        h.runtime,
+        h.runtime.runs.dispatchForCall(
+          { runId, identity: "owner" },
+          taskId,
+          "prepare-role-input",
+        ),
+      );
+      const write = provision.tools.find(
+        ({ name }) => name === "stock_write_report",
+      )!;
+      expect(write.parameters.properties).not.toHaveProperty("valuation");
+      const exec = { signal: new AbortController().signal } as ToolRunContext;
+      await expect(
+        write.execute({ summary: "Rejected update", valuation: null }, exec),
+      ).rejects.toMatchObject({ code: "INVALID_INPUT" });
+      const read = await provision.tools
+        .find(({ name }) => name === "stock_read_report_draft")!
+        .execute({ sections: null }, exec);
+      expect(read).toMatchObject({ draft: { content: {} } });
+      expect((read as { draft: object }).draft).not.toHaveProperty("summary");
+      expect(
+        (read as { availableSections: string[] }).availableSections,
+      ).not.toContain("valuation");
+    },
+  );
 
   it("resolves calculations registered after preparation when writing the original draft", async () => {
     const h = await host();
@@ -943,6 +979,11 @@ describe("persisted research role preparation", () => {
     );
     expect(result).toMatchObject({ status: "succeeded", failure: null });
     expect(h.adapter.requests).toHaveLength(1);
+    expect(
+      h.adapter.requests[0]!.tools?.find(
+        ({ name }) => name === "stock_write_report",
+      )!.parameters.properties,
+    ).not.toHaveProperty("valuation");
     expect(
       h.adapter.requests[0]!.tools?.map((tool) => tool.name).sort(),
     ).toEqual(

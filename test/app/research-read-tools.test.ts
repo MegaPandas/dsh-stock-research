@@ -2,6 +2,7 @@ import type { Agent } from "@deepseek-ai/dsh-agent";
 import type { ToolRunContext } from "@deepseek-ai/dsh-tools";
 import { afterEach, expect, it, vi } from "vitest";
 import { createResearchReadTools } from "../../src/app/research-read-tools.js";
+import { researchRunView } from "../../src/app/research-view.js";
 import { SessionBindings } from "../../src/host/bindings.js";
 import { createRunReadOperations } from "../../src/host/run-reading.js";
 import { DecisionService } from "../../src/services/decisions.js";
@@ -41,13 +42,25 @@ function setup() {
   return { ...f, call };
 }
 
-it("presents the current output catalog with its authorized run view", async () => {
+it("presents model-facing status and business reports without duplicating run metadata", async () => {
   const f = setup();
   const view = f.runs.view(f.operation);
   const result = await f.call("stock_read_run", { runId: f.operation.runId });
-  expect(result).toMatchObject({
+  expect(result).toEqual({
     kind: "run_view",
-    view,
+    view: {
+      runId: f.operation.runId,
+      scope: f.scope,
+      mode: "quick",
+      status: view.status,
+      tasks: view.tasks.map(({ taskId, status, attempt }) => ({
+        taskId,
+        status,
+        attempt,
+      })),
+      blockReasons: [],
+      stages: [],
+    },
     reportCatalog: expect.arrayContaining([
       {
         ref: f.analysisRef,
@@ -65,6 +78,83 @@ it("presents the current output catalog with its authorized run view", async () 
       },
     ]),
   });
+  const modelView = (result as { view: Record<string, unknown> }).view;
+  expect(Object.keys(modelView)).toEqual([
+    "runId",
+    "scope",
+    "mode",
+    "status",
+    "tasks",
+    "blockReasons",
+    "stages",
+  ]);
+  expect(f.runs.view(f.operation)).toEqual(view);
+});
+
+it("retains current review refs, rejection feedback and failures without carrying review history", () => {
+  const f = setup();
+  const view = f.runs.view(f.operation);
+  const review = {
+    stageId: "manager",
+    verdict: "rejected" as const,
+    feedback: "Explain the target-price assumptions",
+    refs: [f.draftRef],
+    identity: "coordinator",
+    recordedAt: f.scope.cutoff,
+    requestId: "review-manager",
+  };
+  view.stages = [
+    {
+      id: "analysis",
+      taskIds: ["analysis"],
+      beforeTasks: ["digest"],
+      readyForReview: false,
+      accepted: true,
+      refs: [f.analysisRef],
+    },
+    {
+      id: "manager",
+      taskIds: ["manager"],
+      beforeTasks: ["final"],
+      readyForReview: true,
+      accepted: false,
+      refs: [f.draftRef],
+      latestReview: review,
+    },
+  ];
+  view.stageReviews = [review];
+  view.tasks[0]!.failure = {
+    code: "SOURCE_UNAVAILABLE",
+    message: "Source failed",
+  };
+  view.blockReasons = [
+    { id: "block", taskId: "analysis", attempt: 1, ...view.tasks[0]!.failure },
+  ];
+  const result = researchRunView(view);
+  expect(result.stages).toEqual([
+    {
+      id: "analysis",
+      taskIds: ["analysis"],
+      readyForReview: false,
+      accepted: true,
+      refs: [],
+    },
+    {
+      id: "manager",
+      taskIds: ["manager"],
+      readyForReview: true,
+      accepted: false,
+      refs: [f.draftRef],
+      feedback: "Explain the target-price assumptions",
+    },
+  ]);
+  expect(result.tasks[0]!.failure).toEqual({
+    code: "SOURCE_UNAVAILABLE",
+    message: "Source failed",
+  });
+  expect(result.blockReasons).toEqual(view.blockReasons);
+  expect(result).not.toHaveProperty("stageReviews");
+  expect(view.stages[0]!.refs).toEqual([f.analysisRef]);
 });
 
 it("presents final report text while preserving its complete stored artifact", async () => {

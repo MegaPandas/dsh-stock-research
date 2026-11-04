@@ -134,8 +134,8 @@ describe("Xueqiu financial collection fallback", () => {
     expect(result.historicalKnowledge).toBe("unverified");
     expect(result.gaps).toContainEqual({
       code: "missing",
-      field: "/data/rows/0/values/MLR",
-      detail: "毛利润 is absent for 2026-06-30.",
+      field: "/data/columns/MLR",
+      detail: "毛利润 is absent from all observations.",
     });
     expect(
       result.gaps.some((gap) => gap.field === "/data/rows/publishedDate"),

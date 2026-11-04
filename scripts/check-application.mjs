@@ -20,6 +20,7 @@ import AgentPresetRegistry from "@deepseek-ai/dsh-agent-preset-registry";
 import CommandRuntime from "@deepseek-ai/dsh-commands";
 import { LocalJobRegistry } from "@deepseek-ai/dsh-jobs-local";
 import { SessionId } from "@deepseek-ai/dsh-session";
+import SessionQuery from "@deepseek-ai/dsh-session-query-sqlite";
 import { SubagentRuntime } from "@deepseek-ai/dsh-subagent";
 import * as SpawnInProcess from "@deepseek-ai/dsh-subagent-spawn-in-process";
 import WebRuntime from "@deepseek-ai/dsh-web";
@@ -68,6 +69,7 @@ try {
   await ctx.plugin(AgentPresetRegistry, { default: "application-user" });
   await ctx.agentPresets.register({ id: "application-user", plugins: [] });
   await mountAgentLoopTestHarness(ctx);
+  await ctx.plugin(SessionQuery, { path: ":memory:", openAt: "never" });
   await ctx.plugin(LocalJobRegistry, {});
   await ctx.plugin(SubagentRuntime, {});
   await ctx.plugin(SpawnInProcess, { providerName: "spawn" });
@@ -145,7 +147,7 @@ try {
   assert.equal(deep.definition.mode, "deep");
   assert.equal(deep.definition.tasks.length, 25);
   assert.equal(deep.versions.mode, DEEP_MODE_VERSION);
-  assert.equal(deep.versions.prompts.roles, "32");
+  assert.equal(deep.versions.prompts.roles, "36");
   assert.ok(
     deep.inputs.some(
       ({ name, content }) =>

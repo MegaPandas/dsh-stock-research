@@ -16,7 +16,7 @@ describe("role preparation boundaries", () => {
   it.each([
     ["src/application.ts", "./app/role-preparation/role.js"],
     ["src/application.ts", "./app/role-preparation/services.js"],
-    ["src/plugin.ts", "./app/role-preparation/valuation-draft.js"],
+    ["src/plugin.ts", "./app/role-preparation/report-input.js"],
     ["src/application.ts", "./app/role-preparation/public-search.js"],
     ["src/application.ts", "./app/role-preparation/report.js"],
     ["src/plugin.ts", "./app/role-preparation/valuation.js"],
@@ -37,7 +37,7 @@ describe("role preparation boundaries", () => {
     ["src/application.ts", "./app/role-preparation/index.js"],
     ["src/plugin.ts", "./app/role-preparation/index.js"],
     ["src/app/role-preparation/index.ts", "./role.js"],
-    ["src/app/role-preparation/role.ts", "./valuation-draft.js"],
+    ["src/app/role-preparation/report.ts", "./report-input.js"],
     ["src/app/role-preparation/role.ts", "./public-search.js"],
     ["src/app/role-preparation/role.ts", "./report.js"],
     ["src/app/role-preparation/role.ts", "./valuation.js"],

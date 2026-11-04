@@ -47,6 +47,7 @@ export interface RoleProvision {
   ): RoleProvision;
   agentPreset?: string;
   agentOptions?: AgentOptions;
+  /** Application-owned input for this activation, including a follow-up. */
   prompt: ContentBlock[];
   tools: readonly ToolDefinition[];
   systemPrompt?: string;
@@ -225,6 +226,7 @@ export class DispatchBridge {
     taskId: string,
     requestId: string,
     signal: AbortSignal,
+    background = false,
   ): Promise<DispatchResult> {
     return this.#afterStops(runId, taskId, signal, () => {
       this.#planning.assertIndividual(
@@ -232,7 +234,14 @@ export class DispatchBridge {
         taskId,
         requestId,
       );
-      return this.#startRole(parent, runId, taskId, requestId, signal);
+      return this.#startRole(
+        parent,
+        runId,
+        taskId,
+        requestId,
+        signal,
+        background,
+      );
     });
   }
 
@@ -242,6 +251,7 @@ export class DispatchBridge {
     stageId: string,
     requestId: string,
     signal: AbortSignal,
+    background = false,
   ): Promise<StageDispatchResult> {
     const operation = { runId, identity: parent.id };
     this.runs.hasStageDispatchReceipt(operation, stageId, requestId);
@@ -278,7 +288,14 @@ export class DispatchBridge {
       this.runs.recordStageDispatch(operation, stageId, requestId);
       const outcomes = await Promise.allSettled(
         requests.map(({ taskId, requestId: taskRequestId }) =>
-          this.#startRole(parent, runId, taskId, taskRequestId, signal),
+          this.#startRole(
+            parent,
+            runId,
+            taskId,
+            taskRequestId,
+            signal,
+            background,
+          ),
         ),
       );
       const failures = outcomes.flatMap((outcome) =>
@@ -320,6 +337,7 @@ export class DispatchBridge {
     requestId: string,
     resumeSearch: boolean,
     signal: AbortSignal,
+    background = false,
   ): Promise<DispatchResult> {
     const payload = JSON.stringify([taskId, message, resumeSearch]);
     const receipt = this.#followupReceipts.find(
@@ -381,7 +399,8 @@ export class DispatchBridge {
           taskId,
           JSON.stringify(["followup", requestId]),
           signal,
-          { session, message, resumeSearch },
+          background,
+          { session, resumeSearch },
         ),
       );
     }).finally(() => {
@@ -412,9 +431,9 @@ export class DispatchBridge {
     taskId: string,
     requestId: string,
     signal: AbortSignal,
+    background: boolean,
     continuation?: {
       session: RoleSession;
-      message: string;
       resumeSearch: boolean;
     },
   ): Promise<DispatchResult> {
@@ -448,6 +467,7 @@ export class DispatchBridge {
           signal,
           controller.signal,
           resolveDrain,
+          background,
           continuation,
         ),
       )
@@ -606,9 +626,9 @@ export class DispatchBridge {
     callerSignal: AbortSignal,
     ownerSignal: AbortSignal,
     resolveDrain: (failures: unknown[]) => void,
+    background: boolean,
     continuation?: {
       session: RoleSession;
-      message: string;
       resumeSearch: boolean;
     },
   ): Promise<DispatchResult> {
@@ -652,6 +672,7 @@ export class DispatchBridge {
             runId: claim.runId,
             taskId: claim.taskId,
             attempt: claim.attempt,
+            ...(background ? { background } : {}),
           },
           provision.tools,
         );
@@ -706,12 +727,7 @@ export class DispatchBridge {
                 this.ctx,
                 parent,
                 childId,
-                [
-                  {
-                    type: "text",
-                    text: `${continuation.message}\nUse the existing conversation to complete the requested additions or revisions, check the draft and submit it. ${continuation.resumeSearch ? "The primary agent has resumed search. Previous usage and limits remain; each over-budget search requires user approval." : "Search pause and usage remain unchanged."}`,
-                  },
-                ],
+                currentProvision.prompt,
                 signal,
               ),
         );

@@ -13,7 +13,13 @@ import {
 import { ResearchError } from "../contracts/errors.js";
 import { parseAgentReport } from "../artifacts/agent-reports.js";
 import { researchTool } from "./tool-protocol/errors.js";
-import { objectSchema, resultOutput } from "./tool-protocol/parameters.js";
+import {
+  object,
+  objectSchema,
+  resultOutput,
+  sectionSelectionSchema,
+  selectedSections,
+} from "./tool-protocol/parameters.js";
 import { createSubmissionSession } from "./agent-protocol/submission.js";
 import {
   stageHandoffSchema,
@@ -117,8 +123,9 @@ export function createReportDraft<Kind extends AgentReportKind, Result>(
     }),
     researchTool({
       name: "stock_read_report_draft",
-      description: "Read the current draft and missing sections.",
-      parameters: emptySchema,
+      description:
+        "Check draft status with sections=[]; read selected top-level sections, or use sections=null for the complete draft. Includes missing sections and handoff confirmation.",
+      parameters: objectSchema({ sections: sectionSelectionSchema }),
       output: resultOutput(
         objectSchema({
           draft: objectSchema(
@@ -129,6 +136,7 @@ export function createReportDraft<Kind extends AgentReportKind, Result>(
             ["content"],
           ),
           missingSections: { type: "array", items: { type: "string" } },
+          availableSections: { type: "array", items: { type: "string" } },
           ...(handoffOptions === undefined
             ? {}
             : {
@@ -141,9 +149,26 @@ export function createReportDraft<Kind extends AgentReportKind, Result>(
       ),
       async execute(value, exec) {
         exec.signal.throwIfAborted();
-        validate(emptySchema, value);
+        const input = object(value, ["sections"]);
+        const selected = selectedSections(
+          input.sections,
+          Object.keys(sections),
+        );
+        const content = stored.content as Record<string, unknown>;
         return {
-          draft: draft(),
+          draft: {
+            ...(selected.includes("summary") && stored.summary !== undefined
+              ? { summary: stored.summary }
+              : {}),
+            content: structuredClone(
+              Object.fromEntries(
+                selected
+                  .filter((section) => Object.hasOwn(content, section))
+                  .map((section) => [section, content[section]]),
+              ),
+            ),
+          },
+          availableSections: Object.keys(sections),
           missingSections: [
             "summary",
             ...schema.properties.content.required,

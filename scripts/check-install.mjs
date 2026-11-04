@@ -128,6 +128,10 @@ async function probe(directory, targetVersion) {
     assert.deepEqual((await ctx.agentPresets.remoteExportList()).presets, []);
     await ctx.agentPresets.register({ id: "installation-user", plugins: [] });
     const userPresets = await ctx.agentPresets.remoteExportList();
+    assert.ok(
+      ctx.get("sessionQuery"),
+      "Research requires the host session query service.",
+    );
     const graph = ctx.clientModules.graph();
     const client = graph.entries.find(({ id }) => id === manifest.name);
     assert.ok(

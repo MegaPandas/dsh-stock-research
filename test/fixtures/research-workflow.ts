@@ -4,7 +4,7 @@ import type {
   AgentReportKind,
 } from "../../src/contracts/agent-reports.js";
 import type { ArtifactRef, ResearchScope } from "../../src/contracts/data.js";
-import type { RunView } from "../../src/contracts/runs.js";
+import type { ResearchRunView } from "../../src/app/research-view.js";
 import type { TaskDefinition } from "../../src/contracts/workflow.js";
 import {
   initialInput,
@@ -45,7 +45,7 @@ export interface MainResearchRequest {
   date?: string;
   mode?: "quick" | "deep";
   runId?: string;
-  view?: RunView;
+  view?: ResearchRunView;
   tasks?: ResearchTaskInfo[];
   operationId?: string;
 }
@@ -104,7 +104,8 @@ export function workflowModel(
     string,
     {
       prompt: number;
-      view?: RunView;
+      view?: ResearchRunView;
+      reportCatalog?: { ref: ArtifactRef; taskId: string; kind: string }[];
       lastAction?: string;
       pendingRedo?: string;
       inspected: Set<string>;
@@ -160,9 +161,12 @@ export function workflowModel(
       } else {
         let feedback: {
           runId?: string;
-          view?: RunView;
+          view?: ResearchRunView;
+          reportCatalog?: { ref: ArtifactRef; taskId: string; kind: string }[];
+          stageId?: string;
+          verdict?: "accepted" | "rejected";
           kind?: string;
-          context?: { runId: string; view: RunView };
+          context?: { runId: string; view: ResearchRunView };
           artifact?: {
             ref: ArtifactRef;
             content: { kind: string; body: string };
@@ -179,8 +183,12 @@ export function workflowModel(
           return;
         } else if (current.lastAction === "stock_read_run") {
           current.view = feedback.view!;
+          current.reportCatalog = feedback.reportCatalog!;
         } else if (current.lastAction === "stock_review_stage") {
-          current.view = feedback as unknown as RunView;
+          const stage = current.view!.stages.find(
+            ({ id }) => id === feedback.stageId,
+          )!;
+          stage.accepted = feedback.verdict === "accepted";
         } else if (current.lastAction === "stock_read_artifact") {
           if (feedback.artifact?.content.kind === "report")
             current.finalReport = feedback.artifact.content.body;
@@ -193,9 +201,9 @@ export function workflowModel(
       }
       const view = current.view!;
       state.runId = view.runId;
-      const marketRef = view.tasks.find(
+      const marketRef = current.reportCatalog?.find(
         ({ taskId }) => taskId === "analysis.market",
-      )?.outputRefs[0];
+      )?.ref;
       if (marketRef !== undefined) state.marketRef = marketRef;
       else delete state.marketRef;
       for (const task of view.tasks)
@@ -203,13 +211,9 @@ export function workflowModel(
           state.taskIds.push(task.taskId);
       if (view.status === "completed") {
         if (current.finalReport === undefined) {
-          const reportRef =
-            view.tasks
-              .find(({ taskId }) => taskId === "finalize")!
-              .outputRefs.find((ref) => ref.artifactId.includes("report")) ??
-            view.tasks
-              .find(({ taskId }) => taskId === "finalize")!
-              .outputRefs.at(-1)!;
+          const reportRef = current.reportCatalog!.find(
+            ({ kind }) => kind === "report",
+          )!.ref;
           yield* invoke("stock_read_artifact", { ref: reportRef });
         } else
           yield* textResponse(

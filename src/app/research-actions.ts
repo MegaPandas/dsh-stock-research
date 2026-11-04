@@ -6,6 +6,7 @@ import type {
   ResumeRunInput,
   RunView,
   StageReviewInput,
+  StageReviewResult,
 } from "../contracts/runs.js";
 import type { RunDefinition, TaskDefinition } from "../contracts/workflow.js";
 import type { ResearchCaller } from "../host/bindings.js";
@@ -96,7 +97,10 @@ export interface ResearchActions {
     request: ResearchCancelRequest,
     caller: ResearchCaller,
   ): Promise<CancelTaskResult>;
-  review(request: ReviewResearchRequest, caller: ResearchCaller): RunView;
+  review(
+    request: ReviewResearchRequest,
+    caller: ResearchCaller,
+  ): StageReviewResult;
   control(
     input: ResearchControl,
     caller: ResearchCaller,

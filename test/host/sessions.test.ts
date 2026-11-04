@@ -13,6 +13,7 @@ import {
 } from "@deepseek-ai/dsh-llm";
 import { bindScopeParent, createScope } from "@deepseek-ai/dsh-scope";
 import { SessionId } from "@deepseek-ai/dsh-session";
+import SessionQuery from "@deepseek-ai/dsh-session-query-sqlite";
 import type {
   ToolDefinition,
   ToolExecutionResult,
@@ -102,6 +103,7 @@ async function host() {
   const adapter = new ToolThenStopAdapter();
   ctx.llm.registerAdapter([agentOptions.provider], adapter);
   await mountAgentLoopTestHarness(ctx);
+  await ctx.plugin(SessionQuery, { path: ":memory:", openAt: "never" });
   const bindings = new SessionBindings();
   const sessions = new ResearchSessions(ctx, bindings);
   let probeCalls = 0;

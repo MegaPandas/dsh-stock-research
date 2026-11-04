@@ -38,16 +38,19 @@ export interface DispatchOperations {
     request: ResearchTaskRequest,
     caller: BoundCaller,
     signal: AbortSignal,
+    background?: boolean,
   ): Promise<DispatchResult>;
   dispatchStage(
     request: ResearchStageRequest,
     caller: BoundCaller,
     signal: AbortSignal,
+    background?: boolean,
   ): Promise<StageDispatchResult>;
   followupTask(
     request: ResearchFollowupRequest,
     caller: BoundCaller,
     signal: AbortSignal,
+    background?: boolean,
   ): Promise<DispatchResult>;
   redoTask(
     request: ResearchRedoRequest,
@@ -91,25 +94,27 @@ export function createDispatchOperations(
   >,
 ): DispatchOperations {
   return {
-    dispatchTask(request, caller, signal) {
+    dispatchTask(request, caller, signal, background = false) {
       return bridge.dispatch(
         caller.agent,
         request.runId,
         request.taskId,
         request.requestId,
         signal,
+        background,
       );
     },
-    dispatchStage(request, caller, signal) {
+    dispatchStage(request, caller, signal, background = false) {
       return bridge.dispatchStage(
         caller.agent,
         request.runId,
         request.stageId,
         request.requestId,
         signal,
+        background,
       );
     },
-    followupTask(request, caller, signal) {
+    followupTask(request, caller, signal, background = false) {
       return bridge.followup(
         caller.agent,
         request.runId,
@@ -118,6 +123,7 @@ export function createDispatchOperations(
         request.requestId,
         request.resumeSearch,
         signal,
+        background,
       );
     },
     redoTask(request, caller, signal) {

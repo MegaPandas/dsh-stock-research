@@ -20,6 +20,11 @@ import type {
 import { securityFor, scopeAtDate } from "./research-scope.js";
 import { parseRunControl, runControlParameters } from "./run-command-input.js";
 import { runStatus } from "./run-view.js";
+import {
+  researchContextView,
+  researchObservationView,
+  researchRunView,
+} from "./research-view.js";
 import { runApplicationTool } from "./settings.js";
 
 export function applicationTool(
@@ -102,7 +107,10 @@ export function createResearchReviewTool(
     }),
     output: resultOutput(opaqueObjectSchema),
     isConcurrencySafe: () => true,
-    execute: async (value, exec) => actions.review(reviewRequest(value), exec),
+    execute: async (value, exec) => {
+      const { runId, review } = actions.review(reviewRequest(value), exec);
+      return { runId, stageId: review.stageId, verdict: review.verdict };
+    },
   });
 }
 
@@ -152,7 +160,9 @@ export function createResearchTools(
       isConcurrencySafe: () => true,
       execute: async (value, exec) => {
         const item = object(value, ["jobId"]);
-        return actions.observe(text(item.jobId, "jobId"), exec);
+        return researchObservationView(
+          actions.observe(text(item.jobId, "jobId"), exec),
+        );
       },
     }),
     applicationTool(ctx, {
@@ -167,10 +177,12 @@ export function createResearchTools(
       isConcurrencySafe: () => true,
       execute: async (value, exec) => {
         const item = object(value, ["jobId", "requestId"]);
-        return actions.cancel(
-          text(item.jobId, "jobId"),
-          exec,
-          text(item.requestId, "requestId"),
+        return researchObservationView(
+          await actions.cancel(
+            text(item.jobId, "jobId"),
+            exec,
+            text(item.requestId, "requestId"),
+          ),
         );
       },
     }),
@@ -192,7 +204,7 @@ export function createResearchTools(
           const result = await actions.control(command, exec, requestId);
           return result.kind === "status"
             ? { kind: "success", text: runStatus(result.view) }
-            : { ...result.context, ...result.handle };
+            : { ...researchContextView(result.context), ...result.handle };
         },
       });
     }),
@@ -239,7 +251,12 @@ export function createResearchTaskTools(
           },
           exec,
         );
-        return result;
+        return result.kind === "status"
+          ? { kind: "status", view: researchRunView(result.view) }
+          : {
+              ...result,
+              context: researchContextView(result.context),
+            };
       },
     }),
     applicationTool(ctx, {

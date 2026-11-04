@@ -35,17 +35,32 @@ const [
   reviewQuestion,
 ] = process.argv.slice(2);
 const reviewMode = selection === "--review";
-const probeTaskId = reviewMode ? undefined : selection;
+const backgroundMode = existingDataRoot === "--followup-policy-background";
+const policyMode = existingDataRoot === "--followup-policy" || backgroundMode;
+const followupMode = existingDataRoot === "--followup" || policyMode;
+const fixtureRoute = {
+  provider: "acceptance-fixture",
+  model: "public-followup-policy",
+};
+const probeTaskId = followupMode
+  ? "analysis.public"
+  : reviewMode
+    ? undefined
+    : selection;
 if (
   [installAnchor, profilePath, envPath, model, date, outputDirectory].some(
     (value) => value === undefined,
   ) ||
-  (existingDataRoot === undefined) !== (resumeRunId === undefined) ||
+  (followupMode && process.argv.slice(2).length !== 7) ||
+  (!followupMode &&
+    (existingDataRoot === undefined) !== (resumeRunId === undefined)) ||
   (selection !== undefined && resumeRunId === undefined) ||
-  (selection?.startsWith("--") && !reviewMode)
+  (selection?.startsWith("--") && !reviewMode) ||
+  (reviewQuestion !== undefined && !reviewMode) ||
+  process.argv.slice(2).length > 10
 ) {
   console.error(
-    "Usage: npm run check:quick -- <dsh-package.json> <profile-patch.yml> <env-file> <model-id> <research-date> <new-output-directory> [<existing-data-root> <source-run-id> [<probe-task-id>|--review [<review-question>]]]",
+    "Usage: npm run check:quick -- <dsh-package.json> <profile-patch.yml> <env-file> <model-id> <research-date> <new-output-directory> [--followup|--followup-policy|--followup-policy-background|<existing-data-root> <source-run-id> [<probe-task-id>|--review [<review-question>]]]",
   );
   process.exit(2);
 }
@@ -55,6 +70,8 @@ const require = createRequire(installAnchor);
 const load = (name) => import(pathToFileURL(require.resolve(name)).href);
 const startedAt = performance.now();
 const calls = new Map();
+const agentInstances = new WeakMap();
+let nextAgentInstance = 0;
 const tools = new Map();
 const streamedArguments = new Map();
 const artifactTools = new Set([
@@ -68,18 +85,40 @@ const artifactTools = new Set([
 const nativeFetch = globalThis.fetch;
 const fetches = { market: 0, fundamentals: 0, macro: 0, search: 0, model: 0 };
 const record = {
-  case: `live BYD ${reviewMode ? "review" : "quick"} through official profile boot`,
+  case: backgroundMode
+    ? "background public approval with fixture-driven child model, real DSH + real search"
+    : policyMode
+      ? "fixture-driven model, real DSH + real search through official profile boot"
+      : followupMode
+        ? "real-model BYD transport and draft smoke through official profile boot"
+        : `live BYD ${reviewMode ? "review" : "quick"} through official profile boot`,
   target: "SZ.002594",
   date,
-  provider: "magpie",
-  model,
+  provider: policyMode ? fixtureRoute.provider : "magpie",
+  model: policyMode ? fixtureRoute.model : model,
+  ...(followupMode
+    ? {
+        workload: backgroundMode
+          ? "Fixture-driven model; real DSH, native approval in separate parent turns and real public search; approval-only turns make no model requests, native settled-notice turns are counted separately; synthetic qualitative report; user UI is not covered."
+          : policyMode
+            ? "Fixture-driven model; real DSH, native approval and real public search; synthetic qualitative report; no live model calls."
+            : "Real-model transport and draft smoke; real DSH and one free public search; approval-policy behavior is not covered.",
+      }
+    : {}),
+  ...(policyMode ? { bootstrapModel: { provider: "magpie", model } } : {}),
   mode: reviewMode
     ? "review"
-    : probeTaskId !== undefined
-      ? "role-probe"
-      : resumeRunId === undefined
-        ? "fresh"
-        : "resume",
+    : backgroundMode
+      ? "role-followup-policy-background"
+      : policyMode
+        ? "role-followup-policy"
+        : followupMode
+          ? "role-followup-smoke"
+          : probeTaskId !== undefined
+            ? "role-probe"
+            : resumeRunId === undefined
+              ? "fresh"
+              : "resume",
   outcome: "pending",
   stage: "configuration",
 };
@@ -202,6 +241,8 @@ try {
     { cwd: project },
   );
   const archive = JSON.parse(packed.stdout)[manifest.name];
+  record.archive = join(outputDirectory, archive.filename);
+  cpSync(join(directory, archive.filename), record.archive);
   await execute("tar", [
     "-xzf",
     join(directory, archive.filename),
@@ -222,6 +263,7 @@ try {
     "llm",
     "session",
     "session-projection",
+    "session-query-sqlite",
     "system-prompt",
     "tools",
     "agent",
@@ -234,6 +276,8 @@ try {
     "commands",
     "agent-preset-registry",
     "web",
+    "tool-web",
+    ...(followupMode ? ["session-persistence-jsonl", "user-approval"] : []),
   ].map((service) => ({
     id: `host-${service}`,
     name: `@deepseek-ai/dsh-${service}`,
@@ -247,13 +291,35 @@ try {
     ...(service === "web"
       ? { config: { searchProvider: "deepseek-search-api" } }
       : {}),
+    ...(service === "tool-web"
+      ? { config: { search: true, fetch: false, searchMaxResults: 3 } }
+      : {}),
+    ...(service === "session-query-sqlite"
+      ? {
+          config: {
+            path: join(outputDirectory, "session-query.sqlite"),
+            openAt: "never",
+          },
+        }
+      : {}),
+    ...(service === "session-persistence-jsonl"
+      ? {
+          config: {
+            root: join(outputDirectory, "sessions"),
+            compression: "none",
+          },
+        }
+      : {}),
+    ...(service === "user-approval"
+      ? { config: { policy: policyMode ? "ask" : "never" } }
+      : {}),
   }));
   process.env.DSH_HOME = join(directory, "home");
   const dataRoot =
-    probeTaskId === undefined && !reviewMode
+    !followupMode && probeTaskId === undefined && !reviewMode
       ? (existingDataRoot ?? join(outputDirectory, "data"))
       : join(outputDirectory, "data");
-  if (probeTaskId !== undefined || reviewMode)
+  if (!followupMode && (probeTaskId !== undefined || reviewMode))
     cpSync(existingDataRoot, dataRoot, { recursive: true });
   record.dataRoot = dataRoot;
   const { applyEntryPatches, entryListSchema } = await load(
@@ -347,6 +413,34 @@ try {
     );
     record.host[name] = selected.version;
   }
+  if (followupMode) {
+    for (const name of [
+      "@deepseek-ai/dsh-session-persistence-jsonl",
+      "@deepseek-ai/dsh-user-approval",
+    ]) {
+      const selected = ctx.pluginPackages.packageOf(name, pluginURL);
+      assert.equal(
+        selected.dir,
+        dirname(require.resolve(`${name}/package.json`)),
+      );
+      assert.equal(
+        selected.version,
+        require("@deepseek-ai/dsh/package.json").version,
+        "Follow-up services must use the selected DSH installation version",
+      );
+      record.host[name] = selected.version;
+    }
+  }
+  record.stage = "host-ready";
+  assert.ok(
+    ctx.get("stockResearch"),
+    "The official profile must initialize stockResearch before model calls.",
+  );
+  if (followupMode)
+    assert.ok(
+      ctx.tools.get("web_search"),
+      "The public follow-up probe requires the host's native web_search tool.",
+    );
   const { LocalCredentialProvider } = await load(
     "@deepseek-ai/dsh-credentials-local",
   );
@@ -368,7 +462,17 @@ try {
     pathToFileURL(join(packageDirectory, "dist/core.mjs")).href
   );
   record.runtimePrompts = { digest: stock.DIGEST_HANDOFF_VERSION };
-  stock.parseLocalDate(date);
+  const researchDate = stock.parseLocalDate(date);
+  if (followupMode) {
+    record.stage = "public-probe-input";
+    assert.equal(
+      researchDate,
+      new Intl.DateTimeFormat("en-CA", {
+        timeZone: "Asia/Shanghai",
+      }).format(new Date()),
+      "The public-only follow-up probe requires today's date; historical search requires saved snapshots.",
+    );
+  }
   record.policy = ctx.stockResearch.policy;
 
   globalThis.fetch = async (input, init) => {
@@ -385,22 +489,33 @@ try {
             : url.href === `${deepseek.DEEPSEEK_WEB_API_BASE_URL}/search`
               ? "search"
               : "model";
+    assert.ok(
+      !policyMode || kind !== "model",
+      "The fixture-driven policy probe must not call a real model endpoint",
+    );
     fetches[kind]++;
     progress({ event: "request", kind, count: fetches[kind] });
     return nativeFetch(input, init);
   };
   ctx.on("agent/assistant-stream", ({ agent, frame }) => {
+    // Attempt IDs restart when the same persisted session gets a new Agent.
+    if (!agentInstances.has(agent))
+      agentInstances.set(agent, ++nextAgentInstance);
+    const streamKey = `${agentInstances.get(agent)}:${frame.attemptId}`;
     if (frame.type === "start") {
       const route = agent.session.requestHeader().config;
-      calls.set(frame.attemptId, {
+      calls.set(streamKey, {
         attemptId: frame.attemptId,
+        agentInstance: agentInstances.get(agent),
         provider: route.provider,
         model: route.model,
         sessionId: agent.id,
+        turn: frame.turn,
+        step: frame.step,
         usage: null,
         finish: null,
       });
-      streamedArguments.set(frame.attemptId, new Map());
+      streamedArguments.set(streamKey, new Map());
       progress({
         event: "model",
         call: calls.size,
@@ -408,9 +523,9 @@ try {
         model: route.model,
       });
     } else if (frame.type === "chunk") {
-      const call = calls.get(frame.attemptId);
+      const call = calls.get(streamKey);
       const chunk = frame.chunk;
-      const blocks = streamedArguments.get(frame.attemptId);
+      const blocks = streamedArguments.get(streamKey);
       if (chunk.type === "block-start" && chunk.blockType === "tool-call")
         blocks.set(chunk.index, []);
       if (chunk.type === "tool-call-delta")
@@ -444,7 +559,7 @@ try {
       }
       if (frame.chunk.type === "finish") call.finish = frame.chunk.reason.kind;
     } else {
-      streamedArguments.delete(frame.attemptId);
+      streamedArguments.delete(streamKey);
     }
   });
   ctx.on("agent/error", ({ agent, error }) => {
@@ -539,7 +654,9 @@ try {
         ? 5 * 60_000
         : probeTaskId === undefined
           ? 30 * 60_000
-          : 120_000,
+          : followupMode
+            ? 6 * 60_000
+            : 120_000,
     ),
   ]);
   if (reviewMode) {
@@ -601,50 +718,559 @@ try {
     record.outcome = "review-passed";
   } else if (probeTaskId !== undefined) {
     const runtime = ctx.stockResearch;
-    const definition = runtime.runs.readDefinition(resumeRunId);
-    const task = definition.tasks.find((item) => item.id === probeTaskId);
-    assert.equal(definition.scope.security.id, "CN:002594.SZ");
-    assert.equal(definition.scope.date, date);
-    assert.equal(task.executor.kind, "role");
-    record.sourceRunId = resumeRunId;
+    const publicSearchLimit = 1;
+    const probeQueries = {
+      free: "比亚迪 王朝 海洋 产品 竞争 2026",
+      firstRejected: "比亚迪 2026年11月 销量 竞争",
+      paused: "比亚迪 海外市场 关税 2026年11月",
+      resumed: "比亚迪 2026年11月 新品 价格 竞争格局",
+    };
     record.taskId = probeTaskId;
-    const parent = await runtime.createAgent(
-      {
-        sessionId: "real-quick-role-probe",
-        agentOptions: { provider: "magpie", model },
-        meta: { cwd: outputDirectory },
-      },
-      { kind: "coordinator", runIds: [runId] },
-      [],
-    );
-    try {
-      const view = runtime.runs.view({ runId });
-      record.resolvedReasons = view.blockReasons;
-      runtime.runs.resume(
-        { runId, identity: parent.agent.id },
-        {
-          resolvedReasonIds: view.blockReasons.map((reason) => reason.id),
-          instructions: [],
-        },
-        randomUUID(),
+    if (followupMode) {
+      const { createQuickInput } = await import(
+        pathToFileURL(join(packageDirectory, "dist/application.mjs")).href
       );
+      const scope = {
+        security: {
+          id: "CN:002594.SZ",
+          market: "CN",
+          symbol: "002594.SZ",
+          exchange: "SZ",
+          currency: "CNY",
+          timeZone: "Asia/Shanghai",
+        },
+        date: researchDate,
+        cutoff: new Date().toISOString(),
+      };
+      const input = createQuickInput(
+        scope,
+        runtime.policy,
+        [],
+        [],
+        publicSearchLimit,
+      );
+      input.definition.tasks = input.definition.tasks.filter(
+        ({ id }) => id === probeTaskId,
+      );
+      input.instructions = input.instructions.filter(
+        ({ taskId }) => taskId === probeTaskId,
+      );
+      input.instructions[0].instruction = [
+        policyMode
+          ? "本次仅验证公开信息角色及原会话修订；只执行下面指定的两次公开查询，不补充或重复查询。"
+          : "本次仅验证公开信息角色报告及原会话修订；只执行下面指定的一次免费公开查询，不补充或重复查询。",
+        `先调用 stock_search_public，query 必须为：${probeQueries.free}。这是唯一一次免费查询，等待其成功返回后再继续。`,
+        ...(policyMode
+          ? [
+              `再调用 stock_search_public，query 必须为：${probeQueries.firstRejected}。该次申请会被验收操作者拒绝。`,
+              "收到拒绝后不要重试，基于已有公开结果提交简洁完整中文报告；未知项如实写入缺口，不臆造数字。检查草稿，确认 stageHandoff 后调用 stock_submit 提交。",
+            ]
+          : [
+              "免费查询完成后不再申请搜索。基于已有公开结果提交简洁完整中文报告；未知项如实写入缺口，不臆造数字。检查草稿，确认 stageHandoff 后调用 stock_submit 提交。",
+            ]),
+      ].join("\n");
+      runId = runtime.runs.open(
+        "real-quick-role-probe",
+        input,
+        randomUUID(),
+      ).runId;
+      record.runId = runId;
+    } else {
+      const definition = runtime.runs.readDefinition(resumeRunId);
+      const task = definition.tasks.find((item) => item.id === probeTaskId);
+      assert.equal(definition.scope.security.id, "CN:002594.SZ");
+      assert.equal(definition.scope.date, date);
+      assert.equal(task.executor.kind, "role");
+      record.sourceRunId = resumeRunId;
+    }
+    if (policyMode) {
+      const llm = await load("@deepseek-ai/dsh-llm");
+      const { createFollowupPolicyAdapter } =
+        await import("./fixtures/followup-policy.mjs");
+      ctx.llm.registerAdapter(
+        [fixtureRoute.provider],
+        createFollowupPolicyAdapter(llm, probeQueries, backgroundMode),
+      );
+    }
+    let parent;
+    const runProbe = async (activeSignal) => {
+      if (!followupMode) {
+        const view = runtime.runs.view({ runId });
+        record.resolvedReasons = view.blockReasons;
+        runtime.runs.resume(
+          { runId, identity: parent.agent.id },
+          {
+            resolvedReasonIds: view.blockReasons.map((reason) => reason.id),
+            instructions: [],
+          },
+          randomUUID(),
+        );
+      }
       record.probe = await runtime.dispatch.dispatch(
         parent.agent,
         runId,
         probeTaskId,
         randomUUID(),
-        signal,
+        activeSignal,
+        backgroundMode,
       );
+      assert.equal(
+        record.probe.status,
+        "succeeded",
+        "The isolated role must commit its actual artifact",
+      );
+      if (followupMode) {
+        const readArtifacts = (receipt) =>
+          receipt.refs.map((ref) => runtime.runs.readArtifact(ref));
+        const searchTimes = (artifacts) =>
+          artifacts.map(
+            ({ content }) => content.payload.publicSearchAsOf ?? null,
+          );
+        let previous = record.probe;
+        const originals = globalThis.structuredClone(readArtifacts(previous));
+        if (!policyMode) {
+          assert.equal(fetches.search, 1);
+          assert.ok(
+            searchTimes(originals).every((time) => typeof time === "string"),
+            "The model smoke must save the result of its free public search",
+          );
+        }
+        const preserved = [...originals];
+        record.followupRounds = [
+          { ...previous, publicSearchAsOf: searchTimes(originals) },
+        ];
+        for (const round of [2, 3]) {
+          record.stage = `role-followup-${round}`;
+          assert.equal(
+            ctx.agents.get(previous.sessionId),
+            undefined,
+            "The prior child Agent must be released before cold restoration",
+          );
+          assert.equal(
+            ctx.sessions.get(previous.sessionId),
+            undefined,
+            "The prior child Session must be released before cold restoration",
+          );
+          const marker = `followup-round-${round}`;
+          const resumeSearch = round === 3;
+          const searchesBefore = fetches.search;
+          const message = [
+            ...(policyMode
+              ? resumeSearch
+                ? [
+                    `搜索已显式恢复：调用 stock_search_public，query 必须为：${probeQueries.resumed}。本次申请将获得单次批准；只执行这次指定查询，不新增或重复查询。用结果核对已有判断，保留使用量与原额度。`,
+                  ]
+                : [
+                    `本轮不恢复搜索，但需要调用 stock_search_public 申请另一条指定查询，query 必须为：${probeQueries.paused}。该申请将被拒绝并触发暂停；被拒后不重试，基于已有材料完成摘要修订。`,
+                  ]
+              : ["本轮只修订已有报告和交接，不申请或新增任何搜索。"]),
+            (policyMode ? "等待上述查询成功或被拒后，" : "") +
+              "使用已有草稿，仅更新 summary 和 content.handoff，其他正文逐项保持不变。在 summary 以及 content.handoff.limitations 中均包含验收标记：" +
+              marker +
+              "。在交接中如实记录本次新材料或缺口；其他正文留待后续任务评估，不在本轮重写。",
+            "检查草稿，在最后一次修改后重新确认 stageHandoff，然后调用 stock_submit 提交。",
+          ].join("\n");
+          const next = await runtime.dispatch.followup(
+            parent.agent,
+            runId,
+            probeTaskId,
+            message,
+            randomUUID(),
+            resumeSearch,
+            activeSignal,
+            backgroundMode,
+          );
+          record.followupRounds.push({
+            ...next,
+            searchRequests: fetches.search - searchesBefore,
+          });
+          assert.equal(next.status, "succeeded");
+          assert.equal(next.attempt, previous.attempt + 1);
+          assert.equal(next.sessionId, record.probe.sessionId);
+          assert.equal(next.refs.length, previous.refs.length);
+          const artifacts = readArtifacts(next);
+          for (const [index, ref] of next.refs.entries()) {
+            assert.equal(ref.artifactId, previous.refs[index].artifactId);
+            assert.equal(ref.revision, previous.refs[index].revision + 1);
+            const report = artifacts[index].content.payload.report;
+            assert.ok(report.summary.includes(marker));
+            const { handoff, ...body } = report.content;
+            const originalBody = {
+              ...originals[index].content.payload.report.content,
+            };
+            delete originalBody.handoff;
+            assert.deepEqual(
+              body,
+              originalBody,
+              "Summary and handoff revisions must preserve every other report section",
+            );
+            assert.ok(
+              handoff.limitations.some((text) => text.includes(marker)),
+              "The explicitly requested handoff revision must be saved",
+            );
+          }
+          for (const artifact of preserved)
+            assert.deepEqual(
+              runtime.runs.readArtifact(artifact.ref),
+              artifact,
+              "Follow-up must preserve every prior artifact version",
+            );
+          if (policyMode && resumeSearch) {
+            assert.ok(
+              fetches.search > searchesBefore,
+              "The resumed public role must execute its requested real search",
+            );
+            assert.ok(
+              searchTimes(artifacts).some(
+                (time) =>
+                  time !== null && !searchTimes(originals).includes(time),
+              ),
+              "The resumed search must advance the saved public search time",
+            );
+          } else {
+            assert.equal(
+              fetches.search,
+              searchesBefore,
+              "This revision must not add an HTTP search",
+            );
+            assert.deepEqual(
+              searchTimes(artifacts),
+              record.followupRounds.at(-2).publicSearchAsOf,
+              "A revision without a completed search must retain its saved public search time",
+            );
+          }
+          record.followupRounds.at(-1).publicSearchAsOf =
+            searchTimes(artifacts);
+          preserved.push(...globalThis.structuredClone(artifacts));
+          previous = next;
+        }
+      }
+    };
+    let probeWork;
+    let probeFailure;
+    const probeTool = {
+      name: "stock_acceptance_followup",
+      description:
+        "Run the isolated public-role acceptance once, including the original report and two revisions. Return passed or failed and end this turn.",
+      parameters: {
+        type: "object",
+        properties: {},
+        additionalProperties: false,
+      },
+      output: {
+        schema: { type: "string", enum: ["passed", "failed"] },
+        render: (_args, value) => [{ type: "text", text: value }],
+      },
+      async execute(_value, exec) {
+        probeWork ??= runProbe(
+          globalThis.AbortSignal.any([signal, exec.signal]),
+        ).then(
+          () => "passed",
+          (cause) => {
+            probeFailure = cause;
+            return "failed";
+          },
+        );
+        const result = await probeWork;
+        exec.concludeTurn();
+        return result;
+      },
+    };
+    parent = await runtime.createAgent(
+      {
+        sessionId: "real-quick-role-probe",
+        agentOptions: policyMode ? fixtureRoute : { provider: "magpie", model },
+        meta: { cwd: outputDirectory },
+        signal,
+      },
+      { kind: "coordinator", runIds: [runId] },
+      followupMode && !backgroundMode ? [probeTool] : [],
+    );
+    try {
+      if (followupMode) {
+        const plannedApprovals = [
+          { query: probeQueries.firstRejected, outcome: "rejected" },
+          { query: probeQueries.paused, outcome: "rejected" },
+          { query: probeQueries.resumed, outcome: "allowed-once" },
+        ].map((item) => ({
+          ...item,
+          reason: `已使用 ${publicSearchLimit} 次公开检索；申请本次检索：${item.query}`,
+        }));
+        record.approval = policyMode
+          ? {
+              mode: "test-controlled",
+              policy: "ask",
+              userUI: false,
+              answers: [],
+              audit: [],
+              ...(backgroundMode ? { turns: [] } : {}),
+            }
+          : {
+              mode: "not-covered-by-model-smoke",
+              policy: "never",
+              userUI: false,
+            };
+        const releases = [];
+        let parentFailure;
+        if (policyMode) {
+          record.searchAttempts = [];
+          const searchQueries = new Map();
+          let currentParentTurn;
+          releases.push(
+            ctx.on("approval/request", (req, next) => {
+              if (
+                req.agent !== parent.agent ||
+                req.toolName !== "stock_search_public"
+              )
+                return next();
+              const expected = plannedApprovals[record.approval.answers.length];
+              if (expected === undefined || req.reason !== expected.reason)
+                return next();
+              record.approval.answers.push(expected);
+              return Promise.resolve(expected.outcome);
+            }),
+          );
+          releases.push(
+            ctx.on("session/event", (session, event) => {
+              if (backgroundMode && session === parent.agent.session) {
+                if (event.type === "turn/start") {
+                  currentParentTurn = {
+                    turn: event.data.turn,
+                    startSeq: event.seq,
+                    inputs: [],
+                  };
+                  record.approval.turns.push(currentParentTurn);
+                } else if (event.type === "user/message") {
+                  currentParentTurn.inputs.push({
+                    id: event.data.id,
+                    seq: event.seq,
+                    source: event.data.source,
+                  });
+                } else if (event.type === "turn/end") {
+                  currentParentTurn.endSeq = event.seq;
+                  currentParentTurn.endReason = event.data.reason;
+                  currentParentTurn = undefined;
+                }
+              }
+              if (
+                session === parent.agent.session &&
+                (event.type === "approval/asked" ||
+                  event.type === "approval/decided")
+              )
+                record.approval.audit.push({
+                  type: event.type,
+                  seq: event.seq,
+                  ...event.data,
+                  ...(backgroundMode ? { turn: currentParentTurn?.turn } : {}),
+                });
+              if (
+                event.type === "tool/call" &&
+                event.data.name === "stock_search_public"
+              )
+                searchQueries.set(
+                  event.data.callId,
+                  JSON.parse(event.data.arguments).query,
+                );
+              if (event.type !== "tool/result") return;
+              const callId = event.data.message.source.callId;
+              if (!searchQueries.has(callId)) return;
+              const text = event.data.message.content
+                .filter((block) => block.type === "text")
+                .map((block) => block.text)
+                .join("");
+              record.searchAttempts.push({
+                query: searchQueries.get(callId),
+                outcome: event.data.message.isError ? "failed" : "succeeded",
+                ...(event.data.message.isError
+                  ? { code: event.data.error?.code, errorText: text }
+                  : { budget: JSON.parse(text).budget }),
+              });
+            }),
+          );
+        }
+        releases.push(
+          ctx.on("agent/error", ({ agent, error }) => {
+            if (agent === parent.agent) parentFailure ??= error;
+          }),
+        );
+        try {
+          if (backgroundMode) {
+            record.background = { initialParentStatus: parent.agent.status };
+            assert.equal(parent.agent.status, "idle");
+            await runProbe(signal);
+          } else {
+            const { createUserMessage } = await load("@deepseek-ai/dsh-llm");
+            parent.agent.followup(
+              createUserMessage({
+                content: [
+                  {
+                    type: "text",
+                    text: "调用 stock_acceptance_followup 一次，参数为 {}。不要自行研究或调用其他工具；该工具完成后结束本轮。",
+                  },
+                ],
+                source: { kind: "user" },
+              }),
+            );
+          }
+          await parent.agent.whenIdle();
+          signal.throwIfAborted();
+          if (probeFailure !== undefined) throw probeFailure;
+          if (parentFailure !== undefined) throw parentFailure;
+          if (!backgroundMode) {
+            assert.ok(probeWork, "The parent must execute its acceptance tool");
+            assert.equal(await probeWork, "passed");
+          }
+          if (policyMode) {
+            assert.deepEqual(record.approval.answers, plannedApprovals);
+            const asked = record.approval.audit.filter(
+              ({ type }) => type === "approval/asked",
+            );
+            const decided = record.approval.audit.filter(
+              ({ type }) => type === "approval/decided",
+            );
+            assert.equal(record.approval.audit.length, 6);
+            assert.equal(asked.length, 3);
+            assert.equal(decided.length, 3);
+            assert.equal(new Set(asked.map(({ id }) => id)).size, 3);
+            for (const [index, request] of asked.entries()) {
+              assert.equal(request.toolName, "stock_search_public");
+              assert.equal(request.reason, plannedApprovals[index].reason);
+              assert.equal(decided[index].id, request.id);
+              assert.equal(
+                decided[index].outcome,
+                plannedApprovals[index].outcome,
+              );
+              assert.ok(request.seq < decided[index].seq);
+            }
+            if (backgroundMode) {
+              const parentCalls = [...calls.values()].filter(
+                (call) => call.sessionId === parent.agent.id,
+              );
+              const approvalTurns = new Set(asked.map(({ turn }) => turn));
+              assert.equal(approvalTurns.size, 3);
+              for (const [index, request] of asked.entries()) {
+                const turn = record.approval.turns.find(
+                  (entry) => entry.turn === request.turn,
+                );
+                assert.ok(turn);
+                assert.equal(decided[index].turn, turn.turn);
+                assert.ok(turn.startSeq < request.seq);
+                assert.ok(decided[index].seq < turn.endSeq);
+                assert.equal(
+                  parentCalls.filter((call) => call.turn === turn.turn).length,
+                  0,
+                  "Approval-only parent turns must not request a model",
+                );
+              }
+              const settledTurns = record.approval.turns.filter(
+                ({ turn }) => !approvalTurns.has(turn),
+              );
+              for (const turn of settledTurns) {
+                const inputs = turn.inputs.filter(
+                  ({ source }) => source.form !== "snapshot",
+                );
+                assert.ok(inputs.length > 0);
+                assert.ok(
+                  inputs.every(
+                    ({ source }) =>
+                      source.kind === "subagent-settled" &&
+                      source.senderSessionId === record.probe.sessionId,
+                  ),
+                  "Other parent turns must contain only this child's settled notices",
+                );
+                assert.equal(
+                  parentCalls.filter((call) => call.turn === turn.turn).length,
+                  1,
+                  "A settled-notice turn receives one fixture response",
+                );
+                assert.ok(turn.endSeq > turn.startSeq);
+              }
+              assert.ok(
+                parentCalls.every((call) =>
+                  settledTurns.some(({ turn }) => turn === call.turn),
+                ),
+              );
+              record.background.approvalTurns = [...approvalTurns];
+              record.background.approvalTurnModelRequests = parentCalls.filter(
+                ({ turn }) => approvalTurns.has(turn),
+              ).length;
+              record.background.settledNoticeTurns = settledTurns.map(
+                ({ turn }) => turn,
+              );
+              record.background.settledNoticeModelRequests = parentCalls.length;
+              record.background.parentModelRequests = parentCalls.length;
+              record.background.finalParentStatus = parent.agent.status;
+              assert.equal(parent.agent.status, "idle");
+            }
+            assert.deepEqual(
+              record.searchAttempts.map(({ query, outcome }) => ({
+                query,
+                outcome,
+              })),
+              [
+                { query: probeQueries.free, outcome: "succeeded" },
+                { query: probeQueries.firstRejected, outcome: "failed" },
+                { query: probeQueries.paused, outcome: "failed" },
+                { query: probeQueries.resumed, outcome: "succeeded" },
+              ],
+            );
+            const rejected = record.searchAttempts.filter(
+              ({ outcome }) => outcome === "failed",
+            );
+            assert.equal(rejected[0].code, "ACCESS_DENIED");
+            assert.match(
+              rejected[0].errorText,
+              /Search approval denied \(1\/2\)/,
+            );
+            assert.equal(rejected[1].code, "ACCESS_DENIED");
+            assert.match(
+              rejected[1].errorText,
+              /Search is paused after 2 denied approvals/,
+            );
+            const budgets = record.searchAttempts
+              .filter(({ outcome }) => outcome === "succeeded")
+              .map(({ budget }) => budget);
+            assert.deepEqual(budgets, [
+              { limit: publicSearchLimit, used: 1, remaining: 0 },
+              { limit: publicSearchLimit, used: 2, remaining: 0 },
+            ]);
+            assert.equal(fetches.search, 2);
+            assert.equal(fetches.model, 0);
+            assert.ok(calls.size > 0);
+            assert.ok(
+              [...calls.values()].every(
+                (call) =>
+                  call.provider === fixtureRoute.provider &&
+                  call.model === fixtureRoute.model,
+              ),
+              "The policy probe must use only its fixture-driven model adapter",
+            );
+          } else {
+            assert.equal(fetches.search, 1);
+            assert.ok(fetches.model > 0);
+            assert.ok(calls.size > 0);
+            assert.ok(
+              [...calls.values()].every(
+                (call) => call.provider === "magpie" && call.model === model,
+              ),
+              "The model smoke must use only the configured real model route",
+            );
+          }
+        } finally {
+          for (const release of releases.reverse()) release();
+        }
+      } else await runProbe(signal);
     } finally {
       await parent.dispose();
     }
     record.stage = "role-acceptance";
-    assert.equal(
-      record.probe.status,
-      "succeeded",
-      "The isolated role must commit its actual artifact",
-    );
-    record.outcome = "role-passed";
+    record.outcome = backgroundMode
+      ? "role-followup-policy-background-passed"
+      : policyMode
+        ? "role-followup-policy-passed"
+        : followupMode
+          ? "role-followup-smoke-passed"
+          : "role-passed";
   } else {
     let command = `/stock-quick SZ.002594 ${date}`;
     if (resumeRunId !== undefined) {

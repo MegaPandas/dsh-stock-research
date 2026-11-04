@@ -1,7 +1,7 @@
 import { ToolCallId } from "@deepseek-ai/dsh-llm";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { CollectedTableData } from "../../src/contracts/collection.js";
-import type { ResearchObservation } from "../../src/app/research-actions.js";
+import type { ResearchObservationView } from "../../src/app/research-view.js";
 import type { RunView } from "../../src/contracts/runs.js";
 import type {
   ArtifactPayloads,
@@ -171,7 +171,7 @@ async function setup(options: { financials?: boolean; late?: boolean } = {}) {
   async function observation() {
     const result = await tool("stock_read_research", { jobId: rootJob().id });
     expect(result.isError).toBe(false);
-    return result.value as unknown as ResearchObservation;
+    return result.value as unknown as ResearchObservationView;
   }
   async function waitView(runId: string, accept: (view: RunView) => boolean) {
     const view = () => h.runtime.runs.view({ runId });

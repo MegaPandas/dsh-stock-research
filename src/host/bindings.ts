@@ -10,7 +10,14 @@ export interface ResearchCaller {
 
 export type ResearchBinding =
   | { kind: "coordinator"; runIds: readonly string[] }
-  | { kind: "task"; runId: string; taskId: string; attempt: number }
+  | {
+      kind: "task";
+      runId: string;
+      taskId: string;
+      attempt: number;
+      /** The caller owns a background Job rather than holding the parent turn. */
+      background?: boolean;
+    }
   | { kind: "ask"; scope: ResearchScope }
   | { kind: "review"; runId: string; scope: ResearchScope };
 export interface BoundCaller {

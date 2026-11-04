@@ -5,6 +5,7 @@ import type { ToolDefinition } from "@deepseek-ai/dsh-tools";
 import { ResearchError } from "../../contracts/errors.js";
 import { SessionBindings, type ResearchBinding } from "../bindings.js";
 import { setupResearchTools } from "./tool-policy.js";
+import { setupResearchContext } from "../research-context.js";
 
 interface SessionPolicy {
   release: () => void;
@@ -76,6 +77,12 @@ export class ResearchSessions {
     return (agentCtx, agent) => {
       this.#requireOpen();
       const verifyTools = setupResearchTools(agentCtx, agent, definitions);
+      const releaseContext = setupResearchContext(
+        agentCtx,
+        agent,
+        this.ctx.sessionQuery,
+      );
+      agentCtx.effect(() => releaseContext);
 
       const policy: SessionPolicy = {
         release: this.bindings.bind(agent, captured),

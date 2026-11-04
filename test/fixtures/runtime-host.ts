@@ -15,6 +15,7 @@ import {
   type StreamChunk,
 } from "@deepseek-ai/dsh-llm";
 import { SessionId } from "@deepseek-ai/dsh-session";
+import SessionQuery from "@deepseek-ai/dsh-session-query-sqlite";
 import { SubagentRuntime } from "@deepseek-ai/dsh-subagent";
 import * as SpawnInProcess from "@deepseek-ai/dsh-subagent-spawn-in-process";
 import type { ToolDefinition } from "@deepseek-ai/dsh-tools";
@@ -98,6 +99,7 @@ export async function runtimeHost(
     await ctx.plugin(AgentPresetRegistry, { default: "research-task" });
     await ctx.agentPresets.register({ id: "research-task", plugins: [] });
     await mountAgentLoopTestHarness(ctx);
+    await ctx.plugin(SessionQuery, { path: ":memory:", openAt: "never" });
     await ctx.plugin(LocalJobRegistry, {});
     await ctx.plugin(SubagentRuntime, {});
     await ctx.plugin(SpawnInProcess, { providerName: "spawn" });

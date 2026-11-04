@@ -21,6 +21,7 @@ import * as PiAi from "@deepseek-ai/dsh-llm-pi-ai";
 import { SessionId } from "@deepseek-ai/dsh-session";
 import { SubagentRuntime } from "@deepseek-ai/dsh-subagent";
 import * as SpawnInProcess from "@deepseek-ai/dsh-subagent-spawn-in-process";
+import SessionQuery from "@deepseek-ai/dsh-session-query-sqlite";
 import { createResearchPlugin } from "@megapandas/dsh-stock-research/runtime";
 import * as Ask from "@megapandas/dsh-stock-research/ask";
 
@@ -91,6 +92,7 @@ try {
   await ctx.agentPresets.register({ id: "real-ask-host", plugins: [] });
   await ctx.plugin(PiAi, { providers: { magpie: profile } });
   await mountAgentLoopTestHarness(ctx);
+  await ctx.plugin(SessionQuery, { path: ":memory:", openAt: "never" });
   await ctx.plugin(SubagentRuntime, {});
   await ctx.plugin(SpawnInProcess, { providerName: "spawn" });
   await ctx.plugin(CommandRuntime);

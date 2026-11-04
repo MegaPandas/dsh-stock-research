@@ -1,7 +1,7 @@
 import type { Context } from "@deepseek-ai/cordis";
 import type { Agent } from "@deepseek-ai/dsh-agent";
 import type { ToolRunContext } from "@deepseek-ai/dsh-tools";
-import type {} from "@deepseek-ai/dsh-user-approval";
+import type { ApprovalRequest } from "@deepseek-ai/dsh-user-approval";
 import type { DataEnvelope } from "../contracts/data.js";
 import type { ResearchData } from "../contracts/research.js";
 import { ResearchError } from "../contracts/errors.js";
@@ -9,6 +9,7 @@ import { HostResearchAdapter } from "../data/host-research.js";
 import type { EvidenceQuery } from "../contracts/task-data.js";
 import type { RunCommands, RunReader } from "../contracts/run-access.js";
 import { type SessionBindings, taskOperation } from "./bindings.js";
+import { requestBackgroundApproval } from "./approval-turn.js";
 
 export async function searchPublic(
   ctx: Context,
@@ -71,6 +72,7 @@ export async function approvePublicSearch(
   exec: ToolRunContext,
   used: number,
   parent?: Agent,
+  background = false,
 ): Promise<boolean> {
   exec.signal.throwIfAborted();
   const approval = ctx.get("approval");
@@ -80,7 +82,7 @@ export async function approvePublicSearch(
       "Public search approval is unavailable.",
     );
   const reason = `已使用 ${used} 次公开检索；申请本次检索：${query}`;
-  const outcome = await approval.request({
+  const request: ApprovalRequest & { signal: AbortSignal } = {
     agent: parent ?? exec.agent!,
     toolName: "stock_search_public",
     ...(parent === undefined ? { callId: exec.callId } : {}),
@@ -90,7 +92,11 @@ export async function approvePublicSearch(
       en: `Public searches used: ${used}. Approve this search: ${query}`,
     },
     signal: exec.signal,
-  });
+  };
+  const outcome =
+    background && parent !== undefined
+      ? await requestBackgroundApproval(approval, request)
+      : await approval.request(request);
   exec.signal.throwIfAborted();
   if (outcome === "rejected") return false;
   if (outcome !== "allowed-once")

@@ -225,7 +225,7 @@ describe("stock-review through real commands, storage and AgentLoop", () => {
         const entry = input!.context.reportCatalog.find(
           ({ kind }) => kind === "decision",
         )!;
-        yield* toolCall("stock_read_report", { id: entry.id });
+        yield* toolCall("stock_read_report", { id: entry.id, sections: null });
       } else {
         decision = lastToolResult(request);
         yield* toolCall("stock_submit", report);

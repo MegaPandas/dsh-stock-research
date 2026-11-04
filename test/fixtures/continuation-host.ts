@@ -1,6 +1,5 @@
 import { join } from "node:path";
 import * as JsonlPersistence from "@deepseek-ai/dsh-session-persistence-jsonl";
-import SessionQuery from "@deepseek-ai/dsh-session-query-sqlite";
 import { runtimeHost } from "./runtime-host.js";
 
 export async function continuationHost(
@@ -11,10 +10,6 @@ export async function continuationHost(
     await host.ctx.plugin(JsonlPersistence, {
       root: join(host.directory, "sessions"),
       compression: "none",
-    });
-    await host.ctx.plugin(SessionQuery, {
-      path: join(host.directory, "query.sqlite"),
-      openAt: "never",
     });
     return host;
   } catch (error) {

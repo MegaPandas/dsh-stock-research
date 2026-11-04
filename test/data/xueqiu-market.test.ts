@@ -138,7 +138,7 @@ describe("Xueqiu China market fallback", () => {
     expect(result.gaps).toContainEqual(
       expect.objectContaining({
         code: "missing",
-        field: "/data/rows/0/values/amplitude",
+        field: "/data/columns/amplitude",
       }),
     );
     expect(result.gaps).toContainEqual(
@@ -226,7 +226,7 @@ describe("Xueqiu China market fallback", () => {
     expect(result.data.rows[0]!.values.volume).toBeNull();
     expect(result.gaps).toContainEqual(
       expect.objectContaining({
-        field: "/data/rows/0/values/volume",
+        field: "/data/columns/volume",
         code: "missing",
       }),
     );
@@ -271,7 +271,7 @@ describe("Xueqiu China market fallback", () => {
     });
     expect(result.gaps).toContainEqual(
       expect.objectContaining({
-        field: "/data/rows/0/values/peDynamic",
+        field: "/data/columns/peDynamic",
         code: "missing",
       }),
     );

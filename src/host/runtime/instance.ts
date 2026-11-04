@@ -216,7 +216,15 @@ export class Runtime implements ResearchRuntime {
     parent?: Agent,
   ): Promise<boolean> {
     this.#requireOpen();
-    return approvePublicSearch(this.ctx, query, exec, used, parent);
+    const { binding } = this.components.bindings.require(exec.agent);
+    return approvePublicSearch(
+      this.ctx,
+      query,
+      exec,
+      used,
+      parent,
+      binding.kind === "task" && binding.background === true,
+    );
   }
 
   bindCoordinator(agent: Agent): () => void {

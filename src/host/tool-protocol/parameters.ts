@@ -44,6 +44,29 @@ export function sourceRef(value: unknown): SourceRef {
   };
 }
 export const stringSchema = { type: "string" } as const;
+export const sectionSelectionSchema: JsonSchemaNode = {
+  oneOf: [{ type: "array", items: stringSchema }, { type: "null" }],
+  description:
+    "Section names to read; [] returns status and available section names without the body, null explicitly reads the complete report.",
+};
+
+export function selectedSections(
+  value: unknown,
+  available: readonly string[],
+): string[] {
+  if (value === null) return [...available];
+  if (!Array.isArray(value)) invalid("sections requires an array or null.");
+  const selected = value.map((section) => text(section, "sections"));
+  if (new Set(selected).size !== selected.length)
+    invalid("sections must not contain duplicate names.");
+  for (const section of selected)
+    if (!available.includes(section))
+      invalid(
+        `Unknown report section ${section}; available sections: ${available.join(", ")}.`,
+      );
+  return selected;
+}
+
 export function objectSchema(
   properties: Record<string, JsonSchemaNode>,
   required = Object.keys(properties),

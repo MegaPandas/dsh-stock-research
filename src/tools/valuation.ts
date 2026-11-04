@@ -52,7 +52,7 @@ export function createValuationCalculationTool(
   return researchTool({
     name: "stock_calculate_valuation",
     description:
-      "Calculate and save research-date valuations, target-date prices and sensitivities for the current task; return calculationId, per-share results, steps and diagnostics. Read the selected method's input schema with stock_read_valuation_method; inputs are validated against methodId. Declare amount and share scales separately; use decimal rates and probabilities. Currency comes from the run. Code discounts by day and clips elapsed periods. Equity multiples yield equity value directly; EV multiples require a debt/cash bridge. Retain negative residual equity for solvency analysis; target prices must be nonnegative.",
+      "Calculate and save a valuation or target-price scenario and sensitivities for the current task. Read the selected method's conventions and calculationInputSchema with stock_read_valuation_method first; inputs are validated against methodId. Returns calculationId, per-share results, steps and diagnostics. Currency and value dates come from the run.",
     parameters:
       valuationCalculationParameters as typeof valuationCalculationParameters &
         Record<string, unknown>,

@@ -201,6 +201,34 @@ describe("public host search", () => {
 });
 
 describe("native public search approval", () => {
+  it("asks from an idle background owner's real turn without a model request", async () => {
+    const h = await setup();
+    if (h.ctx.get("approval") === undefined)
+      await h.ctx.plugin(ApprovalService, {});
+    const parent = (
+      await h.ctx.agents.create(h.agentOptions("background-approval-parent"))
+    ).agent;
+    expect(parent.status).toBe("idle");
+    h.ctx.on("approval/request", async (request) => {
+      expect(request.agent).toBe(parent);
+      return "allowed-once";
+    });
+    await expect(
+      approvePublicSearch(h.ctx, "background news", h.exec, 5, parent, true),
+    ).resolves.toBe(true);
+    await parent.whenIdle();
+    const types = parent.session.snapshotEvents().map((event) => event.type);
+    expect(types.indexOf("turn/start")).toBeLessThan(
+      types.indexOf("approval/asked"),
+    );
+    expect(types.indexOf("approval/asked")).toBeLessThan(
+      types.indexOf("approval/decided"),
+    );
+    expect(types.indexOf("approval/decided")).toBeLessThan(
+      types.indexOf("turn/end"),
+    );
+    expect(h.adapter.requests).toHaveLength(0);
+  });
   it.each(["allowed-once", "rejected", "unavailable", "cancelled"] as const)(
     "routes %s through the parent session without a child call id",
     async (outcome) => {

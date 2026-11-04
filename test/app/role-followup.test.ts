@@ -146,7 +146,26 @@ describe("public role follow-up contract", () => {
       }
       expect(history).toContain("first-round query 0");
       if (step === 0) {
-        yield* toolCall("stock_read_report_draft", {}, `read-round-${round}`);
+        const followup = JSON.stringify(
+          request.messages.filter(({ role }) => role === "user").at(-1),
+        );
+        expect(followup).toContain(
+          round === 2 ? "second-round" : "third-round",
+        );
+        expect(followup).toContain("check the draft and submit it");
+        expect(followup).toContain(
+          round === 2
+            ? "Search pause and usage remain unchanged."
+            : "The primary agent has resumed search.",
+        );
+        expect(followup).not.toContain("dataCatalog");
+        yield* toolCall(
+          "stock_read_report_draft",
+          {
+            sections: round === 2 ? ["handoff"] : ["summary"],
+          },
+          `read-round-${round}`,
+        );
       } else if (step === 1) {
         const { draft, missingSections } = lastToolResult<{
           draft: unknown;
@@ -155,13 +174,10 @@ describe("public role follow-up contract", () => {
         expect(missingSections).toEqual([]);
         expect(draft).toEqual(
           round === 2
-            ? agentAnalysisReport()
+            ? { content: { handoff: agentAnalysisReport().content.handoff } }
             : {
-                ...agentAnalysisReport(),
-                content: {
-                  ...agentAnalysisReport().content,
-                  handoff: secondHandoff,
-                },
+                summary: agentAnalysisReport().summary,
+                content: {},
               },
         );
         yield* toolCall(

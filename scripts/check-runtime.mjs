@@ -13,6 +13,7 @@ import {
 import AgentPresetRegistry from "@deepseek-ai/dsh-agent-preset-registry";
 import CommandRuntime from "@deepseek-ai/dsh-commands";
 import { SessionId } from "@deepseek-ai/dsh-session";
+import SessionQuery from "@deepseek-ai/dsh-session-query-sqlite";
 import { SubagentRuntime } from "@deepseek-ai/dsh-subagent";
 import * as SpawnInProcess from "@deepseek-ai/dsh-subagent-spawn-in-process";
 import { ToolCallId } from "@deepseek-ai/dsh-llm";
@@ -68,6 +69,7 @@ try {
   await ctx.agentPresets.register({ id: "package-research", plugins: [] });
   const presetRoster = await ctx.agentPresets.remoteExportList();
   await mountAgentLoopTestHarness(ctx);
+  await ctx.plugin(SessionQuery, { path: ":memory:", openAt: "never" });
   await ctx.plugin(SubagentRuntime, {});
   await ctx.plugin(SpawnInProcess, { providerName: "spawn" });
   const config = Config({
@@ -148,7 +150,7 @@ try {
     "@megapandas/dsh-stock-research/package.json",
   );
   assert.equal(input.versions.plugin, manifest.version);
-  assert.equal(input.versions.prompts.roles, "32");
+  assert.equal(input.versions.prompts.roles, "36");
   assert.equal(input.versions.prompts.digest, "13");
   assert.equal(input.definition.tasks.length, 15);
   assert.equal(input.instructions.length, 15);

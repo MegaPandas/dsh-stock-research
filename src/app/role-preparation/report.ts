@@ -10,7 +10,7 @@ import { validateRoleValuation } from "../../valuation/report-policy.js";
 import { referencePrice, type RegisteredTable } from "../reference-price.js";
 import type { ValuationMethods } from "../valuation-methods.js";
 import { latestPublicSearchTime } from "./public-search.js";
-import { valuationDraftInput } from "./valuation-draft.js";
+import { roleReportInput } from "./report-input.js";
 import type { RoleServices } from "./services.js";
 
 export type RoleReportKind =
@@ -103,9 +103,12 @@ export function prepareRoleReport(
         : { seed: previous.stageHandoff },
     requiredContentSections:
       definition.valuation === undefined ? [] : ["valuation"],
-    ...(valuationMethods === undefined
-      ? {}
-      : { input: valuationDraftInput(kind, services.runs, claim.runId) }),
+    input: roleReportInput(
+      kind,
+      services.runs,
+      claim.runId,
+      valuationMethods !== undefined,
+    ),
   });
   return {
     tools: submission.tools,

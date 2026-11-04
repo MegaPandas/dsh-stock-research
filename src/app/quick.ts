@@ -13,6 +13,7 @@ import {
 import { createResearchReadTools } from "./research-read-tools.js";
 import { holdActivity } from "./activity.js";
 import { notifyResearch } from "./research-notices.js";
+import { setupResearchContext } from "../host/research-context.js";
 
 export const Config = ModelConfigSchema.required(false);
 export const name = "stock-quick";
@@ -23,6 +24,7 @@ export const inject = [
   "jobs",
   "tools",
   "agents",
+  "sessionQuery",
 ];
 export function apply(ctx: Context, config?: ModelConfig): void {
   const runtime = ctx.stockResearch;
@@ -61,6 +63,7 @@ export function apply(ctx: Context, config?: ModelConfig): void {
     {
       bind: (owner) => runtime.bindCoordinator(owner),
       register: (owner, actions, retain) => {
+        retain(setupResearchContext(owner.ctx, owner, ctx.sessionQuery));
         retain(
           owner.ctx.tools.register(createResearchReviewTool(ctx, actions)),
         );

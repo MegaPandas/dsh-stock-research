@@ -42,6 +42,7 @@ export function createScheduledResearchExecutor(
             },
             caller,
             signal,
+            true,
           );
         } else {
           const request = {
@@ -50,7 +51,7 @@ export function createScheduledResearchExecutor(
             requestId: execution.requestId,
           };
           if (execution.executor.kind === "role")
-            await operations.dispatchTask(request, caller, signal);
+            await operations.dispatchTask(request, caller, signal, true);
           else if (execution.executor.service === "digest")
             await operations.makeDigest(request, caller, signal);
           else if (execution.executor.service === "collection")

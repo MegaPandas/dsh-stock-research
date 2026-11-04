@@ -3,6 +3,7 @@ import type { AgentReport } from "../contracts/agent-reports.js";
 import { ResearchError } from "../contracts/errors.js";
 import type { RunReadOperations } from "../host/run-reading.js";
 import { reportMaterial } from "../report/material.js";
+import { researchRunView } from "./research-view.js";
 import { researchTool } from "../host/tool-protocol/errors.js";
 import {
   artifactRef,
@@ -21,7 +22,8 @@ export function createResearchReadTools(
   return [
     researchTool({
       name: "stock_read_run",
-      description: "Read an authorized run's status, tasks and artifact index.",
+      description:
+        "Read current research status, task attempts, pending stage review references and the business report catalog. Historical review records stay in storage.",
       parameters: objectSchema({ runId: stringSchema }),
       output: resultOutput(opaqueObjectSchema),
       async execute(value, exec) {
@@ -30,19 +32,26 @@ export function createResearchReadTools(
         const view = reads.readRun(text(item.runId, "runId"), exec);
         return {
           kind: "run_view",
-          view,
+          view: researchRunView(view),
           reportCatalog: view.tasks.flatMap(({ outputRefs }) =>
-            outputRefs.map((ref) => {
+            outputRefs.flatMap((ref) => {
               const artifact = reads.readArtifact(ref, exec);
+              if (
+                artifact.content.kind === "collection" ||
+                artifact.content.kind === "digest"
+              )
+                return [];
               const report = artifact.content.payload.report as
                 AgentReport | undefined;
-              return {
-                ref,
-                taskId: artifact.taskId,
-                kind: artifact.content.kind,
-                title: artifact.content.title,
-                summary: report?.summary ?? null,
-              };
+              return [
+                {
+                  ref,
+                  taskId: artifact.taskId,
+                  kind: artifact.content.kind,
+                  title: artifact.content.title,
+                  summary: report?.summary ?? null,
+                },
+              ];
             }),
           ),
         };

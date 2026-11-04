@@ -15,6 +15,7 @@ import type {
   RedoTaskResult,
   RunOperation,
   RunView,
+  StageReviewResult,
 } from "../../contracts/runs.js";
 import type { ResearchCaller } from "../../host/bindings.js";
 import type {
@@ -282,6 +283,7 @@ export class ResearchApplication implements ResearchActions {
             binding: { kind: "coordinator", runIds: [input.runId] },
           },
           signal,
+          true,
         ),
     );
     const saved = revisions ?? new Map();
@@ -400,16 +402,19 @@ export class ResearchApplication implements ResearchActions {
     );
   }
 
-  review(input: ReviewResearchRequest, caller: ResearchCaller): RunView {
+  review(
+    input: ReviewResearchRequest,
+    caller: ResearchCaller,
+  ): StageReviewResult {
     const { runId, requestId, stageId, verdict, feedback, refs } = input;
     const owner = this.#owned(caller.agent, runId);
-    this.ports.runs.reviewStage(
+    const result = this.ports.runs.reviewStage(
       { runId, identity: owner.id },
       { stageId, verdict, feedback, refs },
       requestId,
     );
     this.#executions.publish(runId);
-    return this.ports.runs.view({ runId });
+    return result;
   }
 
   #context(runId: string): ResearchContext {

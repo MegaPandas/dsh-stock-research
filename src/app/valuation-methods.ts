@@ -97,7 +97,7 @@ export function createValuationMethodTool(methods: ValuationMethods) {
   return researchTool({
     name: "stock_read_valuation_method",
     description:
-      "Read a method's formulas, input schema, applicability and references. Use methodId=null for the method-selection guide by business type and development stage.",
+      "Read a method's formulas, conventions, calculationInputSchema, applicability and references before calculating. Use methodId=null for the method-selection guide by business type and development stage.",
     parameters: objectSchema({
       methodId: {
         oneOf: [

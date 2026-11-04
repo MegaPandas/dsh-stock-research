@@ -1,7 +1,6 @@
 import { setImmediate } from "node:timers/promises";
 import { join } from "node:path";
 import * as JsonlPersistence from "@deepseek-ai/dsh-session-persistence-jsonl";
-import SessionQuery from "@deepseek-ai/dsh-session-query-sqlite";
 import {
   createUserMessage,
   ToolCallId,
@@ -10,10 +9,8 @@ import {
 import { JobId } from "@deepseek-ai/dsh-jobs";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import type { RunView } from "../../src/contracts/runs.js";
-import type {
-  ResearchHandle,
-  ResearchObservation,
-} from "../../src/app/research-actions.js";
+import type { ResearchHandle } from "../../src/app/research-actions.js";
+import type { ResearchObservationView } from "../../src/app/research-view.js";
 import { isApplicationBusy } from "../../src/app/activity.js";
 import {
   quickHost,
@@ -96,7 +93,7 @@ async function start(h: Host, signal = new AbortController().signal) {
 async function read(h: Host, handle: ResearchHandle) {
   const result = await call(h, "stock_read_research", handle);
   expect(result.isError).toBe(false);
-  return result.value as unknown as ResearchObservation;
+  return result.value as unknown as ResearchObservationView;
 }
 async function settledJob(h: Host, handle: ResearchHandle) {
   const job = h.ctx.jobs.get(JobId(handle.jobId), h.outside.agent.id);
@@ -415,10 +412,6 @@ it("returns a background revision handle and reserves the original child session
         root: join(directory, "sessions"),
         compression: "none",
       });
-      await ctx.plugin(SessionQuery, {
-        path: join(directory, "query.sqlite"),
-        openAt: "never",
-      });
     },
   );
   cleanups.push(h.close, () => revised.released.resolve());
@@ -528,9 +521,9 @@ it.each(["cancel", "resume"] as const)(
     const state = await read(h, handle);
     const runId = state.runId!;
     expect(state.view!.status).toBe("active");
-    const market = state.view!.tasks.find(
-      ({ taskId }) => taskId === "analysis.market",
-    )!.outputRefs[0]!;
+    const market = h.runtime.runs
+      .view({ runId })
+      .tasks.find(({ taskId }) => taskId === "analysis.market")!.outputRefs[0]!;
     expect(h.runtime.runs.readArtifact(market).taskId).toBe("analysis.market");
     if (action === "cancel") {
       expect(
