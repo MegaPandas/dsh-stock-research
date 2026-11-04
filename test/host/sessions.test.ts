@@ -19,6 +19,7 @@ import type {
   ToolExecutionResult,
 } from "@deepseek-ai/dsh-tools";
 import { afterEach, describe, expect, it } from "vitest";
+import { executeTool } from "../fixtures/tool-execution.js";
 import {
   SessionBindings,
   taskOperation,
@@ -129,7 +130,7 @@ async function host() {
     });
   }
   function call(agent: Agent, name = probe.name) {
-    return ctx.tools.execute({
+    return executeTool(ctx.tools, {
       agent,
       callId: ToolCallId("direct-call"),
       name,
@@ -278,7 +279,10 @@ describe("ResearchSessions with the real DSH AgentLoop", () => {
     expect(h.bindings.require(replacement.agent).binding).toEqual(
       replacementBinding,
     );
-    expect((await h.call(old.agent)).isError).toBe(true);
+    await expect(h.call(old.agent)).rejects.toMatchObject({
+      name: "ToolExecutorUnavailableError",
+      code: "TOOL_EXECUTOR_UNAVAILABLE",
+    });
     expect((await h.call(replacement.agent)).isError).toBe(false);
     expect(h.calls()).toEqual({ probe: 1, unsafe: 0 });
   });

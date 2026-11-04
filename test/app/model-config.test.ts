@@ -124,12 +124,11 @@ describe("research model configuration", () => {
     }
     const { h, agent } = await parent();
     h.ctx.llm.registerAdapter(["selected-fixture"], new SelectedModelAdapter());
-    agent.ctx.on("agent/request", async (_payload, next) => ({
-      ...(await next()),
+    agent.model.select({
       provider: "selected-fixture",
       model: "selected",
       reasoningEffort: ReasoningEffortId("low"),
-    }));
+    });
     agent.followup(
       createUserMessage({
         content: [{ type: "text", text: "Use selected model" }],

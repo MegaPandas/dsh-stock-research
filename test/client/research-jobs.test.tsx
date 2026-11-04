@@ -78,13 +78,17 @@ function browserModule<T>(name: string): T {
     setTimeout,
     clearTimeout,
   });
-  return factory((id) => {
-    // These presentation modules are never rendered by the assembly regression.
-    if (id === "@deepseek-ai/dsh-client-ui-primitives")
-      return new Proxy({}, { get: () => () => null });
-    if (id === "@tanstack/react-virtual") return {};
-    return require(id);
-  });
+  const clientRequire = Object.assign(
+    (id: string) => {
+      // These presentation modules are never rendered by the assembly regression.
+      if (id === "@deepseek-ai/dsh-client-ui-primitives")
+        return new Proxy({}, { get: () => () => null });
+      if (id === "@tanstack/react-virtual") return {};
+      return require(id);
+    },
+    { asset: (reference: string) => reference },
+  );
+  return factory(clientRequire);
 }
 
 function registered(seq = 0): SessionEvent<"job/registered"> {
@@ -272,9 +276,11 @@ describe("research task chat node", () => {
       for (const name of [
         "sessions",
         "uiWorkspace",
+        "connection",
         "remote",
         "remote.session",
         "sidebarRight",
+        "fileDrag",
       ])
         ctx.provide(name, {});
       ctx.provide("slots", {

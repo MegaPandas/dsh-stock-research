@@ -97,12 +97,17 @@ async function probe(directory, targetVersion) {
       "@deepseek-ai/dsh-session-projection",
       "@deepseek-ai/dsh-subagent-spawn-in-process",
     ]) {
+      const range = manifest.peerDependencies[name] ?? manifest.engines.dsh;
+      if (
+        manifest.peerDependenciesMeta?.[name]?.optional &&
+        !satisfies(targetVersion, range, { includePrerelease: true })
+      )
+        continue;
       const selected = ctx.pluginPackages.packageOf(name, pluginURL);
       assert.ok(
         realpathSync(selected.dir).startsWith(`${directory}${sep}`),
         `${name} must be installed independently`,
       );
-      const range = manifest.peerDependencies[name] ?? manifest.engines.dsh;
       if (name === "@deepseek-ai/dsh" || name.startsWith("@deepseek-ai/dsh-"))
         assert.equal(
           selected.version,
@@ -247,6 +252,67 @@ async function probe(directory, targetVersion) {
       cutoff: "2026-10-26T00:00:00.000Z",
     });
     assert.ok(health.sources.every((source) => source.sourceCalls === 0));
+    const healthAgent = await ctx.stockResearch.createAgent(
+      { sessionId: "installation-health", meta: { cwd: directory } },
+      { kind: "ask", scope: health.scope },
+      [ctx.stockResearch.createDataHealthTool()],
+    );
+    try {
+      let extraCalls = 0;
+      healthAgent.agent.ctx.tools.register({
+        name: "installation_extra",
+        description: "A host tool outside the research capabilities.",
+        parameters: { type: "object", properties: {} },
+        output: {
+          schema: { type: "boolean" },
+          render: (_args, value) => [{ type: "text", text: String(value) }],
+        },
+        async execute() {
+          extraCalls++;
+          return true;
+        },
+      });
+      const assembly = await ctx.systemPrompt.assemble({
+        scope: healthAgent.agent,
+        agent: healthAgent.agent,
+      });
+      assert.deepEqual(
+        assembly.tools.map(({ name }) => name),
+        ["stock_data_health"],
+      );
+      const signal = new globalThis.AbortController().signal;
+      async function executeTool(name) {
+        if (typeof ctx.tools.presentAs === "function")
+          return ctx.tools.execute({
+            agent: healthAgent.agent,
+            name,
+            arguments: {},
+            callId: `installation-${name}`,
+            signal,
+          });
+        const batch = await ctx.tools.execute({
+          agent: healthAgent.agent,
+          calls: [
+            {
+              type: "tool-call",
+              id: `installation-${name}`,
+              name,
+              arguments: "{}",
+            },
+          ],
+          signal,
+        });
+        assert.equal(batch.results.length, 1);
+        return batch.results[0].result;
+      }
+      const result = await executeTool("stock_data_health");
+      assert.equal(result.isError, false);
+      assert.deepEqual(result.value, health);
+      assert.equal((await executeTool("installation_extra")).isError, true);
+      assert.equal(extraCalls, 0);
+    } finally {
+      await healthAgent.dispose();
+    }
     const descriptor = ctx.settings
       .describe()
       .find((item) => item.ns === "stock-research");
@@ -400,11 +466,17 @@ async function install(requestedVersion) {
           dependencies: {
             "@deepseek-ai/dsh": targetVersion,
             ...Object.fromEntries(
-              Object.keys(manifest.peerDependencies)
-                .filter((name) => name.startsWith("@deepseek-ai/dsh-"))
-                .map((name) => [name, targetVersion]),
+              Object.entries(manifest.peerDependencies)
+                .filter(([name]) => name.startsWith("@deepseek-ai/dsh-"))
+                .filter(
+                  ([name, range]) =>
+                    !manifest.peerDependenciesMeta?.[name]?.optional ||
+                    satisfies(targetVersion, range, {
+                      includePrerelease: true,
+                    }),
+                )
+                .map(([name]) => [name, targetVersion]),
             ),
-            "@megapandas/dsh-stock-research": `file:${filename}`,
             semver: manifest.devDependencies.semver,
           },
           overrides: { zod: "4.6.6" },
@@ -418,8 +490,16 @@ async function install(requestedVersion) {
       "llm",
       "session",
       "session-projection",
+      "session-query-sqlite",
       "system-prompt",
       "tools",
+      ...(satisfies(
+        targetVersion,
+        manifest.peerDependencies["@deepseek-ai/dsh-tool-executor-native"],
+        { includePrerelease: true },
+      )
+        ? ["tool-executor-native"]
+        : []),
       "agent",
       "fs-local",
       "working-directory",
@@ -437,6 +517,9 @@ async function install(requestedVersion) {
       id: `host-${service}`,
       name: `@deepseek-ai/dsh-${service}`,
       ...(service === "agent-loop" ? { config: { agents: [] } } : {}),
+      ...(service === "session-query-sqlite"
+        ? { config: { path: ":memory:", openAt: "never" } }
+        : {}),
       ...(service === "subagent-spawn-in-process"
         ? { config: { providerName: "spawn" } }
         : {}),
@@ -449,22 +532,36 @@ async function install(requestedVersion) {
       join(host, "cordis.patch.yml"),
       JSON.stringify([{ insert: services }], null, 2),
     );
+    const installOptions = [
+      "--ignore-scripts",
+      "--no-audit",
+      "--no-fund",
+      "--registry=https://registry.npmjs.org",
+      "--cache=/tmp/dsh-stock-npm-cache",
+      "--fetch-retries=0",
+      "--fetch-timeout=20000",
+    ];
+    const installExecution = {
+      cwd: host,
+      timeout: 180_000,
+      maxBuffer: 2_000_000,
+    };
     console.log(
-      `Installing DSH ${targetVersion} and the archive; package lifecycle scripts are disabled.`,
+      `Installing DSH ${targetVersion}; package lifecycle scripts are disabled.`,
     );
+    await execute("npm", ["install", ...installOptions], installExecution);
+    const hostRequire = createRequire(
+      join(host, "node_modules/@deepseek-ai/dsh/package.json"),
+    );
+    // Preserve the framework versions selected by the host when resolving peers.
+    const frameworkDependencies = Object.keys(manifest.peerDependencies)
+      .filter((name) => !name.startsWith("@deepseek-ai/dsh-"))
+      .map((name) => `${name}@${hostRequire(`${name}/package.json`).version}`);
+    console.log("Installing the archive into the prepared host.");
     await execute(
       "npm",
-      [
-        "install",
-        "--ignore-scripts",
-        "--no-audit",
-        "--no-fund",
-        "--registry=https://registry.npmjs.org",
-        "--cache=/tmp/dsh-stock-npm-cache",
-        "--fetch-retries=0",
-        "--fetch-timeout=20000",
-      ],
-      { cwd: host, timeout: 180_000, maxBuffer: 2_000_000 },
+      ["install", filename, ...frameworkDependencies, ...installOptions],
+      installExecution,
     );
     console.log(
       "Booting the official profile without model adapters or user credentials.",

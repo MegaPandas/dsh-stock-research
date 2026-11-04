@@ -32,7 +32,7 @@
 
 ### 安装
 
-需要 Node.js **24.16.0**、DSH **0.2.1 系列（从 0.2.1-rc.1 起）** 和 pnpm。使用前请在 DSH 中配置模型与凭证。将插件安装到使用的 profile（以 `web` 为例）：
+需要 Node.js **24.16.0**、DSH **>= 0.2.1-rc.1** 和 pnpm。使用前请在 DSH 中配置模型与凭证。将插件安装到使用的 profile（以 `web` 为例）：
 
 ```bash
 dsh plugin --profile web add @megapandas/dsh-stock-research@next
@@ -155,7 +155,7 @@ dsh plugin --profile web add @megapandas/dsh-stock-research@next
 
 架构、接口及开发脚本见[技术文档目录](docs/README.md)。
 
-在项目目录安装依赖并执行构建和检查：
+开发用 DSH SDK 固定为 **0.2.2-rc.1**。在项目目录安装依赖并执行构建和检查：
 
 ```bash
 npm ci
@@ -169,7 +169,7 @@ npm run test:package
 
 `test:package` 检查构建产物与包入口。需要验证真实宿主装配时，构建后运行 `npm run test:runtime-package` 和 `npm run test:application-package`；角色准备性能可用 `npm run bench:roles` 测量，该基准不调用模型或数据源。
 
-`npm run test:install` 将构建产物打包，在临时目录安装开发依赖锁定的 DSH 版本并启动独立宿主，验证安装、插件装配、工具和设置。可用 `npm run test:install -- --dsh-version 0.2.1-rc.5` 指定另一个受支持的精确版本。
+`npm run test:install` 将构建产物打包，在临时目录安装开发依赖锁定的 DSH 版本并启动独立宿主，验证安装、插件装配、工具和设置。可用 `npm run test:install -- --dsh-version 0.2.1-rc.5` 验证旧版宿主。
 
 从源码安装时，运行 `npm pack` 生成包含构建产物的归档，再安装到目标 profile：
 

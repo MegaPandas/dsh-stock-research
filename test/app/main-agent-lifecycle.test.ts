@@ -1,5 +1,6 @@
 import { ToolCallId } from "@deepseek-ai/dsh-llm";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { executeTool } from "../fixtures/tool-execution.js";
 import { createQuickInput } from "../../src/app/plan/quick.js";
 import { isApplicationBusy } from "../../src/app/activity.js";
 import { quickHost } from "../fixtures/quick-host.js";
@@ -148,7 +149,7 @@ describe("main Agent research lifecycle", () => {
     ).toThrowError(expect.objectContaining({ code: "ACCESS_DENIED" }));
     expect(h.ctx.agents.list()).toEqual([h.outside.agent]);
     expect(
-      await h.ctx.tools.execute({
+      await executeTool(h.ctx.tools, {
         agent: h.outside.agent,
         callId: ToolCallId("host-marker-after-unload"),
         name: "host_marker",

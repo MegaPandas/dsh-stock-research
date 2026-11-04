@@ -1,17 +1,40 @@
 import type { Context } from "@deepseek-ai/cordis";
 import type { Agent } from "@deepseek-ai/dsh-agent";
+import type { PromptAssembly } from "@deepseek-ai/dsh-system-prompt";
 import type { ToolDefinition } from "@deepseek-ai/dsh-tools";
 import { ResearchError } from "../../contracts/errors.js";
 import { preserveToolArguments } from "./tool-arguments.js";
 
-export function setupResearchTools(
+export async function setupResearchTools(
   ctx: Context,
   agent: Agent,
   tools: readonly ToolDefinition[],
-): () => void {
+): Promise<() => void> {
   preserveToolArguments(agent);
   const approved = new Map(tools.map((tool) => [tool.name, tool]));
-  ctx.tools.presentAs("native");
+  const legacyTools = ctx.tools as typeof ctx.tools & {
+    presentAs?: (mode: "native") => () => void;
+  };
+  if (typeof legacyTools.presentAs === "function") {
+    legacyTools.presentAs("native");
+    ctx.on("system-prompt/assemble", async (_assembly, _context, next) => {
+      const assembly = (await next()) as PromptAssembly;
+      return {
+        ...assembly,
+        tools: assembly.tools.filter(({ name }) => approved.has(name)),
+      };
+    });
+  } else {
+    // DSH 0.2.2 presents tools through a scoped executor, outside prompt transforms.
+    const { NativeToolExecutor } =
+      await import("@deepseek-ai/dsh-tool-executor-native");
+    const executor = new NativeToolExecutor(ctx);
+    ctx.tools.setExecutor({
+      describe: (definitions) =>
+        executor.describe(definitions.filter(({ name }) => approved.has(name))),
+      execute: (input) => executor.execute(input),
+    });
+  }
   // SDK restrictions filter inherited tools; local definitions are registered below.
   ctx.tools.restrict({
     allow: ctx.tools
@@ -20,13 +43,6 @@ export function setupResearchTools(
       .map(({ name }) => name),
   });
   for (const tool of tools) ctx.tools.register(tool);
-  ctx.on("system-prompt/assemble", async (_assembly, _context, next) => {
-    const assembly = await next();
-    return {
-      ...assembly,
-      tools: assembly.tools.filter(({ name }) => approved.has(name)),
-    };
-  });
   ctx.tools.guard((exec) => {
     const definition = approved.get(exec.name);
     if (

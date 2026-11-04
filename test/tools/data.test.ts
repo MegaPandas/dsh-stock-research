@@ -1,7 +1,6 @@
 import { Context } from "@deepseek-ai/cordis";
 import type { Agent } from "@deepseek-ai/dsh-agent";
 import {
-  ToolRuntime,
   validateJsonSchemaValue,
   type ToolRunContext,
 } from "@deepseek-ai/dsh-tools";
@@ -28,6 +27,7 @@ import { dataSchemas } from "../../src/tools/query-inputs.js";
 import type { QueryPolicy } from "../../src/contracts/query.js";
 import { decisionFixture } from "../fixtures/decision.js";
 import { CN_SECURITY, MARKET_FIXTURE } from "../fixtures/market.js";
+import { createToolRuntime, executeTool } from "../fixtures/tool-execution.js";
 
 const cleanups: (() => void | Promise<void>)[] = [];
 const marketArgs = { provider: "yahoo", startDate: "2024-01-02" };
@@ -275,7 +275,7 @@ describe("data tools", () => {
     const release = ctx.provide("systemPrompt", {
       tools: () => () => {},
     } as never);
-    const runtime = new ToolRuntime(ctx, { mode: "native" });
+    const runtime = createToolRuntime(ctx);
     const unregister = f.tools.map((tool) => runtime.register(tool));
     cleanups.push(() => {
       unregister.reverse().forEach((fn) => fn());
@@ -296,7 +296,7 @@ describe("data tools", () => {
       ["stock_get_returns", returnArgs],
       ["stock_research", { provider: "dsh-web", query: "NVDA", maxResults: 2 }],
     ] as const) {
-      const result = await runtime.execute({
+      const result = await executeTool(runtime, {
         name,
         arguments: args,
         agent: f.task,

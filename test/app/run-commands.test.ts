@@ -10,6 +10,7 @@ import {
   type StreamChunk,
 } from "@deepseek-ai/dsh-llm";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { executeTool } from "../fixtures/tool-execution.js";
 import * as Quick from "../../src/quick.js";
 import { createQuickInput } from "../../src/app/plan/quick.js";
 import type { ResearchScope } from "../../src/contracts/data.js";
@@ -164,7 +165,7 @@ describe("explicit run control commands", () => {
     });
     cleanups.push(async () => role.released.resolve());
     const seeded = seed(h);
-    const result = await h.ctx.tools.execute({
+    const result = await executeTool(h.ctx.tools, {
       agent: h.outside.agent,
       callId: ToolCallId("resume-tool"),
       name: "stock_resume_research",
@@ -218,7 +219,7 @@ describe("explicit run control commands", () => {
     const h = await host();
     const seeded = seed(h);
     const before = h.runtime.runs.view({ runId: seeded.runId });
-    const result = await h.ctx.tools.execute({
+    const result = await executeTool(h.ctx.tools, {
       agent: h.outside.agent,
       callId: ToolCallId("bad-resume-tool"),
       name: "stock_resume_research",
@@ -686,7 +687,7 @@ describe("run commands during real producers", () => {
           const job = h.ctx.jobs
             .list(h.outside.agent.id)
             .find(({ kind }) => kind === "stock-research")!;
-          const observation = await h.ctx.tools.execute({
+          const observation = await executeTool(h.ctx.tools, {
             agent: h.outside.agent,
             callId: ToolCallId(`observe-${request.sessionId}`),
             name: "stock_read_research",

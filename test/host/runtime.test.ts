@@ -9,6 +9,7 @@ import {
 } from "@deepseek-ai/dsh-llm";
 import type { WebSearchRequest } from "@deepseek-ai/dsh-web";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { executeTool } from "../fixtures/tool-execution.js";
 import { DataRoot } from "../../src/storage/data-root.js";
 import { QueryService } from "../../src/services/query/index.js";
 import { MemoryService } from "../../src/services/memory/index.js";
@@ -193,7 +194,7 @@ describe("research runtime plugin with the real DSH host", () => {
       throw new Error("Expected the canonical health result");
     expect(JSON.parse(text.text)).toMatchObject({ scope: h.scope });
     expect(
-      await h.ctx.tools.execute({
+      await executeTool(h.ctx.tools, {
         agent: h.outside.agent,
         callId: ToolCallId("outside"),
         name: health.name,
@@ -225,7 +226,7 @@ describe("research runtime plugin with the real DSH host", () => {
     expect(originalCommitted).toBe(true);
     expect(h.ctx.tools.get("unsafe_file", extraHandle.agent)).toBeDefined();
     expect(
-      await h.ctx.tools.execute({
+      await executeTool(h.ctx.tools, {
         agent: extraHandle.agent,
         callId: ToolCallId("extra-tool"),
         name: "unsafe_file",
@@ -234,7 +235,7 @@ describe("research runtime plugin with the real DSH host", () => {
       }),
     ).toMatchObject({ isError: true });
     expect(
-      await h.ctx.tools.execute({
+      await executeTool(h.ctx.tools, {
         agent: extraHandle.agent,
         callId: ToolCallId("approved-tool"),
         name: health.name,

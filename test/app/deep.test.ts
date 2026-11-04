@@ -4,6 +4,7 @@ import {
   type StreamChunk,
 } from "@deepseek-ai/dsh-llm";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { executeTool } from "../fixtures/tool-execution.js";
 import type {
   ReportPayload,
   ResearchArtifactInput,
@@ -78,7 +79,7 @@ describe("stock-deep command and resume", () => {
     const job = h.ctx.jobs
       .list(h.outside.agent.id)
       .find(({ kind }) => kind === "stock-research")!;
-    const observed = await h.ctx.tools.execute({
+    const observed = await executeTool(h.ctx.tools, {
       agent: h.outside.agent,
       callId: ToolCallId("observe-deep"),
       name: "stock_read_research",

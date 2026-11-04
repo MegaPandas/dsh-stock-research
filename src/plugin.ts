@@ -199,9 +199,10 @@ export async function apply(
       },
     };
     yield ctx.provide("stockResearchSettings", settings);
-    yield ctx.on("internal/config", function (raw, next) {
+    yield ctx.on("internal/config", function (this: unknown, target, next) {
       const value = next();
-      if (this !== ctx.fiber) return value;
+      // Cordis 4.0 binds the fiber as `this`; 4.1 passes it as the first argument.
+      if (this !== ctx.fiber && target !== ctx.fiber) return value;
       const candidate = Configuration(interpolate(ctx, structuredClone(value)));
       if (
         !isDeepStrictEqual(candidate.runtime, configuration.get().runtime) &&

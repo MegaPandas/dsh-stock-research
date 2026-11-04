@@ -146,8 +146,7 @@ describe("research from an ordinary DSH chat", () => {
     expect(turns).toContain("turn/start");
     expect(turns.at(-1)).toBe("turn/end");
     expect(
-      h.ctx.sessionProjections.stateOf(h.outside.agent.session, "turnBoundary")
-        ?.lastTurn,
+      h.ctx.agents.turnBoundaryOf(h.outside.agent.session).lastTurn,
     ).toBeGreaterThan(0);
     expect(h.ctx.agents.list()).toEqual([h.outside.agent]);
   });

@@ -70,14 +70,7 @@ async function host(
   );
   async function save(next: ApplicationConfig) {
     const input = structuredClone(next);
-    Configuration(
-      entry.fiber!.ctx.waterfall(
-        entry.fiber!,
-        "internal/config",
-        input,
-        () => input,
-      ),
-    );
+    entry.fiber!.resolveConfig(input);
     await entry.update({ config: input });
     await h.ctx.loader.await();
   }

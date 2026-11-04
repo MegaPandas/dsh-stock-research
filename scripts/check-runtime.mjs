@@ -128,13 +128,20 @@ try {
     ctx.commands.find(handle.agent, "stock-review").name,
     "stock-review",
   );
-  const result = await ctx.tools.execute({
+  const batch = await ctx.tools.execute({
     agent: handle.agent,
-    name: "stock_data_health",
-    arguments: {},
-    callId: ToolCallId("package-health"),
+    calls: [
+      {
+        type: "tool-call",
+        id: ToolCallId("package-health"),
+        name: "stock_data_health",
+        arguments: "{}",
+      },
+    ],
     signal: new globalThis.AbortController().signal,
   });
+  assert.equal(batch.results.length, 1);
+  const result = batch.results[0].result;
   assert.equal(result.isError, false);
   assert.equal(result.value.sources.length, 8);
   assert.deepEqual(

@@ -74,9 +74,13 @@ export class ResearchSessions {
   ): AgentSetup {
     const captured = structuredClone(binding);
     const definitions = [...tools];
-    return (agentCtx, agent) => {
+    return async (agentCtx, agent) => {
       this.#requireOpen();
-      const verifyTools = setupResearchTools(agentCtx, agent, definitions);
+      const verifyTools = await setupResearchTools(
+        agentCtx,
+        agent,
+        definitions,
+      );
       const releaseContext = setupResearchContext(
         agentCtx,
         agent,

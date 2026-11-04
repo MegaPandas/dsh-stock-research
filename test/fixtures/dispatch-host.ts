@@ -58,6 +58,7 @@ import {
   createServiceTaskOperations,
 } from "../../src/host/research-operations.js";
 import { US_SECURITY } from "./market.js";
+import { executeTool } from "./tool-execution.js";
 
 export function analysis(): Extract<
   ResearchArtifactInput,
@@ -456,7 +457,7 @@ export async function dispatchHost(
       agent = parent.agent,
       signal = new AbortController().signal,
     ) {
-      return ctx.tools.execute({
+      return executeTool(ctx.tools, {
         agent,
         name,
         arguments: args,

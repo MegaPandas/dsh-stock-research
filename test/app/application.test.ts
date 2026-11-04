@@ -65,11 +65,10 @@ describe("application bundle role dispatch", () => {
       cleanups.push(h.close);
       if (route === "selected") {
         h.ctx.llm.registerAdapter(["selected-provider"], h.adapter);
-        h.outside.agent.ctx.on("agent/request", async (_payload, next) => ({
-          ...(await next()),
+        h.outside.agent.model.select({
           provider: "selected-provider",
           model: "selected",
-        }));
+        });
         h.outside.agent.followup(
           createUserMessage({
             content: [{ type: "text", text: "Select host model" }],

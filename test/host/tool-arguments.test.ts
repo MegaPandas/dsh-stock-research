@@ -1,6 +1,6 @@
 import * as PiAi from "@deepseek-ai/dsh-llm-pi-ai";
 import { afterEach, expect, it, vi } from "vitest";
-import { createUserMessage } from "@deepseek-ai/dsh-llm";
+import { createUserMessage, type LlmFailure } from "@deepseek-ai/dsh-llm";
 import { SessionId } from "@deepseek-ai/dsh-session";
 import { createSubmission } from "../../src/host/agent-protocol/submission.js";
 import { setupResearchTools } from "../../src/host/sessions/tool-policy.js";
@@ -67,7 +67,7 @@ function toolResponse(
 }
 
 it.each(["business fields", "native arguments"] as const)(
-  "returns malformed %s diagnostics through real PiAi, then accepts one corrected role report",
+  "preserves malformed %s diagnostics through real PiAi without accepting an invalid report",
   async (failureKind) => {
     vi.stubEnv("DSH_ARGUMENTS_TEST_KEY", "fixture-only-key");
     const h = await runtimeHost();
@@ -104,7 +104,7 @@ it.each(["business fields", "native arguments"] as const)(
         requests.push(body);
         if (requests.length === 1) {
           if (failureKind === "native arguments")
-            // A complete malformed call exercises PiAi's normalization to {}.
+            // DSH 0.2.2 rejects malformed completed arguments at the model boundary.
             return toolResponse([
               {
                 name: "stock_submit",
@@ -144,13 +144,24 @@ it.each(["business fields", "native arguments"] as const)(
     };
     const accept = vi.fn(() => committed);
     const submission = createSubmission("analysis", accept);
+    const failures: LlmFailure[] = [];
     const handle = await h.ctx.agents.create({
       sessionId: SessionId("arguments-role"),
       agentOptions: { provider: "fixture", model: "fixture" },
       meta: { cwd: h.directory },
-      setup: (ctx, agent) => {
-        const verifyTools = setupResearchTools(ctx, agent, [submission.tool]);
+      setup: async (ctx, agent) => {
+        const verifyTools = await setupResearchTools(ctx, agent, [
+          submission.tool,
+        ]);
         observeModelCalls(agent, operation, "role");
+        ctx.on("session/event", (session, event) => {
+          if (
+            session === agent.session &&
+            event.type === "turn/end" &&
+            event.data.reason.kind === "error"
+          )
+            failures.push(event.data.reason.error);
+        });
         return { commit: verifyTools };
       },
     });
@@ -162,27 +173,36 @@ it.each(["business fields", "native arguments"] as const)(
         }),
       );
       await handle.agent.whenIdle();
+      if (failureKind === "native arguments") {
+        expect(requests).toHaveLength(1);
+        expect(failures).toHaveLength(1);
+        expect(failures[0]!.code).toBe("MALFORMED_RESPONSE");
+        expect(failures[0]!.message).toContain("stock_submit");
+        expect(failures[0]!.message).toContain('{"summary": [}');
+        expect(failures[0]!.message).toMatch(/JSON|position|token/);
+        expect(accept).not.toHaveBeenCalled();
+        expect(() => submission.result()).toThrowError(
+          expect.objectContaining({ code: "INVALID_ARTIFACT" }),
+        );
+        expect(logs).toHaveLength(1);
+        expect(logs[0]).toMatchObject({
+          sessionId: handle.agent.id,
+          finish: "error",
+        });
+        return;
+      }
       expect(submission.result()).toEqual(committed);
     } finally {
       await handle.dispose();
     }
     expect(requests).toHaveLength(2);
     const feedback = requests[1]!.messages.find(
-      (message) =>
-        message.tool_call_id ===
-        (failureKind === "business fields"
-          ? "original-report"
-          : "malformed-arguments"),
+      (message) => message.tool_call_id === "original-report",
     );
     expect(feedback?.content).toContain("INVALID_INPUT");
-    if (failureKind === "business fields") {
-      expect(feedback?.content).toContain("currentState");
-      expect(feedback?.content).toMatch(/string/);
-      expect(feedback?.content).not.toContain(business.summary);
-    } else {
-      expect(feedback?.content).toContain('{"summary": [}');
-      expect(feedback?.content).toMatch(/JSON|position|token/);
-    }
+    expect(feedback?.content).toContain("currentState");
+    expect(feedback?.content).toMatch(/string/);
+    expect(feedback?.content).not.toContain(business.summary);
     expect(accept).toHaveBeenCalledExactlyOnceWith(
       business,
       expect.objectContaining({ agent: handle.agent }),

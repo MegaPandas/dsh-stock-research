@@ -1,5 +1,6 @@
 import { ToolCallId } from "@deepseek-ai/dsh-llm";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { executeTool } from "../fixtures/tool-execution.js";
 import type { CollectedTableData } from "../../src/contracts/collection.js";
 import type { ResearchObservationView } from "../../src/app/research-view.js";
 import type { RunView } from "../../src/contracts/runs.js";
@@ -157,7 +158,7 @@ async function setup(options: { financials?: boolean; late?: boolean } = {}) {
   cleanups.push(async () => macro.released.resolve());
   let call = 0;
   const tool = (name: string, args: unknown) =>
-    h.ctx.tools.execute({
+    executeTool(h.ctx.tools, {
       agent: h.outside.agent,
       name,
       arguments: args,

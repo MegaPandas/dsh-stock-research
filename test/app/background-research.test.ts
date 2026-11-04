@@ -8,6 +8,7 @@ import {
 } from "@deepseek-ai/dsh-llm";
 import { JobId } from "@deepseek-ai/dsh-jobs";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { executeTool } from "../fixtures/tool-execution.js";
 import type { RunView } from "../../src/contracts/runs.js";
 import type { ResearchHandle } from "../../src/app/research-actions.js";
 import type { ResearchObservationView } from "../../src/app/research-view.js";
@@ -67,7 +68,7 @@ function call(
   signal = new AbortController().signal,
   owner = h.outside.agent,
 ) {
-  return h.ctx.tools.execute({
+  return executeTool(h.ctx.tools, {
     agent: owner,
     callId: ToolCallId(`background-${++callId}`),
     name,

@@ -1,6 +1,6 @@
 import { Context } from "@deepseek-ai/cordis";
 import type { Agent } from "@deepseek-ai/dsh-agent";
-import { ToolRuntime, type ToolRunContext } from "@deepseek-ai/dsh-tools";
+import type { ToolRunContext } from "@deepseek-ai/dsh-tools";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { SqliteCache } from "../../src/cache/index.js";
 import type { CollectedTableData } from "../../src/contracts/collection.js";
@@ -16,6 +16,7 @@ import { QueryService } from "../../src/services/query/index.js";
 import { createReadTools } from "../../src/tools/read.js";
 import { createRunReadOperations } from "../../src/host/run-reading.js";
 import { decisionFixture } from "../fixtures/decision.js";
+import { createToolRuntime, executeTool } from "../fixtures/tool-execution.js";
 
 const cleanups: (() => void | Promise<void>)[] = [];
 const recall = { relatedRunId: null, text: null, limit: 10 };
@@ -143,7 +144,7 @@ describe("read tools", () => {
     const releasePrompt = ctx.provide("systemPrompt", {
       tools: () => () => {},
     } as never);
-    const runtime = new ToolRuntime(ctx, { mode: "native" });
+    const runtime = createToolRuntime(ctx);
     const unregister = f.tools.map((tool) => runtime.register(tool));
     cleanups.push(() => {
       for (const release of unregister.reverse()) release();
@@ -198,7 +199,7 @@ describe("read tools", () => {
       ],
     ] as const;
     for (const [name, args, expected] of calls) {
-      const result = await runtime.execute({
+      const result = await executeTool(runtime, {
         name,
         arguments: args,
         agent: f.task,

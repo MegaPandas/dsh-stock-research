@@ -8,6 +8,7 @@ import {
   type StreamChunk,
 } from "@deepseek-ai/dsh-llm";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { executeTool } from "../fixtures/tool-execution.js";
 import { createQuickInput } from "../../src/app/plan/quick.js";
 import { completeCollectionTasks } from "../fixtures/collection-tasks.js";
 import type { CollectionRecord } from "../../src/contracts/collection.js";
@@ -66,7 +67,7 @@ async function readResearch(h: Awaited<ReturnType<typeof host>>) {
   const job = h.ctx.jobs
     .list(h.outside.agent.id)
     .find(({ kind }) => kind === "stock-research")!;
-  const result = await h.ctx.tools.execute({
+  const result = await executeTool(h.ctx.tools, {
     agent: h.outside.agent,
     callId: ToolCallId("observe-research"),
     name: "stock_read_research",
@@ -126,10 +127,9 @@ describe("stock-quick real command boundary", () => {
     expect(job.progress).toContain("采集");
     expect(h.created).toEqual([]);
     expect(h.adapter.requests[0]!.sessionId).toBe(h.outside.agent.id);
-    expect(
-      h.ctx.sessionProjections.stateOf(h.outside.agent.session, "turnBoundary")
-        ?.lastTurn,
-    ).toBe(1);
+    expect(h.ctx.agents.turnBoundaryOf(h.outside.agent.session).lastTurn).toBe(
+      1,
+    );
     request.abort(new DOMException("Browser request finished", "AbortError"));
     expect(collectionSignal.aborted).toBe(false);
     expect((await h.execute("/host-ping"))?.result).toEqual({

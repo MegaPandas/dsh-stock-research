@@ -1,7 +1,6 @@
 import { Context } from "@deepseek-ai/cordis";
 import type { Agent } from "@deepseek-ai/dsh-agent";
 import {
-  ToolRuntime,
   validateJsonSchemaValue,
   type ToolRunContext,
 } from "@deepseek-ai/dsh-tools";
@@ -28,6 +27,7 @@ import { createServiceTaskTools } from "../../src/tools/service-tasks.js";
 import { createServiceTaskOperations } from "../../src/host/research-operations.js";
 import { createReportSubmission } from "../../src/host/report-submission.js";
 import { decisionFixture } from "../fixtures/decision.js";
+import { createToolRuntime, executeTool } from "../fixtures/tool-execution.js";
 
 const cleanups: (() => void | Promise<void>)[] = [];
 function note() {
@@ -277,13 +277,13 @@ describe("write tools", () => {
     const releasePrompt = ctx.provide("systemPrompt", {
       tools: () => () => {},
     } as never);
-    const runtime = new ToolRuntime(ctx, { mode: "native" });
+    const runtime = createToolRuntime(ctx);
     const unregister = f.tools.map((tool) => runtime.register(tool));
     cleanups.push(() => {
       for (const release of unregister.reverse()) release();
       releasePrompt();
     });
-    const result = await runtime.execute({
+    const result = await executeTool(runtime, {
       name: "stock_save_report",
       arguments: { requestId: "unauthorized", contents: [analysis()] },
       agent: f.review,
@@ -305,7 +305,7 @@ describe("write tools", () => {
     const releasePrompt = ctx.provide("systemPrompt", {
       tools: () => () => {},
     } as never);
-    const runtime = new ToolRuntime(ctx, { mode: "native" });
+    const runtime = createToolRuntime(ctx);
     const unregister = f.tools.map((tool) => runtime.register(tool));
     cleanups.push(() => {
       for (const release of unregister.reverse()) release();
@@ -325,7 +325,7 @@ describe("write tools", () => {
       ],
     };
     const before = f.store.read(f.operation.runId).artifacts;
-    const result = await runtime.execute({
+    const result = await executeTool(runtime, {
       name: "stock_save_report",
       arguments: { requestId: "bad-number", contents: [content] },
       agent: f.task,
@@ -355,14 +355,14 @@ describe("write tools", () => {
     const releasePrompt = ctx.provide("systemPrompt", {
       tools: () => () => {},
     } as never);
-    const runtime = new ToolRuntime(ctx, { mode: "native" });
+    const runtime = createToolRuntime(ctx);
     const unregister = f.tools.map((tool) => runtime.register(tool));
     cleanups.push(() => {
       for (const release of unregister.reverse()) release();
       releasePrompt();
     });
     const execute = async (name: string, args: unknown, agent: Agent) => {
-      const result = await runtime.execute({
+      const result = await executeTool(runtime, {
         name,
         arguments: args,
         agent,
@@ -400,7 +400,7 @@ describe("write tools", () => {
     const releaseDigestPrompt = digestContext.provide("systemPrompt", {
       tools: () => () => {},
     } as never);
-    const digestRuntime = new ToolRuntime(digestContext, { mode: "native" });
+    const digestRuntime = createToolRuntime(digestContext);
     const unregisterDigest = g.tools.map((tool) =>
       digestRuntime.register(tool),
     );
@@ -408,7 +408,7 @@ describe("write tools", () => {
       for (const release of unregisterDigest.reverse()) release();
       releaseDigestPrompt();
     });
-    const result = await digestRuntime.execute({
+    const result = await executeTool(digestRuntime, {
       name: "stock_make_digest",
       arguments: g.serviceArgs("digest"),
       agent: g.coordinator,
