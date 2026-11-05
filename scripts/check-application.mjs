@@ -147,7 +147,7 @@ try {
   assert.equal(deep.definition.mode, "deep");
   assert.equal(deep.definition.tasks.length, 25);
   assert.equal(deep.versions.mode, DEEP_MODE_VERSION);
-  assert.equal(deep.versions.prompts.roles, "36");
+  assert.equal(deep.versions.prompts.roles, "37");
   assert.ok(
     deep.inputs.some(
       ({ name, content }) =>
