@@ -7,6 +7,17 @@ import {
 } from "../contracts/stage-handoff.js";
 import { ResearchError } from "../contracts/errors.js";
 
+export function validateRiskHandoff(
+  handoff: StageHandoff,
+  issueCount: number,
+): void {
+  if (handoff.risks.length !== issueCount)
+    throw new ResearchError(
+      "INVALID_INPUT",
+      "stageHandoff.risks must have exactly one summary for each report issue, in the same order.",
+    );
+}
+
 export function parseStageHandoff(value: unknown): StageHandoff {
   assertJsonSchema(stageHandoffSchema, value, "stageHandoff");
   const handoff = value as StageHandoff;

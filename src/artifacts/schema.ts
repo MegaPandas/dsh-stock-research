@@ -4,7 +4,7 @@ import { parseISOTime, parseLocalDate } from "../contracts/time.js";
 import { parseAnalysisReport } from "./analysis-report.js";
 import { validateStoredAgentReport } from "./agent-reports.js";
 import { PRICE_RATING_POLICY } from "../contracts/rating-policy.js";
-import { parseStageHandoff } from "./stage-handoff.js";
+import { parseStageHandoff, validateRiskHandoff } from "./stage-handoff.js";
 import {
   invalid,
   list,
@@ -301,11 +301,15 @@ function payload(kind: unknown, value: unknown, path: string): void {
     }
     case "risk": {
       const item = object(value, path, ["issues"], ["report", "stageHandoff"]);
-      if (item.stageHandoff !== undefined) parseStageHandoff(item.stageHandoff);
       if (item.report !== undefined)
         validateStoredAgentReport("risk", item.report);
       list(item.issues, `${path}/issues`, risk);
       uniqueIssues(item.issues, `${path}/issues`);
+      if (item.stageHandoff !== undefined)
+        validateRiskHandoff(
+          parseStageHandoff(item.stageHandoff),
+          (item.issues as unknown[]).length,
+        );
       return;
     }
     case "plan": {

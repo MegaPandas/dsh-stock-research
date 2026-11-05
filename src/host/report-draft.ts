@@ -27,7 +27,10 @@ import {
   STAGE_HANDOFF_TARGET_CHARACTERS,
   type StageHandoff,
 } from "../contracts/stage-handoff.js";
-import { parseStageHandoff } from "../artifacts/stage-handoff.js";
+import {
+  parseStageHandoff,
+  validateRiskHandoff,
+} from "../artifacts/stage-handoff.js";
 
 export type ReportDraft<Kind extends AgentReportKind> = {
   summary?: string;
@@ -88,11 +91,15 @@ export function createReportDraft<Kind extends AgentReportKind, Result>(
       ? undefined
       : parseStageHandoff(handoffOptions.seed);
   let handoffConfirmed = false;
-  const submission = createSubmissionSession(kind, (report, exec) =>
-    handoffOptions === undefined
-      ? accept(report, exec)
-      : accept(report, exec, handoff),
-  );
+  const submission = createSubmissionSession(kind, (report, exec) => {
+    if (handoffOptions === undefined) return accept(report, exec);
+    if (kind === "risk")
+      validateRiskHandoff(
+        handoff!,
+        (report as AgentReport<"risk">).content.issues.length,
+      );
+    return accept(report, exec, handoff);
+  });
   const draft = () => structuredClone(stored);
   const tools: ToolDefinition[] = [
     researchTool({
@@ -200,16 +207,6 @@ export function createReportDraft<Kind extends AgentReportKind, Result>(
             throw new ResearchError(
               "INVALID_INPUT",
               "Write or reconfirm stageHandoff with stock_write_handoff after the final report edit before submitting.",
-            );
-          if (
-            kind === "risk" &&
-            handoff.risks.length !==
-              (stored.content as Partial<AgentReportContent<"risk">>).issues
-                ?.length
-          )
-            throw new ResearchError(
-              "INVALID_INPUT",
-              "stageHandoff.risks must have exactly one summary for each report issue, in the same order.",
             );
         }
         return submission.submit(draft(), exec);
