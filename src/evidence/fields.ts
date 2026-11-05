@@ -41,7 +41,7 @@ export function referenceField(
     bad("Evidence references must identify business data.");
   const fields = tokens.slice(1);
   const data = envelope.data;
-  let times = allTimes(envelope);
+  let times: NumberTime[] | undefined;
   const dependencies = [selector];
   if ("table" in data) {
     if (fields[0] === "rows" && fields.length >= 2) {
@@ -147,7 +147,7 @@ export function referenceField(
       },
     ];
   }
-  return { times, dependencies };
+  return { times: times ?? allTimes(envelope), dependencies };
 }
 function temporalPaths(base: string): string[] {
   return ["asOf", "availableAt", "sessionComplete"].map(

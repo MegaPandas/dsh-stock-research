@@ -112,6 +112,7 @@
     "bench:replay": "node scripts/benchmark-replay.mjs",
     "bench:numbers": "node scripts/benchmark-numbers.mjs",
     "bench:number-references": "node scripts/benchmark-number-references.mjs",
+    "bench:evidence-fields": "node scripts/benchmark-evidence-fields.mjs",
     "bench:valuation-reads": "node scripts/benchmark-valuation-reads.mjs",
     "bench:valuation-calculations": "node scripts/benchmark-valuation-calculations.mjs",
     "bench:decisions": "node scripts/benchmark-decisions.mjs",
