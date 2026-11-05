@@ -2,13 +2,13 @@ import {
   agentReportSchemas,
   calculatedReportSections,
   type AgentReportKind,
+  type ValuationSelection,
 } from "../../contracts/agent-reports.js";
 import type { ReportDraftInput } from "../../host/report-draft.js";
 import type { RunReader } from "../../contracts/run-access.js";
 import {
   materializeTargetPrice,
   materializeValuation,
-  type ValuationSelection,
 } from "../../services/valuation/reports.js";
 
 export function roleReportInput(

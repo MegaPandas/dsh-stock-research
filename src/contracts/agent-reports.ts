@@ -1,4 +1,5 @@
-import type { JsonSchema } from "./json.js";
+import type { JsonSchema, JsonValue } from "./json.js";
+import { AMOUNT_SCALES, type AmountUnit } from "./valuation.js";
 
 type ReportSchema = JsonSchema;
 
@@ -28,7 +29,9 @@ type SchemaValue<Schema> = Schema extends { oneOf: (infer Branch)[] }
             ? number
             : Schema extends { type: "null" }
               ? null
-              : never;
+              : keyof Schema extends never
+                ? JsonValue
+                : never;
 
 function object<const Properties extends Record<string, ReportSchema>>(
   properties: Properties,
@@ -93,6 +96,71 @@ const envelope = <Content extends ReportSchema>(content: Content) =>
     ),
     content,
   });
+
+export const valuationSelectionSchema = object({
+  companyProfile: text(
+    "Business type, development stage and supporting rationale.",
+  ),
+  methods: array(
+    object({
+      methodId: text("Built-in method ID; the first method is primary."),
+      suitability: text("Method applicability and selection rationale."),
+      calculationIds: texts(
+        "Research-date calculation IDs. Fundamentals must include a calculated method; explain uncomputed alternatives in limitations.",
+      ),
+      limitations: texts("Missing inputs and limitations of the results."),
+    }),
+  ),
+  targetPriceBasis: nullable(
+    text(
+      "Rationale for the target-date scenario, interim distributions, financing and share count. Null when no target price is set.",
+    ),
+  ),
+});
+export type ValuationSelection = SchemaValue<typeof valuationSelectionSchema>;
+
+const amountUnit = {
+  type: "string" as const,
+  enum: Object.keys(AMOUNT_SCALES) as AmountUnit[],
+};
+
+/** Exact calculation data for reports; localized text is produced by renderers. */
+export const valuationCalculationSnapshotSchema = object({
+  calculationId: text("Immutable calculation ID."),
+  engineVersion: text("Recorded calculation engine version."),
+  amountUnit,
+  shareUnit: amountUnit,
+  inputs: array(
+    object({
+      path: text("Input JSON Pointer in the recorded request."),
+      value: {},
+      kind: choices("observed", "normalized", "assumed"),
+      basis: text("Recorded provenance rationale."),
+    }),
+  ),
+  assumptions: texts("Recorded calculation assumptions."),
+  steps: array(
+    object({
+      label: text("Recorded engine step label."),
+      value: { type: "number" },
+      unit: text("Recorded step unit."),
+    }),
+  ),
+  perShareValues: array({ type: "number" }),
+  sensitivities: array(
+    object({
+      label: text("Recorded scenario label."),
+      path: text("Changed input JSON Pointer."),
+      value: { type: "number" },
+      basis: text("Recorded scenario rationale."),
+      perShareValues: array({ type: "number" }),
+    }),
+  ),
+  diagnostics: texts("Recorded engine diagnostics."),
+});
+export type ValuationCalculationSnapshot = SchemaValue<
+  typeof valuationCalculationSnapshotSchema
+>;
 
 export const valuationRecordSchema = object({
   companyProfile: text(
@@ -177,30 +245,7 @@ export function calculatedReportSections<
     Sections[keyof Sections] | ReportSchema
   >;
   if (properties.valuation !== undefined)
-    properties.valuation = nullable(
-      object({
-        companyProfile: text(
-          "Business type, development stage and supporting rationale.",
-        ),
-        methods: array(
-          object({
-            methodId: text("Built-in method ID; the first method is primary."),
-            suitability: text("Method applicability and selection rationale."),
-            calculationIds: texts(
-              "Research-date calculation IDs. Fundamentals must include a calculated method; explain uncomputed alternatives in limitations.",
-            ),
-            limitations: texts(
-              "Missing inputs and limitations of the results.",
-            ),
-          }),
-        ),
-        targetPriceBasis: nullable(
-          text(
-            "Rationale for the target-date scenario, interim distributions, financing and share count. Null when no target price is set.",
-          ),
-        ),
-      }),
-    );
+    properties.valuation = nullable(valuationSelectionSchema);
   if (properties.targetPrice !== undefined)
     properties.targetPrice = object({
       calculationId: text(

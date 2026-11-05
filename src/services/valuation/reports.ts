@@ -2,6 +2,7 @@ import { isDeepStrictEqual } from "node:util";
 import type {
   AgentReport,
   ValuationRecord,
+  ValuationSelection,
 } from "../../contracts/agent-reports.js";
 import type { DecisionProposal } from "../../contracts/artifact-payloads.js";
 import type { NumericClaim } from "../../contracts/artifacts.js";
@@ -27,17 +28,6 @@ type CalculationReader = Pick<
 
 function invalid(message: string): never {
   throw new ResearchError("INVALID_INPUT", `valuation: ${message}`);
-}
-
-export interface ValuationSelection {
-  companyProfile: string;
-  methods: {
-    methodId: string;
-    suitability: string;
-    calculationIds: string[];
-    limitations: string[];
-  }[];
-  targetPriceBasis: string | null;
 }
 
 function materializeMethod(
