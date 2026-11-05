@@ -70,7 +70,7 @@ function runner(core, text) {
 }
 
 function stableResult(envelope) {
-  const result = structuredClone(envelope);
+  const result = globalThis.structuredClone(envelope);
   delete result.retrievedAt;
   return result;
 }
