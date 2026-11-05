@@ -1,6 +1,6 @@
 import { ResearchError } from "../contracts/errors.js";
 import type { HttpClient } from "./http.js";
-import { DAY_MS, sourceDecimal } from "./market.js";
+import { DAY_MS, SHARES_PER_LOT, sourceDecimal } from "./market.js";
 import {
   parseSourceJson,
   sourceArray,
@@ -33,7 +33,7 @@ export function tencentPeriodCount(
   return Math.floor((endDay + 3) / 7) - Math.floor((startDay + 3) / 7) + 1;
 }
 
-/** Requests raw, unadjusted source periods; adjusted arrays are never substituted. */
+/** Raw unadjusted periods, with stock volume in shares and index volume in source lots. */
 export async function tencentKlines(
   http: HttpClient,
   request: {
@@ -42,11 +42,17 @@ export async function tencentKlines(
     start: string;
     end: string;
     count: number;
-    volumeScale: number;
+    instrument: "stock" | "index";
   },
   signal?: AbortSignal,
 ) {
-  const { symbol, period, start, end, count, volumeScale } = request;
+  const { symbol, period, start, end, count } = request;
+  const volumeScale =
+    request.instrument === "index" ||
+    symbol.startsWith("sh688") ||
+    symbol.startsWith("sh689")
+      ? 1
+      : SHARES_PER_LOT;
   const url = new URL(TENCENT_KLINE_ENDPOINT);
   url.search = new URLSearchParams({
     param: `${symbol},${period},${start},${end},${count},`,

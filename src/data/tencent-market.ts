@@ -6,7 +6,6 @@ import {
   marketCapability,
   marketEnvelope,
   requireMarketCoverage,
-  SHARES_PER_LOT,
 } from "./market.js";
 import { tencentKlines } from "./tencent-kline.js";
 
@@ -23,10 +22,6 @@ export class TencentMarketAdapter {
     const symbol =
       query.scope.security.exchange.toLowerCase() +
       query.scope.security.symbol.slice(0, 6);
-    const volumeScale =
-      symbol.startsWith("sh688") || symbol.startsWith("sh689")
-        ? 1
-        : SHARES_PER_LOT;
     // One daily row at most per calendar day; asking for fewer truncates the front.
     const count =
       (Date.parse(query.scope.date) - Date.parse(query.startDate)) / DAY_MS + 1;
@@ -38,7 +33,7 @@ export class TencentMarketAdapter {
         start: query.startDate,
         end: query.scope.date,
         count,
-        volumeScale,
+        instrument: "stock",
       },
       signal,
     );

@@ -282,25 +282,21 @@ function klineTasks(
             : window.interval === "1wk"
               ? "week"
               : "month";
-        const response = await (
-          provider === "tencent" ? tencentKlines : sinaKlines
-        )(
-          provider === "tencent" ? tencent : sina,
-          {
-            symbol,
-            period,
-            start: startDate,
-            end,
-            count: tencentPeriodCount(startDate, end, period),
-            volumeScale:
-              provider === "sina" ||
-              symbol.startsWith("sh688") ||
-              symbol.startsWith("sh689")
-                ? 1
-                : 100,
-          },
-          signal,
-        );
+        const request = {
+          symbol,
+          period,
+          start: startDate,
+          end,
+          count: tencentPeriodCount(startDate, end, period),
+        };
+        const response =
+          provider === "tencent"
+            ? await tencentKlines(
+                tencent,
+                { ...request, instrument: "stock" },
+                signal,
+              )
+            : await sinaKlines(sina, { ...request, volumeScale: 1 }, signal);
         const rows = response.rows
           .map(({ date, ...raw }) => {
             const values = Object.fromEntries(

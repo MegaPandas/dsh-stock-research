@@ -41,6 +41,38 @@ function dates(count: number, step = 1, end = "2026-10-26"): string[] {
 afterEach(() => vi.restoreAllMocks());
 
 describe("deterministic China market collection", () => {
+  it.each(["688001", "689009"])(
+    "retains Tencent stock volume already reported in shares for %s",
+    async (code) => {
+      const { tasks } = setup(
+        {
+          code: 0,
+          data: {
+            [`sh${code}`]: {
+              day: [["2026-10-26", "80", "82", "83", "79", "123"]],
+            },
+          },
+        },
+        {
+          ...scope,
+          security: {
+            ...scope.security,
+            id: `CN:${code}.SH`,
+            symbol: `${code}.SH`,
+            exchange: "SH",
+          },
+        },
+      );
+      const result = await tasks
+        .find(
+          ({ id, provider }) => id === "market.daily" && provider === "tencent",
+        )!
+        .run();
+      expect(result.data.rows[0]!.values.volume).toBe(123);
+      expect(result.data.columns.volume!.unit).toBe("shares");
+    },
+  );
+
   it.each([
     [0, "240", "2026-10-26", "2026-10-28", "2026-10-26T07:30:00.000Z"],
     [1, "1200", "2026-10-23", "2026-10-28", "2026-10-23T07:30:00.000Z"],

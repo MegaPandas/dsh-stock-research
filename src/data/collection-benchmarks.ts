@@ -710,7 +710,7 @@ function tencentTask(
           start,
           end,
           count: tencentPeriodCount(start, end, period),
-          volumeScale: 1,
+          instrument: "index",
         },
         signal,
       );
