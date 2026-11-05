@@ -77,7 +77,7 @@ function calculationIndex(
 export function createValuationReader(runs: CalculationReader, runId: string) {
   let index: ReturnType<typeof calculationIndex> | undefined;
   const resolveIndex = () => (index ??= calculationIndex(runs, runId));
-  let methods: typeof catalogue | undefined;
+  let methodIds: string[] | undefined;
   const records = new Map<string, ValuationCalculation>();
   function read(id: string): ValuationCalculation {
     const { entries, current } = resolveIndex();
@@ -100,8 +100,12 @@ export function createValuationReader(runs: CalculationReader, runId: string) {
       return resolveIndex().scope;
     },
     read,
-    methods() {
-      return (methods ??= readMethods(runs, runId, resolveIndex().catalog));
+    methodIds() {
+      return (methodIds ??= readMethods(
+        runs,
+        runId,
+        resolveIndex().catalog,
+      ).methods.map(({ id }) => id));
     },
   };
 }

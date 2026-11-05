@@ -36,6 +36,7 @@ import {
   validateCalculatedReport,
 } from "../../src/services/valuation/reports.js";
 import {
+  createValuationReader,
   readValuationCalculation,
   valuationCalculationCatalog,
 } from "../../src/services/valuation/records.js";
@@ -470,13 +471,19 @@ it("requires one target-date value for target prices", () => {
     "valuation",
   );
   expect(() =>
-    materializeTargetPrice(f.runs, f.operation.runId, valuation.calculationId),
+    materializeTargetPrice(
+      createValuationReader(f.runs, f.operation.runId),
+      valuation.calculationId,
+    ),
   ).toThrow(/target price/);
   const target = request();
   target.purpose = "target_price";
   const range = calculateValuation(f.runs, f.operation, target, "target-range");
   expect(() =>
-    materializeTargetPrice(f.runs, f.operation.runId, range.calculationId),
+    materializeTargetPrice(
+      createValuationReader(f.runs, f.operation.runId),
+      range.calculationId,
+    ),
   ).toThrow(/target price/);
   target.inputs.multiples = [0.5];
   const single = calculateValuation(
@@ -486,7 +493,10 @@ it("requires one target-date value for target prices", () => {
     "target-single",
   );
   expect(
-    materializeTargetPrice(f.runs, f.operation.runId, single.calculationId),
+    materializeTargetPrice(
+      createValuationReader(f.runs, f.operation.runId),
+      single.calculationId,
+    ),
   ).toMatchObject({ calculationId: single.calculationId, value: 22.5 });
   expect(single.valueDate).toBe("2024-12-30");
 });
@@ -564,8 +574,7 @@ it("saves negative equity residuals and their diagnostics without treating them 
   };
   const report = agentAnalysisReport();
   report.content.valuation = materializeValuation(
-    f.runs,
-    f.operation.runId,
+    createValuationReader(f.runs, f.operation.runId),
     selection,
   );
   expect(report.content.valuation.methods[0]!.valueRange).toBeNull();
@@ -579,13 +588,21 @@ it("saves negative equity residuals and their diagnostics without treating them 
     "股权残值为负，不能作为目标股价；应分析偿付能力和索取权分配。",
   );
   expect(() =>
-    validateCalculatedReport(f.runs, f.operation.runId, report, "research"),
+    validateCalculatedReport(
+      createValuationReader(f.runs, f.operation.runId),
+      report,
+      "research",
+    ),
   ).not.toThrow();
   report.content.valuation.methods[0]!.calculations[0]!.diagnostics = [
     "Unrelated limitation.",
   ];
   expect(() =>
-    validateCalculatedReport(f.runs, f.operation.runId, report, "research"),
+    validateCalculatedReport(
+      createValuationReader(f.runs, f.operation.runId),
+      report,
+      "research",
+    ),
   ).toThrow(/calculations/);
   const target = calculateValuation(
     f.runs,
@@ -594,7 +611,10 @@ it("saves negative equity residuals and their diagnostics without treating them 
     "negative-target",
   );
   expect(() =>
-    materializeTargetPrice(f.runs, f.operation.runId, target.calculationId),
+    materializeTargetPrice(
+      createValuationReader(f.runs, f.operation.runId),
+      target.calculationId,
+    ),
   ).toThrow(/negative equity residual/);
 });
 
@@ -654,18 +674,21 @@ it("formats report values while preserving exact calculations and range endpoint
   input.sensitivities[0]!.value = 619.1999999999999;
   const saved = calculateValuation(f.runs, f.operation, input, "display");
   const original = structuredClone(saved);
-  const valuation = materializeValuation(f.runs, f.operation.runId, {
-    companyProfile: "Synthetic company",
-    methods: [
-      {
-        methodId: "comparable_multiples",
-        suitability: "Revenue comparison",
-        calculationIds: [saved.calculationId],
-        limitations: [],
-      },
-    ],
-    targetPriceBasis: null,
-  });
+  const valuation = materializeValuation(
+    createValuationReader(f.runs, f.operation.runId),
+    {
+      companyProfile: "Synthetic company",
+      methods: [
+        {
+          methodId: "comparable_multiples",
+          suitability: "Revenue comparison",
+          calculationIds: [saved.calculationId],
+          limitations: [],
+        },
+      ],
+      targetPriceBasis: null,
+    },
+  );
   const text = renderValuation(valuation).join("\n");
   expect(text).toContain("倍数法经济指标=7.74 亿USD");
   expect(text).toContain("普通股每股价值1=7.74 USD/股");
@@ -684,8 +707,80 @@ it("formats report values while preserving exact calculations and range endpoint
   const report = agentAnalysisReport();
   report.content.valuation = valuation;
   expect(() =>
-    validateCalculatedReport(f.runs, f.operation.runId, report, "research"),
+    validateCalculatedReport(
+      createValuationReader(f.runs, f.operation.runId),
+      report,
+      "research",
+    ),
   ).not.toThrow();
+});
+
+it("shares a calculation index within each report update and refreshes it for later calculations", () => {
+  const f = setup();
+  const research = calculateValuation(
+    f.runs,
+    f.operation,
+    request(),
+    "update-research",
+  );
+  const targetRequest = request();
+  targetRequest.purpose = "target_price";
+  targetRequest.inputs.multiples = [0.5];
+  const target = calculateValuation(
+    f.runs,
+    f.operation,
+    targetRequest,
+    "update-target",
+  );
+  const input = roleReportInput(
+    "decision_draft",
+    f.runs,
+    f.operation.runId,
+    true,
+  );
+  const selection = {
+    companyProfile: "Synthetic company",
+    methods: [
+      {
+        methodId: "comparable_multiples",
+        suitability: "Revenue comparison",
+        calculationIds: [research.calculationId],
+        limitations: [],
+      },
+    ],
+    targetPriceBasis: "Synthetic target-date scenario.",
+  };
+  const catalog = vi.spyOn(f.runs, "inputCatalog");
+  try {
+    expect(
+      input.resolve({
+        valuation: selection,
+        targetPrice: { calculationId: target.calculationId },
+      }),
+    ).toMatchObject({
+      valuation: {
+        methods: [{ valueRange: { low: 13.5, high: 22.5, unit: "USD/share" } }],
+      },
+      targetPrice: { calculationId: target.calculationId, value: 22.5 },
+    });
+    expect(catalog).toHaveBeenCalledTimes(1);
+    targetRequest.inputs.revenue = 900;
+    const revised = calculateValuation(
+      f.runs,
+      f.operation,
+      targetRequest,
+      "update-revised-target",
+    );
+    catalog.mockClear();
+    expect(
+      input.resolve({ targetPrice: { calculationId: revised.calculationId } }),
+    ).toMatchObject({
+      targetPrice: { calculationId: revised.calculationId, value: 45 },
+    });
+    expect(catalog).toHaveBeenCalledTimes(1);
+  } finally {
+    catalog.mockRestore();
+  }
 });
 
 it("enforces explicit research valuation on an independently named task", () => {
@@ -716,18 +811,21 @@ it("enforces explicit research valuation on an independently named task", () => 
       "missing-report",
     ),
   ).toThrow(/requires a report/);
-  report.content.valuation = materializeValuation(f.runs, f.operation.runId, {
-    companyProfile: "Synthetic loss-making company",
-    methods: [
-      {
-        methodId: "fcff_dcf",
-        suitability: "Cash-flow model requires an operating forecast.",
-        calculationIds: [],
-        limitations: ["Forecast inputs have not been estimated."],
-      },
-    ],
-    targetPriceBasis: null,
-  });
+  report.content.valuation = materializeValuation(
+    createValuationReader(f.runs, f.operation.runId),
+    {
+      companyProfile: "Synthetic loss-making company",
+      methods: [
+        {
+          methodId: "fcff_dcf",
+          suitability: "Cash-flow model requires an operating forecast.",
+          calculationIds: [],
+          limitations: ["Forecast inputs have not been estimated."],
+        },
+      ],
+      targetPriceBasis: null,
+    },
+  );
   const artifact = assembleAgentArtifact("analysis", report, {
     taskId: f.operation.taskId,
     specialty: "fundamentals",
@@ -745,18 +843,21 @@ it("enforces explicit research valuation on an independently named task", () => 
     outputRefs: [],
   });
   const saved = calculateValuation(f.runs, f.operation, request(), "research");
-  report.content.valuation = materializeValuation(f.runs, f.operation.runId, {
-    companyProfile: "Synthetic company",
-    methods: [
-      {
-        methodId: "comparable_multiples",
-        suitability: "Revenue comparison",
-        calculationIds: [saved.calculationId],
-        limitations: [],
-      },
-    ],
-    targetPriceBasis: null,
-  });
+  report.content.valuation = materializeValuation(
+    createValuationReader(f.runs, f.operation.runId),
+    {
+      companyProfile: "Synthetic company",
+      methods: [
+        {
+          methodId: "comparable_multiples",
+          suitability: "Revenue comparison",
+          calculationIds: [saved.calculationId],
+          limitations: [],
+        },
+      ],
+      targetPriceBasis: null,
+    },
+  );
   const calculated = assembleAgentArtifact("analysis", report, {
     taskId: f.operation.taskId,
     specialty: "fundamentals",
@@ -779,18 +880,21 @@ it("accepts the same calculated report after display wording and precision chang
     "display-boundary",
   );
   const report = agentAnalysisReport();
-  report.content.valuation = materializeValuation(f.runs, f.operation.runId, {
-    companyProfile: "Synthetic company",
-    methods: [
-      {
-        methodId: "comparable_multiples",
-        suitability: "Revenue comparison",
-        calculationIds: [saved.calculationId],
-        limitations: [],
-      },
-    ],
-    targetPriceBasis: null,
-  });
+  report.content.valuation = materializeValuation(
+    createValuationReader(f.runs, f.operation.runId),
+    {
+      companyProfile: "Synthetic company",
+      methods: [
+        {
+          methodId: "comparable_multiples",
+          suitability: "Revenue comparison",
+          calculationIds: [saved.calculationId],
+          limitations: [],
+        },
+      ],
+      targetPriceBasis: null,
+    },
+  );
   const original = structuredClone(report);
   const artifact = assembleAgentArtifact("analysis", report, {
     taskId: f.operation.taskId,
@@ -842,18 +946,21 @@ it("shares one calculation read across report, citation and number checks for a 
     "shared-submission",
   );
   const report = agentAnalysisReport();
-  report.content.valuation = materializeValuation(f.runs, f.operation.runId, {
-    companyProfile: "Synthetic company",
-    methods: [
-      {
-        methodId: "comparable_multiples",
-        suitability: "Revenue comparison",
-        calculationIds: [saved.calculationId],
-        limitations: [],
-      },
-    ],
-    targetPriceBasis: null,
-  });
+  report.content.valuation = materializeValuation(
+    createValuationReader(f.runs, f.operation.runId),
+    {
+      companyProfile: "Synthetic company",
+      methods: [
+        {
+          methodId: "comparable_multiples",
+          suitability: "Revenue comparison",
+          calculationIds: [saved.calculationId],
+          limitations: [],
+        },
+      ],
+      targetPriceBasis: null,
+    },
+  );
   const artifact = assembleAgentArtifact("analysis", report, {
     taskId: f.operation.taskId,
     specialty: "fundamentals",
@@ -921,25 +1028,32 @@ it.each(["input", "step", "result", "sensitivity"] as const)(
       "snapshot-integrity",
     );
     const report = agentAnalysisReport();
-    report.content.valuation = materializeValuation(f.runs, f.operation.runId, {
-      companyProfile: "Synthetic company",
-      methods: [
-        {
-          methodId: "comparable_multiples",
-          suitability: "Revenue comparison",
-          calculationIds: [saved.calculationId],
-          limitations: [],
-        },
-      ],
-      targetPriceBasis: null,
-    });
+    report.content.valuation = materializeValuation(
+      createValuationReader(f.runs, f.operation.runId),
+      {
+        companyProfile: "Synthetic company",
+        methods: [
+          {
+            methodId: "comparable_multiples",
+            suitability: "Revenue comparison",
+            calculationIds: [saved.calculationId],
+            limitations: [],
+          },
+        ],
+        targetPriceBasis: null,
+      },
+    );
     const snapshot = report.content.valuation.methods[0]!.calculations[0]!;
     if (field === "input") snapshot.inputs[0]!.value = 0;
     else if (field === "step") snapshot.steps[0]!.value = 0;
     else if (field === "result") snapshot.perShareValues[0] = 0;
     else snapshot.sensitivities[0]!.perShareValues[0] = 0;
     expect(() =>
-      validateCalculatedReport(f.runs, f.operation.runId, report, "research"),
+      validateCalculatedReport(
+        createValuationReader(f.runs, f.operation.runId),
+        report,
+        "research",
+      ),
     ).toThrow(/calculations/);
     expect(
       readValuationCalculation(f.runs, f.operation.runId, saved.calculationId),
@@ -950,18 +1064,21 @@ it.each(["input", "step", "result", "sensitivity"] as const)(
 it("validates calculated results against their saved calculations", () => {
   const f = setup();
   const saved = calculateValuation(f.runs, f.operation, request(), "ps");
-  const valuation = materializeValuation(f.runs, f.operation.runId, {
-    companyProfile: "Synthetic company",
-    methods: [
-      {
-        methodId: "comparable_multiples",
-        suitability: "Revenue comparison",
-        calculationIds: [saved.calculationId],
-        limitations: [],
-      },
-    ],
-    targetPriceBasis: null,
-  });
+  const valuation = materializeValuation(
+    createValuationReader(f.runs, f.operation.runId),
+    {
+      companyProfile: "Synthetic company",
+      methods: [
+        {
+          methodId: "comparable_multiples",
+          suitability: "Revenue comparison",
+          calculationIds: [saved.calculationId],
+          limitations: [],
+        },
+      ],
+      targetPriceBasis: null,
+    },
+  );
   expect(valuation.methods[0]!.valueRange).toEqual({
     low: 13.5,
     high: 22.5,
@@ -979,16 +1096,28 @@ it("validates calculated results against their saved calculations", () => {
   const report = agentAnalysisReport();
   report.content.valuation = valuation;
   expect(() =>
-    validateCalculatedReport(f.runs, f.operation.runId, report, "research"),
+    validateCalculatedReport(
+      createValuationReader(f.runs, f.operation.runId),
+      report,
+      "research",
+    ),
   ).not.toThrow();
   valuation.methods[0]!.valueRange!.high = 99;
   expect(() =>
-    validateCalculatedReport(f.runs, f.operation.runId, report, "research"),
+    validateCalculatedReport(
+      createValuationReader(f.runs, f.operation.runId),
+      report,
+      "research",
+    ),
   ).toThrow(/valueRange/);
   valuation.methods[0]!.valueRange!.high = 22.5;
   valuation.methods[0]!.calculations[0]!.calculationId = "missing";
   expect(() =>
-    validateCalculatedReport(f.runs, f.operation.runId, report, "research"),
+    validateCalculatedReport(
+      createValuationReader(f.runs, f.operation.runId),
+      report,
+      "research",
+    ),
   ).toThrow(/not registered/);
   valuation.methods[0]!.calculations[0]!.calculationId = saved.calculationId;
   f.runs.redo(
@@ -997,7 +1126,7 @@ it("validates calculated results against their saved calculations", () => {
     "redo",
   );
   expect(() =>
-    materializeValuation(f.runs, f.operation.runId, {
+    materializeValuation(createValuationReader(f.runs, f.operation.runId), {
       companyProfile: valuation.companyProfile,
       methods: [
         {
@@ -1051,11 +1180,14 @@ it("calculates selected methods separately and preserves their values and order 
     });
   }
   const report = agentAnalysisReport();
-  report.content.valuation = materializeValuation(f.runs, f.operation.runId, {
-    companyProfile: "Synthetic company with asset and revenue inputs.",
-    methods,
-    targetPriceBasis: null,
-  });
+  report.content.valuation = materializeValuation(
+    createValuationReader(f.runs, f.operation.runId),
+    {
+      companyProfile: "Synthetic company with asset and revenue inputs.",
+      methods,
+      targetPriceBasis: null,
+    },
+  );
   expect(
     report.content.valuation.methods.map(({ methodId, valueRange }) => ({
       methodId,
@@ -1073,7 +1205,11 @@ it("calculates selected methods separately and preserves their values and order 
   ]);
   expect(methods[0]!.calculationIds).not.toEqual(methods[1]!.calculationIds);
   expect(() =>
-    validateCalculatedReport(f.runs, f.operation.runId, report, "research"),
+    validateCalculatedReport(
+      createValuationReader(f.runs, f.operation.runId),
+      report,
+      "research",
+    ),
   ).not.toThrow();
 });
 
@@ -1371,8 +1507,7 @@ it.each(["calculation", "report"] as const)(
       ).calculationId;
       const report = agentAnalysisReport();
       report.content.valuation = materializeValuation(
-        f.runs,
-        f.operation.runId,
+        createValuationReader(f.runs, f.operation.runId),
         {
           companyProfile: "Synthetic company",
           methods: [
@@ -1479,23 +1614,25 @@ it.each(["different-value", "missing-calculation"] as const)(
       content: {
         thesis: ["Synthetic thesis"],
         targetPrice: materializeTargetPrice(
-          f.runs,
-          operation.runId,
+          createValuationReader(f.runs, operation.runId),
           target.calculationId,
         ),
-        valuation: materializeValuation(f.runs, operation.runId, {
-          companyProfile: "Synthetic company",
-          methods: [
-            {
-              methodId: "comparable_multiples",
-              suitability: "Revenue comparison",
-              calculationIds: [valuation.calculationId],
-              limitations: [],
-            },
-          ],
-          targetPriceBasis:
-            "Unchanged shares and valuation assumptions at target date.",
-        }),
+        valuation: materializeValuation(
+          createValuationReader(f.runs, operation.runId),
+          {
+            companyProfile: "Synthetic company",
+            methods: [
+              {
+                methodId: "comparable_multiples",
+                suitability: "Revenue comparison",
+                calculationIds: [valuation.calculationId],
+                limitations: [],
+              },
+            ],
+            targetPriceBasis:
+              "Unchanged shares and valuation assumptions at target date.",
+          },
+        ),
         risks: [],
         riskResponses: [],
         invalidationConditions: [],

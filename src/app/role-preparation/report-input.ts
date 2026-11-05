@@ -6,6 +6,7 @@ import {
 } from "../../contracts/agent-reports.js";
 import type { ReportDraftInput } from "../../host/report-draft.js";
 import type { RunReader } from "../../contracts/run-access.js";
+import { createValuationReader } from "../../services/valuation/records.js";
 import {
   materializeTargetPrice,
   materializeValuation,
@@ -27,16 +28,15 @@ export function roleReportInput(
     sections,
     resolve(input) {
       const resolved = { ...input };
+      const calculations = createValuationReader(runs, runId);
       if (input.valuation !== undefined && input.valuation !== null)
         resolved.valuation = materializeValuation(
-          runs,
-          runId,
+          calculations,
           input.valuation as ValuationSelection,
         );
       if (input.targetPrice !== undefined && input.targetPrice !== null)
         resolved.targetPrice = materializeTargetPrice(
-          runs,
-          runId,
+          calculations,
           (input.targetPrice as { calculationId: string }).calculationId,
         );
       return resolved;

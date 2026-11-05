@@ -9,17 +9,13 @@ import type { NumericClaim } from "../../contracts/artifacts.js";
 import type { ResearchScope } from "../../contracts/data.js";
 import { ResearchError } from "../../contracts/errors.js";
 import { decisionPolicy } from "../../valuation/rating-policy.js";
-import type { RunReader } from "../../contracts/run-access.js";
 import type { ValuationCalculation } from "../../contracts/valuation.js";
 import type { TaskDefinition } from "../../contracts/workflow.js";
-import { createValuationReader, type ValuationReader } from "./records.js";
+import type { ValuationReader } from "./records.js";
 import { validateRoleValuation } from "../../valuation/report-policy.js";
 import { valuationCalculationSnapshot } from "../../valuation/report-snapshot.js";
 
-type CalculationReader = Pick<
-  RunReader,
-  "numberContext" | "inputCatalog" | "readInput"
->;
+type CalculationReader = Pick<ValuationReader, "scope" | "read">;
 
 function invalid(message: string): never {
   throw new ResearchError("INVALID_INPUT", `valuation: ${message}`);
@@ -64,11 +60,10 @@ function materializeMethod(
 }
 
 export function materializeValuation(
-  runs: CalculationReader,
-  runId: string,
+  calculations: CalculationReader,
   selection: ValuationSelection,
 ): ValuationRecord {
-  const { scope, read } = createValuationReader(runs, runId);
+  const { scope, read } = calculations;
   return {
     companyProfile: selection.companyProfile,
     currency: scope.security.currency,
@@ -82,11 +77,10 @@ export function materializeValuation(
 }
 
 export function materializeTargetPrice(
-  runs: CalculationReader,
-  runId: string,
+  calculations: CalculationReader,
   calculationId: string,
 ): NonNullable<AgentReport<"decision_draft">["content"]["targetPrice"]> {
-  const { scope, read } = createValuationReader(runs, runId);
+  const { scope, read } = calculations;
   return targetPrice(scope, read(calculationId));
 }
 
@@ -112,24 +106,21 @@ function targetPrice(
 }
 
 export function validateCalculatedReport(
-  runs: CalculationReader,
-  runId: string,
+  calculations: ValuationReader,
   report: AgentReport,
   requirement: TaskDefinition["valuation"],
-  calculations?: ValuationReader,
 ): void {
   const hasValuation =
     "valuation" in report.content && report.content.valuation != null;
   const hasTarget =
     "targetPrice" in report.content && report.content.targetPrice !== null;
   if (requirement === undefined && !hasValuation && !hasTarget) return;
-  const reader = calculations ?? createValuationReader(runs, runId);
-  const { scope, read } = reader;
+  const { scope, read } = calculations;
   validateRoleValuation(
     report,
     requirement,
     scope,
-    hasValuation ? reader.methods().methods.map(({ id }) => id) : [],
+    hasValuation ? calculations.methodIds() : [],
   );
   if ("valuation" in report.content && report.content.valuation != null) {
     const record = report.content.valuation;

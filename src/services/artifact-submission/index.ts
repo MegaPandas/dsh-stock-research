@@ -108,11 +108,9 @@ export class ArtifactService {
         );
       if (content.kind === "analysis" && "report" in content.payload)
         validateCalculatedReport(
-          this.runs,
-          operation.runId,
+          calculations,
           content.payload.report,
           valuation,
-          calculations,
         );
       if (
         content.kind === "decision_draft" &&
@@ -123,11 +121,9 @@ export class ArtifactService {
             "Decision submission requires the current calculated report contract.",
           );
         validateCalculatedReport(
-          this.runs,
-          operation.runId,
+          calculations,
           content.payload.report,
           valuation,
-          calculations,
         );
         validateCalculatedTarget(
           content.payload,
