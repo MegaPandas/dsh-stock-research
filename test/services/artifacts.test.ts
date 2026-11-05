@@ -6,12 +6,7 @@ import type {
   AnalysisPayload,
   ResearchArtifactInput,
 } from "../../src/contracts/artifact-payloads.js";
-import type { NumberTarget } from "../../src/contracts/numbers.js";
-import type {
-  RunOperation,
-  RunState,
-  TaskOperation,
-} from "../../src/contracts/runs.js";
+import type { RunState, TaskOperation } from "../../src/contracts/runs.js";
 import type { TaskDefinition } from "../../src/contracts/workflow.js";
 import {
   ArtifactNumberError,
@@ -26,11 +21,10 @@ import { US_SECURITY } from "../fixtures/market.js";
 class CountedNumbers extends NumberService {
   checks = 0;
   override checkNumbersBatch(
-    operation: RunOperation,
-    targets: readonly NumberTarget[],
+    ...args: Parameters<NumberService["checkNumbersBatch"]>
   ) {
-    this.checks += targets.length;
-    return super.checkNumbersBatch(operation, targets);
+    this.checks += args[1].length;
+    return super.checkNumbersBatch(...args);
   }
 }
 const cleanups: (() => void)[] = [];

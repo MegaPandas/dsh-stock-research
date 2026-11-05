@@ -166,6 +166,7 @@ export const valuationRecordSchema = object({
   companyProfile: text(
     "Business type, development stage and supporting rationale.",
   ),
+  currency: text("Security currency shared by the recorded calculations."),
   valuationDate: text(
     "Research date, YYYY-MM-DD; all valueRange results are valued at this date.",
   ),
@@ -173,60 +174,23 @@ export const valuationRecordSchema = object({
     "Target date six months after the research date: context.valuationMethods.targetDate.",
   ),
   methods: array(
-    withOptional(
-      {
-        methodId: text(
-          "Built-in method ID. The first method is primary; others are cross-checks.",
-        ),
-        suitability: text(
-          "Applicable business, stage and data conditions, with selection rationale.",
-        ),
-        valueObject: choices(
-          "operating_assets",
-          "common_equity",
-          "per_share",
-          "project",
-        ),
-        inputs: array(
-          object({
-            name: text("Input name, period and unit."),
-            value: text(
-              "Input value with units. Record missing inputs in limitations, not as zero.",
-            ),
-            kind: choices("observed", "normalized", "assumed"),
-            basis: text(
-              "For observations, cite the snapshot table, field and date or source location. Explain derivations for normalized and assumed values; method literature does not substantiate company inputs.",
-            ),
-          }),
-        ),
-        assumptions: texts(
-          "Specific assumptions for growth, margins, reinvestment, discount rates, terminal value and share count.",
-        ),
-        calculation: texts(
-          "Reproducible steps, including period cash flows, terminal value and discounting where applicable, and bridges from operating value to equity or per-share value.",
-        ),
-        valueRange: nullable(
-          object({
-            low: { type: "number" },
-            high: { type: "number" },
-            unit: text(
-              "Base currency or per-share unit, e.g. CNY or USD/share, matching valueObject. Express scale in the numeric value.",
-            ),
-          }),
-        ),
-        sensitivity: texts(
-          "Effects of key parameter changes or alternative scenarios.",
-        ),
-        limitations: texts(
-          "Missing required inputs, unmet applicability conditions and their effects. Set valueRange to null when quantification is unsupported.",
-        ),
-      },
-      {
-        calculationIds: texts(
-          "Saved calculation IDs; code assembles values and steps from these results.",
-        ),
-      },
-    ),
+    object({
+      methodId: text(
+        "Built-in method ID. The first method is primary; others are cross-checks.",
+      ),
+      suitability: text("Method applicability and selection rationale."),
+      calculations: array(valuationCalculationSnapshotSchema),
+      valueRange: nullable(
+        object({
+          low: { type: "number" },
+          high: { type: "number" },
+          unit: text("Security currency per share, e.g. CNY/share."),
+        }),
+      ),
+      limitations: texts(
+        "Analyst's missing inputs, applicability limits and their effects; engine diagnostics remain in calculation snapshots.",
+      ),
+    }),
   ),
   targetPriceBasis: nullable(
     text(

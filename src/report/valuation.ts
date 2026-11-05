@@ -1,5 +1,10 @@
 import type { ValuationRecord } from "../contracts/agent-reports.js";
-import { inline, valueText } from "./render.js";
+import type { ValuationMethodId } from "../contracts/valuation.js";
+import { formatNumber, inline, valueText } from "./render.js";
+import {
+  formatValuationDiagnostic,
+  formatValuationStep,
+} from "./valuation-labels.js";
 
 export function renderValuation(
   record: ValuationRecord | null | undefined,
@@ -9,12 +14,6 @@ export function renderValuation(
     items.length === 0
       ? []
       : ["", `**${label}**`, "", ...items.map((item) => `- ${item}`)];
-  const objects = {
-    operating_assets: "经营资产",
-    common_equity: "普通股股权",
-    per_share: "普通股每股价值",
-    project: "项目",
-  };
   const inputs = {
     observed: "观察值",
     normalized: "正常化调整",
@@ -33,22 +32,55 @@ export function renderValuation(
       "",
       method.suitability,
       "",
-      `价值对象：${objects[method.valueObject]}。`,
+      "价值对象：普通股每股价值。",
       ...list(
         "输入与依据",
-        method.inputs.map(
-          (input) =>
-            `${input.name}：${input.value}（${inputs[input.kind]}）；${input.basis}`,
+        method.calculations.flatMap((calculation) =>
+          calculation.inputs.map((input) => {
+            const value = JSON.stringify(input.value, (_key, item: unknown) =>
+              typeof item === "number" ? Number(formatNumber(item)) : item,
+            );
+            return `${calculation.calculationId}:${input.path}：${value} (amountUnit=${calculation.amountUnit}; shareUnit=${calculation.shareUnit})（${inputs[input.kind]}）；${input.basis}`;
+          }),
         ),
       ),
-      ...list("模型假设", method.assumptions),
-      ...list("计算步骤", method.calculation),
+      ...list("模型假设", [
+        ...new Set(
+          method.calculations.flatMap(({ assumptions }) => assumptions),
+        ),
+      ]),
+      ...list(
+        "计算步骤",
+        method.calculations.flatMap((calculation) => [
+          `计算 ${calculation.calculationId}；算法版本 ${calculation.engineVersion}`,
+          ...calculation.steps.map((step) =>
+            formatValuationStep(step, method.methodId as ValuationMethodId),
+          ),
+        ]),
+      ),
       "",
       method.valueRange === null
         ? "研究日价值区间：未量化。"
         : `研究日价值区间：${valueText(method.valueRange.low, method.valueRange.unit)} 至 ${valueText(method.valueRange.high, method.valueRange.unit)}。`,
-      ...list("敏感性与替代情景", method.sensitivity),
-      ...list("输入缺口与适用限制", method.limitations),
+      ...list(
+        "敏感性与替代情景",
+        method.calculations.flatMap((calculation) =>
+          calculation.sensitivities.map((scenario) => {
+            const values = scenario.perShareValues
+              .map((value) => valueText(value, `${record.currency}/share`))
+              .join(", ");
+            return `${scenario.label}：${scenario.path}=${formatNumber(scenario.value)}；每股结果=${values}；依据：${scenario.basis}`;
+          }),
+        ),
+      ),
+      ...list("输入缺口与适用限制", [
+        ...new Set([
+          ...method.limitations,
+          ...method.calculations.flatMap(({ diagnostics }) =>
+            diagnostics.map(formatValuationDiagnostic),
+          ),
+        ]),
+      ]),
     ]),
     ...(record.targetPriceBasis === null
       ? []

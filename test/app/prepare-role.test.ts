@@ -284,10 +284,10 @@ describe("persisted research role preparation", () => {
         report.content.valuation = valuationRecord(
           input.scope.date,
           input.scope.security.currency,
+          true,
         );
-        report.content.valuation.methods[0]!.calculationIds = [
-          lastToolResult<{ calculationId: string }>(request).calculationId,
-        ];
+        report.content.valuation.methods[0]!.calculations[0]!.calculationId =
+          lastToolResult<{ calculationId: string }>(request).calculationId;
       }
       yield* reportSubmission(report, `valuation-${calls}`);
     });
@@ -315,7 +315,11 @@ describe("persisted research role preparation", () => {
             methods: [
               {
                 methodId: "comparable_multiples",
-                calculationIds: [expect.any(String)],
+                calculations: [
+                  expect.objectContaining({
+                    calculationId: expect.any(String),
+                  }),
+                ],
                 valueRange: { low: 192, high: 240, unit: "USD/share" },
               },
             ],
@@ -422,7 +426,11 @@ describe("persisted research role preparation", () => {
             valuation: {
               methods: [
                 {
-                  calculationIds: [calculation.calculationId],
+                  calculations: [
+                    expect.objectContaining({
+                      calculationId: calculation.calculationId,
+                    }),
+                  ],
                   valueRange: { low: 192, high: 240, unit: "USD/share" },
                 },
               ],

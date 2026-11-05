@@ -35,11 +35,11 @@ export function valuationSelection(
   return {
     companyProfile: record.companyProfile,
     methods: record.methods.map(
-      ({ methodId, suitability, limitations, calculationIds }) => ({
+      ({ methodId, suitability, limitations, calculations }) => ({
         methodId,
         suitability,
         limitations,
-        calculationIds: calculationIds ?? [],
+        calculationIds: calculations.map(({ calculationId }) => calculationId),
       }),
     ),
     targetPriceBasis: record.targetPriceBasis,
@@ -54,6 +54,7 @@ export function valuationRecord(
 ): ValuationRecord {
   return {
     companyProfile: "人工成熟制造企业，阶段判断仅用于测试。",
+    currency,
     valuationDate: date,
     targetDate: decisionPolicy(date).horizonEndDate,
     methods: [
@@ -61,29 +62,50 @@ export function valuationRecord(
         methodId: "comparable_multiples",
         suitability:
           "人工盈利情景用于检验估值记录交接；真实可比样本仍需另行核实。",
-        valueObject: "per_share",
-        inputs: quantified
+        calculations: quantified
           ? [
               {
-                name: `未来年度普通股EPS（${currency}/share）`,
-                value: "8",
-                kind: "assumed",
-                basis: "人工预测情景。",
-              },
-              {
-                name: "可比PE（倍）",
-                value: "24至30",
-                kind: "assumed",
-                basis: "人工定价区间，不代表市场样本。",
+                calculationId: "synthetic-valuation",
+                engineVersion: "2",
+                amountUnit: "unit",
+                shareUnit: "unit",
+                inputs: [
+                  {
+                    path: "/inputs/netIncome",
+                    value: 8,
+                    kind: "assumed",
+                    basis: "人工预测情景。",
+                  },
+                  {
+                    path: "/inputs/multiples",
+                    value: [24, 30],
+                    kind: "assumed",
+                    basis: "人工定价区间，不代表市场样本。",
+                  },
+                ],
+                assumptions: ["人工情景EPS为8，PE为24至30倍。"],
+                steps: [
+                  { label: "Comparable metric", value: 8, unit: currency },
+                  {
+                    label: "Common value per share 1",
+                    value: 192,
+                    unit: `${currency}/share`,
+                  },
+                  {
+                    label: "Common value per share 2",
+                    value: 240,
+                    unit: `${currency}/share`,
+                  },
+                ],
+                perShareValues: [192, 240],
+                sensitivities: [],
+                diagnostics: [],
               },
             ]
           : [],
-        assumptions: quantified ? ["人工情景EPS为8，PE为24至30倍。"] : [],
-        calculation: quantified ? ["8×24=192；8×30=240。"] : [],
         valueRange: quantified
           ? { low: 192, high: 240, unit: `${currency}/share` }
           : null,
-        sensitivity: quantified ? ["PE每变化1倍，每股价值变化8。"] : [],
         limitations: ["人工测试材料，真实公司输入与可比样本未核实。"],
       },
     ],

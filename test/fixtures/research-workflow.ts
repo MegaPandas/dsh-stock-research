@@ -354,11 +354,11 @@ export function workflowModel(
         report.content.valuation = valuationRecord(
           role.scope.date,
           role.scope.security.currency,
+          calculates,
         );
       if (calculates)
-        report.content.valuation!.methods[0]!.calculationIds = [
-          calculations.get(session)!,
-        ];
+        report.content.valuation!.methods[0]!.calculations[0]!.calculationId =
+          calculations.get(session)!;
       if (request.tools?.some(({ name }) => name === "stock_write_report"))
         yield* reportSubmission(
           report,
@@ -454,11 +454,10 @@ export function workflowModel(
         };
         (
           report as AgentReport<"decision_draft">
-        ).content.valuation!.methods[0]!.calculationIds = [
+        ).content.valuation!.methods[0]!.calculations[0]!.calculationId =
           context.valuationCalculations.find(
             ({ purpose }) => purpose === "valuation",
-          )!.calculationId,
-        ];
+          )!.calculationId;
       }
     } else throw new Error(`Unexpected role task ${role.task.id}`);
     if (repairManager && reportCall === 1) {

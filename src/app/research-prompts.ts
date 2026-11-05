@@ -4,7 +4,7 @@ import {
 } from "../contracts/agent-reports.js";
 import { sharedResearchPrompt } from "./agent-prompt.js";
 
-export const ROLE_PROMPT_VERSION = "36";
+export const ROLE_PROMPT_VERSION = "37";
 export type ResearchRole = "analyst" | "discussion" | "manager";
 export type RoleArtifactKind =
   "analysis" | "debate" | "risk" | "plan" | "decision_draft";

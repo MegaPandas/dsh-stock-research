@@ -4,6 +4,7 @@ import type {
   NumberTarget,
 } from "../../contracts/numbers.js";
 import type { RunOperation } from "../../contracts/runs.js";
+import type { ValuationCalculation } from "../../contracts/valuation.js";
 import { NumberCheckSession, type NumberReads } from "./session.js";
 
 export { NUMBER_CHECK_VERSION } from "./session.js";
@@ -18,10 +19,15 @@ export class NumberService implements NumberChecker {
   checkNumbersBatch(
     operation: RunOperation,
     targets: readonly NumberTarget[],
+    readCalculation?: (id: string) => ValuationCalculation,
   ): NumberCheck[] {
     const captured = targets.map((target) => structuredClone(target));
     if (captured.length === 0) return [];
-    const session = new NumberCheckSession(this.runs, operation.runId);
+    const session = new NumberCheckSession(
+      this.runs,
+      operation.runId,
+      readCalculation,
+    );
     return captured.map((target) => session.check(target));
   }
 }

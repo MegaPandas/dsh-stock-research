@@ -23,7 +23,10 @@ export function validateValuationRecord(record: ValuationRecord): void {
   for (const method of record.methods) {
     const range = method.valueRange;
     if (range === null) {
-      if (method.limitations.length === 0)
+      if (
+        method.limitations.length === 0 &&
+        !method.calculations.some(({ diagnostics }) => diagnostics.length > 0)
+      )
         invalid(
           `${method.methodId} requires a limitation explaining the unavailable value range.`,
         );
@@ -35,7 +38,11 @@ export function validateValuationRecord(record: ValuationRecord): void {
       range.low > range.high
     )
       invalid(`${method.methodId} requires a finite ordered value range.`);
-    if (method.inputs.length === 0 || method.calculation.length === 0)
+    if (
+      !method.calculations.some(
+        ({ inputs, steps }) => inputs.length > 0 && steps.length > 0,
+      )
+    )
       invalid(
         `${method.methodId} requires inputs with provenance and calculation steps for a numeric range.`,
       );
@@ -56,6 +63,8 @@ export function validateRoleValuation(
     return;
   }
   const record = report.content.valuation;
+  if (record.currency !== scope.security.currency)
+    invalid("Valuation currency must match the research security.");
   if (
     record.valuationDate !== scope.date ||
     record.targetDate !== decisionPolicy(scope.date).horizonEndDate
@@ -69,15 +78,10 @@ export function validateRoleValuation(
         `Unknown method ${method.methodId} in this run's recorded catalogue.`,
       );
     if (method.valueRange !== null) {
-      const unit =
-        method.valueObject === "per_share"
-          ? `${scope.security.currency}/share`
-          : scope.security.currency;
+      const unit = `${scope.security.currency}/share`;
       if (method.valueRange.unit !== unit)
-        invalid(
-          `${method.methodId} must use ${unit} for its selected value object.`,
-        );
-      if (method.valueObject === "per_share" && method.valueRange.low < 0)
+        invalid(`${method.methodId} must use ${unit}.`);
+      if (method.valueRange.low < 0)
         invalid("Common-share price ranges must be nonnegative.");
     }
   }

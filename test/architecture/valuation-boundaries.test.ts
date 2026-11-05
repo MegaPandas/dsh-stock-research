@@ -14,6 +14,24 @@ async function boundaryErrors(filePath: string, source: string) {
 }
 
 describe("valuation module boundaries", () => {
+  it.each(["render", "valuation-labels"])(
+    "keeps display module %s out of valuation report validation",
+    async (module) => {
+      const dependency = `../../report/${module}.js`;
+      for (const source of [
+        `import { value } from "${dependency}";`,
+        `export * from "${dependency}";`,
+        `const value = import("${dependency}");`,
+      ]) {
+        const errors = await boundaryErrors(
+          "src/services/valuation/reports.ts",
+          source,
+        );
+        expect(errors).toHaveLength(1);
+        expect(errors[0]!.message).toContain("display formatting");
+      }
+    },
+  );
   it.each([
     [
       "src/services/numbers/session.ts",

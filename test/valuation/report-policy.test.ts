@@ -67,8 +67,9 @@ it.each([
   const method = record.methods[0]!;
   if (problem === "empty-methods") record.methods = [];
   else if (problem === "unordered-range") method.valueRange!.low = 241;
-  else if (problem === "missing-provenance") method.inputs[0]!.basis = " ";
-  else if (problem === "missing-calculation") method.calculation = [];
+  else if (problem === "missing-provenance")
+    method.calculations[0]!.inputs[0]!.basis = " ";
+  else if (problem === "missing-calculation") method.calculations = [];
   else {
     method.valueRange = null;
     method.limitations = [];

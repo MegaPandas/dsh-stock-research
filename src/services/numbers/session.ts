@@ -29,6 +29,7 @@ import {
   type NumberField,
 } from "../../evidence/fields.js";
 import type { RunReader } from "../../contracts/run-access.js";
+import type { ValuationCalculation } from "../../contracts/valuation.js";
 import { createValuationReader } from "../valuation/records.js";
 
 export const NUMBER_CHECK_VERSION = "1";
@@ -69,13 +70,16 @@ export class NumberCheckSession {
     string,
     RegisteredEvidenceRecord<EvidenceData>
   >();
-  private valuationReader: ReturnType<typeof createValuationReader> | undefined;
+  private readonly readCalculation: (id: string) => ValuationCalculation;
 
   constructor(
     private readonly runs: NumberReads,
     runId: string,
+    readCalculation?: (id: string) => ValuationCalculation,
   ) {
     this.context = runs.numberContext(runId);
+    this.readCalculation =
+      readCalculation ?? createValuationReader(runs, runId).read;
   }
 
   check(captured: NumberTarget): NumberCheck {
@@ -249,10 +253,7 @@ export class NumberCheckSession {
           };
         } else if (claim.kind === "estimated") {
           if (claim.calculationId !== undefined) {
-            const calculation = (this.valuationReader ??= createValuationReader(
-              this.runs,
-              context.runId,
-            )).read(claim.calculationId);
+            const calculation = this.readCalculation(claim.calculationId);
             if (
               calculation.result.perShareValues.length !== 1 ||
               calculation.result.perShareValues[0] !== claim.value ||

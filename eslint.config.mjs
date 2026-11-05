@@ -349,6 +349,21 @@ export default defineConfig(
     },
   },
   {
+    files: ["src/services/valuation/reports.ts"],
+    rules: {
+      "no-restricted-syntax": [
+        "error",
+        valuationRegistrationRestriction,
+        {
+          selector:
+            ":matches(ImportDeclaration, ExportNamedDeclaration, ExportAllDeclaration, ImportExpression)[source.value=/(^|\\u002F)report\\u002F/]",
+          message:
+            "Valuation report validation must not depend on display formatting.",
+        },
+      ],
+    },
+  },
+  {
     files: ["src/services/valuation/records.ts"],
     rules: {
       "no-restricted-syntax": [

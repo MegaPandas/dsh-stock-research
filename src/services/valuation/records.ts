@@ -3,6 +3,7 @@ import { ResearchError } from "../../contracts/errors.js";
 import type { RunReader } from "../../contracts/run-access.js";
 import { VALUATION_METHODS_INPUT } from "../../contracts/valuation.js";
 import type { ValuationCalculation } from "../../contracts/valuation.js";
+import type { RunInputCatalog } from "../../contracts/runs.js";
 
 type CalculationReader = Pick<
   RunReader,
@@ -17,7 +18,14 @@ export function savedValuationMethods(
   runs: Pick<RunReader, "inputCatalog" | "readInput">,
   runId: string,
 ): typeof catalogue {
-  const catalog = runs.inputCatalog(runId);
+  return readMethods(runs, runId, runs.inputCatalog(runId));
+}
+
+function readMethods(
+  runs: Pick<RunReader, "readInput">,
+  runId: string,
+  catalog: RunInputCatalog,
+): typeof catalogue {
   const entries = catalog.inputs.filter(
     ({ name }) => name === VALUATION_METHODS_INPUT,
   );
@@ -43,10 +51,10 @@ function calculationIndex(
   const attempts = new Map(
     tasks.map((task) => [task.taskId, task.attempts.at(-1)!]),
   );
+  const catalog = runs.inputCatalog(runId);
   const entries = new Map(
-    runs
-      .inputCatalog(runId)
-      .inputs.filter((entry) => entry.calculation !== undefined)
+    catalog.inputs
+      .filter((entry) => entry.calculation !== undefined)
       .map((entry) => [entry.ref.id, entry]),
   );
   const validity = new Map<string, boolean>();
@@ -62,14 +70,17 @@ function calculationIndex(
     validity.set(id, valid);
     return valid;
   }
-  return { scope, entries, current };
+  return { scope, entries, current, catalog };
 }
 
 /** The reader belongs to one synchronous operation; later calls observe redo/cancellation. */
 export function createValuationReader(runs: CalculationReader, runId: string) {
-  const { scope, entries, current } = calculationIndex(runs, runId);
+  let index: ReturnType<typeof calculationIndex> | undefined;
+  const resolveIndex = () => (index ??= calculationIndex(runs, runId));
+  let methods: typeof catalogue | undefined;
   const records = new Map<string, ValuationCalculation>();
   function read(id: string): ValuationCalculation {
+    const { entries, current } = resolveIndex();
     const entry = entries.get(id);
     if (entry === undefined)
       invalid(`Calculation ${id} is not registered in this run.`);
@@ -84,8 +95,18 @@ export function createValuationReader(runs: CalculationReader, runId: string) {
     }
     return record;
   }
-  return { scope, read };
+  return {
+    get scope() {
+      return resolveIndex().scope;
+    },
+    read,
+    methods() {
+      return (methods ??= readMethods(runs, runId, resolveIndex().catalog));
+    },
+  };
 }
+
+export type ValuationReader = ReturnType<typeof createValuationReader>;
 
 export function valuationCalculationCatalog(
   runs: Pick<RunReader, "numberContext" | "inputCatalog" | "readInputs">,

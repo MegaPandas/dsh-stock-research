@@ -28,7 +28,9 @@ export function artifactCalculationIds(
     const report = content.payload.report;
     if ("valuation" in report.content && report.content.valuation != null)
       for (const method of report.content.valuation.methods)
-        ids.push(...(method.calculationIds ?? []));
+        ids.push(
+          ...method.calculations.map(({ calculationId }) => calculationId),
+        );
     if (
       "targetPrice" in report.content &&
       report.content.targetPrice?.calculationId !== undefined

@@ -50,6 +50,8 @@ import { roleReportInput } from "../../src/app/role-preparation/report-input.js"
 import { agentAnalysisReport } from "../fixtures/analysis-report.js";
 import { US_SECURITY } from "../fixtures/market.js";
 import { renderValuation } from "../../src/report/valuation.js";
+import * as valuationLabels from "../../src/report/valuation-labels.js";
+import * as reportFormatting from "../../src/report/render.js";
 
 const cleanups: (() => void)[] = [];
 afterEach(() => {
@@ -242,8 +244,8 @@ it("shares calculation citation reads across one submission and observes later i
         String(path).endsWith(`/inputs/${id}.json`),
       ),
     );
-    // Citation checks and the numeric batch each read the two fixed calculations once.
-    expect(calculationReads).toHaveLength(4);
+    // Citation checks and the numeric batch share this submission's fixed records.
+    expect(calculationReads).toHaveLength(2);
   } finally {
     read.mockRestore();
   }
@@ -570,16 +572,21 @@ it("saves negative equity residuals and their diagnostics without treating them 
   expect(saved.result.diagnostics).toEqual([
     "Negative equity residual is not a usable target share price; analyze solvency and allocation of claims.",
   ]);
-  expect(report.content.valuation.methods[0]!.limitations).toEqual([
+  expect(
+    report.content.valuation.methods[0]!.calculations[0]!.diagnostics,
+  ).toEqual(saved.result.diagnostics);
+  expect(renderValuation(report.content.valuation).join("\n")).toContain(
     "股权残值为负，不能作为目标股价；应分析偿付能力和索取权分配。",
-  ]);
+  );
   expect(() =>
     validateCalculatedReport(f.runs, f.operation.runId, report, "research"),
   ).not.toThrow();
-  report.content.valuation.methods[0]!.limitations = ["Unrelated limitation."];
+  report.content.valuation.methods[0]!.calculations[0]!.diagnostics = [
+    "Unrelated limitation.",
+  ];
   expect(() =>
     validateCalculatedReport(f.runs, f.operation.runId, report, "research"),
-  ).toThrow(/limitations/);
+  ).toThrow(/calculations/);
   const target = calculateValuation(
     f.runs,
     f.operation,
@@ -763,6 +770,130 @@ it("enforces explicit research valuation on an independently named task", () => 
   expect(f.runs.view(f.operation).tasks[0]!.status).toBe("succeeded");
 });
 
+it("accepts the same calculated report after display wording and precision change", () => {
+  const f = setup();
+  const saved = calculateValuation(
+    f.runs,
+    f.operation,
+    request(),
+    "display-boundary",
+  );
+  const report = agentAnalysisReport();
+  report.content.valuation = materializeValuation(f.runs, f.operation.runId, {
+    companyProfile: "Synthetic company",
+    methods: [
+      {
+        methodId: "comparable_multiples",
+        suitability: "Revenue comparison",
+        calculationIds: [saved.calculationId],
+        limitations: [],
+      },
+    ],
+    targetPriceBasis: null,
+  });
+  const original = structuredClone(report);
+  const artifact = assembleAgentArtifact("analysis", report, {
+    taskId: f.operation.taskId,
+    specialty: "fundamentals",
+    title: "Calculated analysis",
+    inputRefs: [],
+    currency: "USD",
+    referencePrice: null,
+    scope: f.input.definition.scope,
+  });
+  const service = new ArtifactService(f.runs, new NumberService(f.runs));
+  const before = service.validateArtifact(f.operation, [artifact], "before");
+  const rendered = renderValuation(report.content.valuation).join("\n");
+  const labels = vi
+    .spyOn(valuationLabels, "formatValuationStep")
+    .mockImplementation(() => "展示术语已调整");
+  const precision = vi
+    .spyOn(reportFormatting, "formatNumber")
+    .mockImplementation((value) => value.toFixed(3));
+  try {
+    expect(renderValuation(report.content.valuation).join("\n")).not.toBe(
+      rendered,
+    );
+    labels.mockClear();
+    precision.mockClear();
+    expect(service.validateArtifact(f.operation, [artifact], "after")).toEqual(
+      before,
+    );
+    expect(labels).not.toHaveBeenCalled();
+    expect(precision).not.toHaveBeenCalled();
+    expect(report).toEqual(original);
+    expect(
+      readValuationCalculation(f.runs, f.operation.runId, saved.calculationId),
+    ).toEqual(saved);
+  } finally {
+    labels.mockRestore();
+    precision.mockRestore();
+  }
+});
+
+it("shares one calculation read across report, citation and number checks for a submission", () => {
+  const f = setup();
+  const input = request();
+  input.inputs.multiples = [0.5];
+  const saved = calculateValuation(
+    f.runs,
+    f.operation,
+    input,
+    "shared-submission",
+  );
+  const report = agentAnalysisReport();
+  report.content.valuation = materializeValuation(f.runs, f.operation.runId, {
+    companyProfile: "Synthetic company",
+    methods: [
+      {
+        methodId: "comparable_multiples",
+        suitability: "Revenue comparison",
+        calculationIds: [saved.calculationId],
+        limitations: [],
+      },
+    ],
+    targetPriceBasis: null,
+  });
+  const artifact = assembleAgentArtifact("analysis", report, {
+    taskId: f.operation.taskId,
+    specialty: "fundamentals",
+    title: "Calculated analysis",
+    inputRefs: [],
+    currency: "USD",
+    referencePrice: null,
+    scope: f.input.definition.scope,
+  });
+  artifact.claims = calculationClaims([
+    { calculationId: saved.calculationId, value: 22.5 },
+  ]).content.claims;
+  const service = new ArtifactService(f.runs, new NumberService(f.runs));
+  const read = vi.spyOn(fs, "readFileSync");
+  const catalog = vi.spyOn(f.runs, "inputCatalog");
+  try {
+    expect(
+      service.validateArtifact(f.operation, [artifact, artifact], "shared")
+        .contents,
+    ).toEqual([artifact, artifact]);
+    expect(
+      read.mock.calls.filter(([path]) =>
+        String(path).endsWith(`/inputs/${saved.calculationId}.json`),
+      ),
+    ).toHaveLength(1);
+    expect(catalog).toHaveBeenCalledTimes(1);
+  } finally {
+    read.mockRestore();
+    catalog.mockRestore();
+  }
+  f.runs.redo(
+    { runId: f.operation.runId, identity: "coordinator" },
+    f.operation.taskId,
+    "invalidate-shared",
+  );
+  expect(() =>
+    service.validateArtifact(f.operation, [artifact], "stale"),
+  ).toThrow(/superseded|unsuccessful/);
+});
+
 it("does not infer a required valuation from a reserved task name", () => {
   const f = setup([roleTask("analysis.fundamentals")]);
   const artifact = assembleAgentArtifact("analysis", agentAnalysisReport(), {
@@ -778,6 +909,43 @@ it("does not infer a required valuation from a reserved task name", () => {
   service.submitArtifact(f.operation, [artifact], "ordinary");
   expect(f.runs.view(f.operation).tasks[0]!.status).toBe("succeeded");
 });
+
+it.each(["input", "step", "result", "sensitivity"] as const)(
+  "rejects an altered %s in a structured calculation snapshot",
+  (field) => {
+    const f = setup();
+    const saved = calculateValuation(
+      f.runs,
+      f.operation,
+      request(),
+      "snapshot-integrity",
+    );
+    const report = agentAnalysisReport();
+    report.content.valuation = materializeValuation(f.runs, f.operation.runId, {
+      companyProfile: "Synthetic company",
+      methods: [
+        {
+          methodId: "comparable_multiples",
+          suitability: "Revenue comparison",
+          calculationIds: [saved.calculationId],
+          limitations: [],
+        },
+      ],
+      targetPriceBasis: null,
+    });
+    const snapshot = report.content.valuation.methods[0]!.calculations[0]!;
+    if (field === "input") snapshot.inputs[0]!.value = 0;
+    else if (field === "step") snapshot.steps[0]!.value = 0;
+    else if (field === "result") snapshot.perShareValues[0] = 0;
+    else snapshot.sensitivities[0]!.perShareValues[0] = 0;
+    expect(() =>
+      validateCalculatedReport(f.runs, f.operation.runId, report, "research"),
+    ).toThrow(/calculations/);
+    expect(
+      readValuationCalculation(f.runs, f.operation.runId, saved.calculationId),
+    ).toEqual(saved);
+  },
+);
 
 it("validates calculated results against their saved calculations", () => {
   const f = setup();
@@ -800,12 +968,14 @@ it("validates calculated results against their saved calculations", () => {
     unit: "USD/share",
   });
   expect(saved.result.steps[0]!.label).toBe("Comparable metric");
-  expect(valuation.methods[0]!.calculation).toContain(
-    "倍数法经济指标=450 亿USD",
-  );
-  expect(valuation.methods[0]!.calculation).toContain(
-    "普通股每股价值1=13.5 USD/股",
-  );
+  expect(valuation.methods[0]!.calculations[0]!.steps).toContainEqual({
+    label: "Comparable metric",
+    value: 45000000000,
+    unit: "USD",
+  });
+  expect(valuation.methods[0]!.calculations[0]!.perShareValues).toEqual([
+    13.5, 22.5,
+  ]);
   const report = agentAnalysisReport();
   report.content.valuation = valuation;
   expect(() =>
@@ -815,11 +985,12 @@ it("validates calculated results against their saved calculations", () => {
   expect(() =>
     validateCalculatedReport(f.runs, f.operation.runId, report, "research"),
   ).toThrow(/valueRange/);
-  delete valuation.methods[0]!.calculationIds;
+  valuation.methods[0]!.valueRange!.high = 22.5;
+  valuation.methods[0]!.calculations[0]!.calculationId = "missing";
   expect(() =>
     validateCalculatedReport(f.runs, f.operation.runId, report, "research"),
-  ).toThrow(/calculationIds/);
-  valuation.methods[0]!.calculationIds = [saved.calculationId];
+  ).toThrow(/not registered/);
+  valuation.methods[0]!.calculations[0]!.calculationId = saved.calculationId;
   f.runs.redo(
     { runId: f.operation.runId, identity: "coordinator" },
     f.operation.taskId,

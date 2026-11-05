@@ -270,8 +270,10 @@ describe("explicit run control commands", () => {
         report.content.valuation = valuationRecord(
           input.scope.date,
           input.scope.security.currency,
+          true,
         );
-        report.content.valuation.methods[0]!.calculationIds = [calculationId];
+        report.content.valuation.methods[0]!.calculations[0]!.calculationId =
+          calculationId;
         yield* reportSubmission(report, "save-fundamentals");
       }
     });
@@ -757,10 +759,10 @@ describe("run commands during real producers", () => {
           report.content.valuation = valuationRecord(
             role.scope.date,
             role.scope.security.currency,
+            true,
           );
-          report.content.valuation.methods[0]!.calculationIds = [
-            fundamentalsCalculation,
-          ];
+          report.content.valuation.methods[0]!.calculations[0]!.calculationId =
+            fundamentalsCalculation;
         }
         yield* reportSubmission(report, "save");
       });

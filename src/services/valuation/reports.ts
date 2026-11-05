@@ -12,14 +12,9 @@ import { decisionPolicy } from "../../valuation/rating-policy.js";
 import type { RunReader } from "../../contracts/run-access.js";
 import type { ValuationCalculation } from "../../contracts/valuation.js";
 import type { TaskDefinition } from "../../contracts/workflow.js";
-import { formatNumber, valueText } from "../../report/render.js";
-import {
-  formatValuationDiagnostic,
-  formatValuationStep,
-} from "../../report/valuation-labels.js";
-import { valuationInputAt } from "../../valuation/requests.js";
-import { createValuationReader, savedValuationMethods } from "./records.js";
+import { createValuationReader, type ValuationReader } from "./records.js";
 import { validateRoleValuation } from "../../valuation/report-policy.js";
+import { valuationCalculationSnapshot } from "../../valuation/report-snapshot.js";
 
 type CalculationReader = Pick<
   RunReader,
@@ -55,32 +50,7 @@ function materializeMethod(
   return {
     methodId: selection.methodId,
     suitability: selection.suitability,
-    calculationIds: [...selection.calculationIds],
-    valueObject: "per_share",
-    inputs: records.flatMap(({ request, calculationId }) =>
-      request.provenance.map((entry) => {
-        const value = JSON.stringify(
-          valuationInputAt(request, entry.path),
-          (_key, input: unknown) =>
-            typeof input === "number" ? Number(formatNumber(input)) : input,
-        );
-        return {
-          name: `${calculationId}:${entry.path}`,
-          value: `${value} (amountUnit=${request.amountUnit}; shareUnit=${request.shares.unit})`,
-          kind: entry.kind,
-          basis: entry.basis,
-        };
-      }),
-    ),
-    assumptions: [
-      ...new Set(records.flatMap(({ request }) => request.assumptions)),
-    ],
-    calculation: records.flatMap((record) => [
-      `计算 ${record.calculationId}；算法版本 ${record.engineVersion}`,
-      ...record.result.steps.map((step) =>
-        formatValuationStep(step, record.request.methodId),
-      ),
-    ]),
+    calculations: records.map(valuationCalculationSnapshot),
     valueRange:
       values.length === 0
         ? null
@@ -89,22 +59,7 @@ function materializeMethod(
             high: Math.max(...values),
             unit: `${scope.security.currency}/share`,
           },
-    sensitivity: records.flatMap((record) =>
-      record.sensitivities.map((scenario) => {
-        const values = scenario.result.perShareValues
-          .map((value) => valueText(value, `${record.currency}/share`))
-          .join(", ");
-        return `${scenario.label}：${scenario.path}=${formatNumber(scenario.value)}；每股结果=${values}；依据：${scenario.basis}`;
-      }),
-    ),
-    limitations: [
-      ...new Set([
-        ...selection.limitations,
-        ...records.flatMap(({ result }) =>
-          result.diagnostics.map(formatValuationDiagnostic),
-        ),
-      ]),
-    ],
+    limitations: [...selection.limitations],
   };
 }
 
@@ -116,6 +71,7 @@ export function materializeValuation(
   const { scope, read } = createValuationReader(runs, runId);
   return {
     companyProfile: selection.companyProfile,
+    currency: scope.security.currency,
     valuationDate: scope.date,
     targetDate: decisionPolicy(scope.date).horizonEndDate,
     methods: selection.methods.map((method) =>
@@ -160,41 +116,31 @@ export function validateCalculatedReport(
   runId: string,
   report: AgentReport,
   requirement: TaskDefinition["valuation"],
+  calculations?: ValuationReader,
 ): void {
   const hasValuation =
     "valuation" in report.content && report.content.valuation != null;
   const hasTarget =
     "targetPrice" in report.content && report.content.targetPrice !== null;
   if (requirement === undefined && !hasValuation && !hasTarget) return;
-  const { scope, read } = createValuationReader(runs, runId);
+  const reader = calculations ?? createValuationReader(runs, runId);
+  const { scope, read } = reader;
   validateRoleValuation(
     report,
     requirement,
     scope,
-    hasValuation
-      ? savedValuationMethods(runs, runId).methods.map(({ id }) => id)
-      : [],
+    hasValuation ? reader.methods().methods.map(({ id }) => id) : [],
   );
   if ("valuation" in report.content && report.content.valuation != null) {
     const record = report.content.valuation;
     for (const method of record.methods) {
-      if (method.calculationIds === undefined)
-        invalid(
-          "Use calculationIds; model-written valuation results are not accepted.",
-        );
       const expected = materializeMethod(scope, read, {
         ...method,
-        calculationIds: method.calculationIds,
+        calculationIds: method.calculations.map(
+          ({ calculationId }) => calculationId,
+        ),
       });
-      for (const key of [
-        "inputs",
-        "assumptions",
-        "calculation",
-        "valueObject",
-        "valueRange",
-        "sensitivity",
-        "limitations",
-      ] as const)
+      for (const key of ["calculations", "valueRange"] as const)
         if (!isDeepStrictEqual(method[key], expected[key]))
           invalid(
             `Stored ${method.methodId}.${key} must equal the referenced calculation results.`,
@@ -202,7 +148,7 @@ export function validateCalculatedReport(
     }
     if (
       requirement === "research" &&
-      !record.methods.some(({ calculationIds }) => calculationIds!.length > 0)
+      !record.methods.some(({ calculations }) => calculations.length > 0)
     )
       invalid(
         "This task requires at least one saved research-date valuation calculation. Read the financial statement details, select an applicable model, justify forecast assumptions and call stock_calculate_valuation before submitting.",

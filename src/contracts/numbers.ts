@@ -1,12 +1,15 @@
 import type { ArtifactInput, NumericClaim } from "./artifacts.js";
 import type { ArtifactRef, DataGap, ResearchScope, SourceRef } from "./data.js";
 import type { ResearchRun, RunOperation } from "./runs.js";
+import type { ValuationCalculation } from "./valuation.js";
 
 export interface NumberChecker {
   checkNumbers(operation: RunOperation, target: NumberTarget): NumberCheck;
   checkNumbersBatch(
     operation: RunOperation,
     targets: readonly NumberTarget[],
+    /** Fixed calculations from this synchronous operation and authorized run. */
+    readCalculation?: (id: string) => ValuationCalculation,
   ): NumberCheck[];
 }
 

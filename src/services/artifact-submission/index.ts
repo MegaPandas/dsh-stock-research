@@ -23,6 +23,7 @@ import { readPointer, SelectorError } from "../../json/pointer.js";
 import { referenceField } from "../../evidence/fields.js";
 import { artifactKey } from "../../contracts/artifact-identity.js";
 import type { RunCommands, RunReader } from "../../contracts/run-access.js";
+import type { ValuationCalculation } from "../../contracts/valuation.js";
 import { ArtifactInputs } from "../artifact-inputs.js";
 import {
   assessDecisionBasics,
@@ -95,6 +96,7 @@ export class ArtifactService {
     const valuation = definition.tasks.find(
       ({ id }) => id === operation.taskId,
     )!.valuation;
+    const calculations = createValuationReader(this.runs, operation.runId);
     for (const content of captured) {
       if (
         ((valuation === "research" && content.kind === "analysis") ||
@@ -110,6 +112,7 @@ export class ArtifactService {
           operation.runId,
           content.payload.report,
           valuation,
+          calculations,
         );
       if (
         content.kind === "decision_draft" &&
@@ -124,6 +127,7 @@ export class ArtifactService {
           operation.runId,
           content.payload.report,
           valuation,
+          calculations,
         );
         validateCalculatedTarget(
           content.payload,
@@ -132,7 +136,7 @@ export class ArtifactService {
         );
       }
     }
-    this.checkReferences(operation, captured);
+    this.checkReferences(operation, captured, calculations.read);
     const checks = this.numbers.checkNumbersBatch(
       operation,
       captured.flatMap((content, index) =>
@@ -146,6 +150,7 @@ export class ArtifactService {
               },
             ],
       ),
+      calculations.read,
     );
     if (checks.some((check) => !check.passed))
       throw new ArtifactNumberError(checks);
@@ -205,6 +210,7 @@ export class ArtifactService {
   private checkReferences(
     operation: TaskOperation,
     contents: ResearchArtifactInput[],
+    readCalculation: (id: string) => ValuationCalculation,
   ): void {
     const context = this.runs.numberContext(operation.runId);
     const attempt = context.tasks
@@ -216,7 +222,6 @@ export class ArtifactService {
     const artifacts = new Map<string, ArtifactVersion>();
     const evidence = new Map<string, RegisteredEvidenceRecord<EvidenceData>>();
     const checkedSources = new Set<string>();
-    let calculations: ReturnType<typeof createValuationReader> | undefined;
     const sourceRecord = (ref: SourceRef) => {
       if (ref.runId !== context.runId)
         invalid("Payload evidence must belong to the authorized run.");
@@ -267,11 +272,7 @@ export class ArtifactService {
       )
         invalid("Malformed body number placeholder.");
       const refs = artifactReferences(content);
-      for (const id of refs.calculations)
-        (calculations ??= createValuationReader(
-          this.runs,
-          operation.runId,
-        )).read(id);
+      for (const id of refs.calculations) readCalculation(id);
       for (const ref of refs.artifacts) allowArtifact(ref);
       if (content.kind === "digest") {
         const upstream = new Set(content.payload.upstreamRefs.map(artifactKey));
