@@ -288,7 +288,7 @@ function klineTasks(
           start: startDate,
           end,
           count: tencentPeriodCount(startDate, end, period),
-        };
+        } as const;
         const response =
           provider === "tencent"
             ? await tencentKlines(
