@@ -92,6 +92,7 @@
     "bench:indicators": "node --expose-gc scripts/benchmark-indicators.mjs",
     "bench:cache": "node scripts/benchmark-cache.mjs",
     "bench:market": "node scripts/benchmark-market.mjs",
+    "bench:collection-market": "node scripts/benchmark-collection-market.mjs",
     "bench:runs": "node scripts/benchmark-runs.mjs",
     "bench:memory": "node scripts/benchmark-memory.mjs",
     "bench:memory-service": "node scripts/benchmark-memory-service.mjs",

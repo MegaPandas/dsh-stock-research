@@ -58,7 +58,6 @@ const MARKET_COLUMNS: Record<string, CollectionColumn> = {
   change: { label: "涨跌额", unit: "CNY/share" },
   turnover: { label: "换手率", unit: "percent" },
 };
-const KLINE_FIELDS = Object.keys(MARKET_COLUMNS);
 
 function urlWith(base: string, parameters: Record<string, string>): string {
   const url = new URL(base);
@@ -266,15 +265,21 @@ function klineTasks(
               )
             : await sinaKlines(sina, { ...request, volumeScale: 1 }, signal);
         const rows = response.rows
-          .map(({ date, ...raw }) => {
-            const values = Object.fromEntries(
-              KLINE_FIELDS.map((key) => [
-                key,
-                key in raw ? raw[key as keyof typeof raw] : null,
-              ]),
-            );
-            validatePrices(values, date);
-            return sourceRow(date, values, scope, window.interval);
+          .map((bar) => {
+            const values = {
+              open: bar.open,
+              close: bar.close,
+              high: bar.high,
+              low: bar.low,
+              volume: bar.volume,
+              amount: null,
+              amplitude: null,
+              changePercent: null,
+              change: null,
+              turnover: null,
+            };
+            validatePrices(values, bar.date);
+            return sourceRow(bar.date, values, scope, window.interval);
           })
           .filter(
             (row) =>
