@@ -76,15 +76,40 @@ export class ArtifactInputs {
   closure(roots: readonly ArtifactRef[]): ResearchArtifactVersion[] {
     const found = new Set<string>();
     const result: ResearchArtifactVersion[] = [];
-    const queue = [...roots];
-    for (let index = 0; index < queue.length; index++) {
-      const ref = queue[index]!;
-      const key = artifactKey(ref);
-      if (found.has(key)) continue;
-      found.add(key);
-      const version = this.artifact(ref);
-      result.push(version);
-      queue.push(...version.content.inputRefs);
+    let queue = [...roots];
+    while (queue.length > 0) {
+      const batch = queue.filter((ref) => {
+        const key = artifactKey(ref);
+        if (found.has(key)) return false;
+        found.add(key);
+        return true;
+      });
+      const missing = new Map<string, ArtifactRef[]>();
+      for (const ref of batch) {
+        if (this.artifacts.has(artifactKey(ref))) continue;
+        const group = missing.get(ref.runId) ?? [];
+        group.push(ref);
+        missing.set(ref.runId, group);
+      }
+      // Share one manifest read per run and dependency layer.
+      for (const [runId, refs] of missing) {
+        const versions = this.runs.readInputs<ResearchArtifactVersion>(
+          runId,
+          refs.map(({ artifactId, revision }) => ({
+            kind: "artifact",
+            id: artifactId,
+            revision,
+          })),
+        );
+        for (const version of versions)
+          this.artifacts.set(artifactKey(version.ref), version);
+      }
+      queue = [];
+      for (const ref of batch) {
+        const version = this.artifact(ref);
+        result.push(version);
+        queue.push(...version.content.inputRefs);
+      }
     }
     return result;
   }

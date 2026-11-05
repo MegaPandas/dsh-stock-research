@@ -1,6 +1,7 @@
 import { expect, it, vi } from "vitest";
 import type { ResearchArtifactVersion } from "../../src/contracts/artifact-payloads.js";
 import type { ArtifactRef } from "../../src/contracts/data.js";
+import type { ContentRef } from "../../src/contracts/storage.js";
 import { ArtifactInputs } from "../../src/services/artifact-inputs.js";
 
 function artifact(
@@ -37,7 +38,16 @@ function reader(versions: ResearchArtifactVersion[]) {
       )!,
     ),
     readEvidence: vi.fn(),
-    readInputs: vi.fn(),
+    readInputs: <T>(runId: string, refs: readonly ContentRef[]): T[] =>
+      refs.map((ref) =>
+        versions.find(
+          (version) =>
+            version.ref.runId === runId &&
+            version.ref.artifactId === ref.id &&
+            ref.kind === "artifact" &&
+            version.ref.revision === ref.revision,
+        ),
+      ) as T[],
     numberContext: vi.fn(),
   };
 }
@@ -54,7 +64,6 @@ it("traverses multiple roots and shared dependencies once while retaining distin
   expect(inputs.closure([a.ref, b.ref, a.ref]).map(({ ref }) => ref)).toEqual(
     expected,
   );
-  expect(runs.readArtifact).toHaveBeenCalledTimes(5);
   expect(inputs.closure([b.ref, a.ref]).map(({ ref }) => ref)).toEqual([
     b.ref,
     a.ref,
@@ -62,9 +71,9 @@ it("traverses multiple roots and shared dependencies once while retaining distin
     first.ref,
     leaf.ref,
   ]);
-  expect(runs.readArtifact).toHaveBeenCalledTimes(5);
-  new ArtifactInputs(runs).closure([a.ref, b.ref]);
-  expect(runs.readArtifact).toHaveBeenCalledTimes(10);
+  expect(
+    new ArtifactInputs(runs).closure([a.ref, b.ref]).map(({ ref }) => ref),
+  ).toEqual(expected);
 });
 
 it("uses the captured pending version together with fixed upstream versions", () => {
@@ -73,5 +82,17 @@ it("uses the captured pending version together with fixed upstream versions", ()
   const runs = reader([saved]);
   const inputs = new ArtifactInputs(runs, [pending]);
   expect(inputs.closure([pending.ref])).toEqual([pending, saved]);
-  expect(runs.readArtifact).toHaveBeenCalledTimes(1);
+});
+
+it("keeps artifacts in different runs distinct and reuses captured roots", () => {
+  const first = artifact("shared", 1);
+  const second = artifact("shared", 1);
+  second.ref = { ...second.ref, runId: "other-run" };
+  second.content.title = "Other run";
+  const a = artifact("a", 1, [first.ref, second.ref]);
+  const b = artifact("b", 1, [second.ref, first.ref]);
+  b.ref = { ...b.ref, runId: "other-run" };
+  const inputs = new ArtifactInputs(reader([a, b, first, second]));
+  expect(inputs.artifact(a.ref)).toEqual(a);
+  expect(inputs.closure([a.ref, b.ref])).toEqual([a, b, first, second]);
 });

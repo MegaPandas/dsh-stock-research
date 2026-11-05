@@ -76,8 +76,8 @@ export function prepareUnifiedRole(
     );
   const reportKind = kind as RoleReportKind;
   const inputs = new ArtifactInputs(services.runs);
-  const roots = claim.inputRefs.map((ref) => inputs.artifact(ref));
   const fixedInputs = inputs.closure(claim.inputRefs);
+  const roots = claim.inputRefs.map((ref) => inputs.artifact(ref));
   const reports = fixedInputs.filter(
     ({ content }) => content.kind !== "collection",
   );

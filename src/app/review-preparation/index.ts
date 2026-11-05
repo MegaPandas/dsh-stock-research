@@ -39,13 +39,13 @@ export function prepareReviewRequest(
 ): PreparedReview {
   signal.throwIfAborted();
   const inputs = new ArtifactInputs(ports.runs);
-  const currentReports = ports.runs
+  const currentRefs = ports.runs
     .view({ runId: input.runId })
-    .tasks.flatMap(({ outputRefs }) => outputRefs)
-    .map((ref) => inputs.artifact(ref));
+    .tasks.flatMap(({ outputRefs }) => outputRefs);
   const reports = inputs
-    .closure(currentReports.map(({ ref }) => ref))
+    .closure(currentRefs)
     .filter(({ content }) => content.kind !== "collection");
+  const currentReports = currentRefs.map((ref) => inputs.artifact(ref));
   const reader = createReportReader(reports, []);
   const selectedDecision =
     currentReports.find(({ content }) => content.kind === "decision") ??

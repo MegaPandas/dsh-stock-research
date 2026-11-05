@@ -180,8 +180,8 @@ export class DigestService {
     try {
       signal.throwIfAborted();
       const inputs = new ArtifactInputs(this.runs);
-      const roots = claimed.inputRefs.map((ref) => inputs.artifact(ref));
       const versions = inputs.closure(claimed.inputRefs);
+      const roots = claimed.inputRefs.map((ref) => inputs.artifact(ref));
       const reports = versions.filter(
         ({ content }) => content.kind !== "collection",
       );
