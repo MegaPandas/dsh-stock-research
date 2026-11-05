@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ResearchScope } from "../../src/contracts/data.js";
 import { createChinaMarketTasks } from "../../src/data/collection-market.js";
+import { EastmoneyMarketAdapter } from "../../src/data/eastmoney-market.js";
 import { HttpClient } from "../../src/data/http.js";
 
 const scope: ResearchScope = {
@@ -23,7 +24,7 @@ function setup(body: unknown, selectedScope = scope) {
   });
   vi.spyOn(http, "forSource").mockReturnValue(http);
   const get = vi.spyOn(http, "getText").mockResolvedValue(JSON.stringify(body));
-  return { get, tasks: createChinaMarketTasks(http, selectedScope) };
+  return { get, http, tasks: createChinaMarketTasks(http, selectedScope) };
 }
 function kline(date: string, volume = 123) {
   return `${date},80.97,82.40,82.62,80.97,${volume},2242715557.57,2.03,1.20,0.98,0.78`;
@@ -41,6 +42,40 @@ function dates(count: number, step = 1, end = "2026-10-26"): string[] {
 afterEach(() => vi.restoreAllMocks());
 
 describe("deterministic China market collection", () => {
+  it("shares Eastmoney price and volume semantics with ordinary queries", async () => {
+    const { http, tasks } = setup(
+      response([
+        "2026-10-26,-,82.40,82.62,80.97,-,2242715557.57,2.03,-1.20,-0.98,0.78",
+      ]),
+    );
+    const daily = await new EastmoneyMarketAdapter(http).query({
+      scope,
+      startDate: "2026-10-26",
+      maxAgeMs: 86_400_000,
+    });
+    const collected = await tasks
+      .find(
+        ({ id, provider }) => id === "market.daily" && provider === "eastmoney",
+      )!
+      .run();
+    const expected = {
+      open: null,
+      close: 82.4,
+      high: 82.62,
+      low: 80.97,
+      volume: null,
+    };
+    expect(daily.data.bars[0]).toMatchObject(expected);
+    expect(collected.data.rows[0]!.values).toEqual({
+      ...expected,
+      amount: 2242715557.57,
+      amplitude: 2.03,
+      changePercent: -1.2,
+      change: -0.98,
+      turnover: 0.78,
+    });
+  });
+
   it.each(["688001", "689009"])(
     "retains Tencent stock volume already reported in shares for %s",
     async (code) => {

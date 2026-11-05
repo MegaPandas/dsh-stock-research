@@ -18,6 +18,10 @@ import {
 } from "./source.js";
 import { SESSION_DATES } from "./market-session.js";
 import {
+  EASTMONEY_KLINE_ENDPOINT,
+  eastmoneyStockKlines,
+} from "./eastmoney-kline.js";
+import {
   TENCENT_KLINE_ENDPOINT,
   tencentKlines,
   tencentPeriodCount,
@@ -27,9 +31,9 @@ import { type XueqiuClient, xueqiuDate, xueqiuTimestamp } from "./xueqiu.js";
 
 const DAY_MS = 86_400_000;
 const MARKET_WINDOWS = [
-  { interval: "1d", id: "daily", klt: "101", count: 60, title: "日线" },
-  { interval: "1wk", id: "weekly", klt: "102", count: 52, title: "周线" },
-  { interval: "1mo", id: "monthly", klt: "103", count: 36, title: "月线" },
+  { interval: "1d", id: "daily", count: 60, title: "日线" },
+  { interval: "1wk", id: "weekly", count: 52, title: "周线" },
+  { interval: "1mo", id: "monthly", count: 36, title: "月线" },
 ] as const;
 const localDate = new Intl.DateTimeFormat("sv-SE", {
   timeZone: "Asia/Shanghai",
@@ -169,63 +173,27 @@ function klineTasks(
             .toISOString()
             .slice(0, 10);
   const code = scope.security.symbol.slice(0, 6);
-  const market = scope.security.exchange === "SH" ? 1 : 0;
-  const url = urlWith("https://push2his.eastmoney.com/api/qt/stock/kline/get", {
-    secid: `${market}.${code}`,
-    klt: window.klt,
-    fqt: "0",
-    beg: start.replaceAll("-", ""),
-    end: end.replaceAll("-", ""),
-    fields1: "f1,f2,f3,f4,f5,f6",
-    fields2: "f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61",
-    lmt: String(window.count),
-  });
   const task: CollectionTask = {
     id: `market.${window.id}`,
     dataset: "market",
     provider: "eastmoney",
     enabledBy: ["eastmoney-market"],
-    endpoint: new URL(url).origin + new URL(url).pathname,
+    endpoint: EASTMONEY_KLINE_ENDPOINT,
     async run(signal) {
-      const response = parseSourceJson(
-        await http.getText(url, {
-          ...(signal && { signal }),
-          headers: { Referer: "https://quote.eastmoney.com/" },
-        }),
+      const response = await eastmoneyStockKlines(
+        http,
+        {
+          security: scope.security,
+          interval: window.interval,
+          start,
+          end,
+          count: window.count,
+          fields: "statistics",
+        },
+        signal,
       );
-      const retrievedAt = new Date().toISOString();
-      if (response.rc !== 0)
-        throw new ResearchError(
-          "SOURCE_UNAVAILABLE",
-          "Eastmoney reported a market-data error.",
-          { cause: response },
-        );
-      if (response.data === null)
-        throw new ResearchError(
-          "DATA_INSUFFICIENT",
-          "Eastmoney returned no stock data.",
-        );
-      const raw = sourceObject(response.data, "data");
-      if (raw.code !== code || raw.market !== market)
-        sourceError("data", "security does not match the request");
-      const rows = sourceArray(raw.klines, "klines")
-        .map((line) => {
-          if (typeof line !== "string")
-            sourceError("klines", "expected a CSV row");
-          const fields = line.split(",");
-          if (fields.length !== 11)
-            sourceError(
-              "klines",
-              "expected date and ten source-reported quantities",
-            );
-          const date = sourceDate(fields[0]);
-          const values = Object.fromEntries(
-            KLINE_FIELDS.map((key, index) => [
-              key,
-              collectedNumber(fields[index + 1], key),
-            ]),
-          );
-          if (values.volume !== null) values.volume! *= 100;
+      const rows = response.rows
+        .map(({ date, ...values }) => {
           validatePrices(values, date);
           return sourceRow(date, values, scope, window.interval);
         })
@@ -246,8 +214,8 @@ function klineTasks(
         "market",
         data,
         "eastmoney",
-        url,
-        retrievedAt,
+        response.url,
+        response.retrievedAt,
       );
       envelope.gaps.push(...windowGap(data, window.count));
       if (window.interval !== "1d")
